@@ -4,7 +4,6 @@ import os
 import sys
 import time
 import json
-import errno
 import tempfile
 import signal
 import subprocess
