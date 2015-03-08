@@ -32,6 +32,7 @@ class Exchange(object):
 class Poloniex(Exchange):
   def __init__(self):
     super(Poloniex, self).__init__('poloniex.com/tradingApi')
+    self._shift = 1
 
   def create_request(self, unit, secret = None):
     if not secret: return None, None
@@ -44,7 +45,7 @@ class Poloniex(Exchange):
     headers = { 'Sign' : sign, 'Key' : key }
     ret = urllib2.urlopen(urllib2.Request('https://poloniex.com/tradingApi', urllib.urlencode(data), headers))
     response = json.loads(ret.read())
-    if 'error' in response: return None
+    if 'error' in response: return response
     return [ {
       'id' : int(order['orderNumber']),
       'price' : float(order['rate']),

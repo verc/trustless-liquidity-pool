@@ -139,7 +139,7 @@ def validate():
       if keys[user]['units'][unit]['request']:
         orders = _wrappers[keys[user]['name']].validate_request(user, *keys[user]['units'][unit]['request'])
         keys[user]['units'][unit]['request'] = None
-        if orders != None:
+        if not 'error' in orders:
           valid = { 'bid': [], 'ask' : [] }
           for order in orders:
             if 1.0 - min(order['price'], price[unit]) / max(order['price'], price[unit]) < _tolerance:
@@ -150,7 +150,7 @@ def validate():
             keys[user]['units'][unit][side].append(valid[side])
             liquidity[side] += sum([ order[1] for order in valid[side]])
         else:
-          logger.error("unable to validate request for user %s at exchange %s on market %s" % (user, keys[user]['name'], unit))
+          logger.error("unable to validate request for user %s at exchange %s on market %s: %s" % (user, keys[user]['name'], unit, orders))
       else:
         logger.warning("no request received for user %s at exchange %s on market %s" % (user, keys[user]['name'], unit))
   return liquidity
