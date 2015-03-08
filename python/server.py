@@ -11,16 +11,29 @@ from math import log, exp
 from thread import start_new_thread
 from exchanges import *
 
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
+fh = logging.FileHandler('logs/%d.log' % time.time())
+fh.setLevel(logging.DEBUG)
+ch = logging.StreamHandler()
+ch.setLevel(logging.INFO)
+
+formatter = logging.Formatter(fmt = '%(asctime)s %(levelname)s: %(message)s', datefmt="%Y/%m/%d-%H:%M:%S")
+fh.setFormatter(formatter)
+ch.setFormatter(formatter)
+logger.addHandler(fh)
+logger.addHandler(ch)
+
 _port = 2019
-_interest = { 'poloniex' : { 'BTC' : { 'rate' : 0.002, 'target' : 100.0 } } }
+_interest = { 'poloniex' : { 'btc' : { 'rate' : 0.002, 'target' : 100.0 } } }
 _nuconfig = '%s/.nu/nu.conf'%os.getenv("HOME") # path to nu.conf
 _wrappers = { 'poloniex' : Poloniex() }
-_tolerance = 100000
+_tolerance = 0.03
 _sampling = 12
 _minpayout = 0.1
 
 keys = {}
-price = {'BTC' : 0.003666}
+price = {'btc' : 0.003666}
 
 _lock = False
 def acquire_lock():
@@ -46,7 +59,7 @@ def register(params):
         for unit in _interest[name]:
           keys[user]['units'][unit] = { 'request' : None, 'bid' : [], 'ask' : [] }
         release_lock()
-        print "new user %s: %s" % (user, keys[user]['address'])
+        logger.info("new user %s: %s" % (user, keys[user]['address']))
       elif keys[user]['address'] != params['address'][0]:
         ret = response(9, "user already exists with different address: %s" % user)
     else:
@@ -67,7 +80,7 @@ def liquidity(params):
         keys[user]['units'][unit]['request'] = ({ p : v[0] for p,v in params.items() }, sign)
         release_lock()
       else:
-        ret = response(12, "%s market not supported on %s" % (params['unit'], params['name']))
+        ret = response(12, "%s market not supported on %s" % (unit, keys[user]['name']))
     else:
         ret = response(11, "user not found: %s" % user)
   else:
@@ -78,8 +91,8 @@ def userstats(user):
   res = { 'name' : keys[user]['name'], 'address' : keys[user]['address'], 'balance' : keys[user]['balance'], 'accepts' : keys[user]['accepts'] }
   res['orders'] = {}
   for unit in keys[user]['units']:
-    bid = [x for x in keys[user]['units'][unit]['bid'] if x]
-    ask = [x for x in keys[user]['units'][unit]['ask'] if x]
+    bid = [ x for x in keys[user]['units'][unit]['bid'] if x ]
+    ask = [ x for x in keys[user]['units'][unit]['ask'] if x ]
     if len(bid) > 0 or len(ask) > 0:
       bid, ask = [[]] + bid, [[]] + ask
       res['orders'][unit] = { 'bid' : bid[-1], 'ask' : ask[-1] }
@@ -116,7 +129,8 @@ class RequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
   def log_message(self, format, *args): pass
 
 def update_price():
-  price = {'BTC' : 0.003666}
+  ret = json.loads(urllib2.urlopen(urllib2.Request('https://api.bitfinex.com/v1//pubticker/btcusd')).read())
+  price = {'btc' : 1.0 / float(ret['mid'])}
 
 def validate():
   liquidity = { 'bid' : 0.0, 'ask' : 0.0 }
@@ -128,17 +142,17 @@ def validate():
         if orders != None:
           valid = { 'bid': [], 'ask' : [] }
           for order in orders:
-            if abs(order['price'] - price[unit]) < _tolerance:
+            if 1.0 - min(order['price'], price[unit]) / max(order['price'], price[unit]) < _tolerance:
               valid[order['type']].append((order['id'], order['amount']))
             else:
-              logging.warning("order of deviates too much from current price for user %s at exchange %s on market %s" % (user, keys[user]['name'], unit))
+              logger.warning("order of deviates too much from current price for user %s at exchange %s on market %s" % (user, keys[user]['name'], unit))
           for side in [ 'bid', 'ask' ]:
             keys[user]['units'][unit][side].append(valid[side])
             liquidity[side] += sum([ order[1] for order in valid[side]])
         else:
-          logging.error("unable to validate request for user %s at exchange %s on market %s" % (user, keys[user]['name'], unit))
+          logger.error("unable to validate request for user %s at exchange %s on market %s" % (user, keys[user]['name'], unit))
       else:
-        logging.warning("no request received for user %s at exchange %s on market %s" % (user, keys[user]['name'], unit))
+        logger.warning("no request received for user %s at exchange %s on market %s" % (user, keys[user]['name'], unit))
   return liquidity
 
 def calculate_interest(balance, amount, interest):
@@ -160,8 +174,10 @@ def credit():
           orders.sort(key = lambda x: x[1][0])
           balance = 0.0
           for user, order in orders:
-            keys[user]['balance'] += calculate_interest(balance, order[1], _interest[name][unit]) / (_sampling * 60 * 24)
+            payout = calculate_interest(balance, order[1], _interest[name][unit]) / (_sampling * 60 * 24)
+            keys[user]['balance'] += payout
             balance += order[1]
+            logger.info("credit %.8f NBT to %s for providing %.8f %s liquidity on the %s market of %s", payout, user, order[1], side, unit, keys[user]['name'])
         for user in users:
           keys[user]['units'][unit][side] = []
 
@@ -189,8 +205,9 @@ def pay():
 
 httpd = BaseHTTPServer.HTTPServer(("", _port), RequestHandler)
 sa = httpd.socket.getsockname()
-print "Serving HTTP on", sa[0], "port", sa[1], "..."
+logger.debug("Serving on %s port %d", sa[0], sa[1])
 start_new_thread(httpd.serve_forever, ())
+update_price()
 
 ts = 0
 lq = []
@@ -203,11 +220,10 @@ while True:
     release_lock()
   if ts % 60 == 0:
     acquire_lock()
-    print "submitted liquidity:", 'buy:', sum([l['bid'] for l in lq]) / len(lq), 'ask:', sum([l['ask'] for l in lq])  / len(lq)
+    bid = sum([l['bid'] for l in lq]) / len(lq)
+    ask = sum([l['ask'] for l in lq])  / len(lq)
+    logger.info("liquidity buy: %.8f sell: %.08f", bid, ask)
     credit()
-    print "current payout:"
-    for user in keys:
-      print user, keys[user]['balance']
     lq = []
     release_lock()
   if ts % 120 == 0: update_price()

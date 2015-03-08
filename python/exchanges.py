@@ -36,7 +36,7 @@ class Poloniex(Exchange):
   def __repr__(self): return "poloniex"
 
   def get_markets(self):
-    ret = urllib2.urlopen(urllib2.Request('https://poloniex.com/public', urllib.urlencode({'command' : 'returnTicker'})))
+    ret = urllib2.urlopen(urllib2.Request('https://poloniex.com/public', urllib.urlencode({'command' : 'returnTicker'}))).read()
     return [ unit.split('_')[0] for unit in json.loads(ret).keys() if unit.split('_')[1] == 'NBT' ]
 
   def get_balance(self, key, secret):
