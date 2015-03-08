@@ -11,6 +11,9 @@ from math import log, exp
 from thread import start_new_thread
 from exchanges import *
 
+try: os.makedirs('logs')
+except: pass
+
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 fh = logging.FileHandler('logs/%d.log' % time.time())
@@ -23,9 +26,6 @@ fh.setFormatter(formatter)
 ch.setFormatter(formatter)
 logger.addHandler(fh)
 logger.addHandler(ch)
-
-try: os.makedirs('logs')
-except: pass
 
 _port = 2019
 _interest = { 'poloniex' : { 'btc' : { 'rate' : 0.002, 'target' : 100.0 } }, 'ccedk' : { 'btc' : { 'rate' : 0.002, 'target' : 100.0 } } }
