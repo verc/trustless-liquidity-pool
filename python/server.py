@@ -3,55 +3,87 @@
 import SimpleHTTPServer
 import BaseHTTPServer
 import cgi
+import logging
 import urllib
-import sys
+import sys, os
 import time
 from math import log, exp
 from thread import start_new_thread
 from exchanges import *
 
 _port = 2019
-_markets = { 'poloniex' : { 'BTC' : { 'request' : None, 'bid' : [], 'ask' : [], 'nreqs' : 0 } } }
-_interest = { 'poloniex' : { 'BTC' : { 'rate' : 0.02, 'target' : 100.0 } } }
+_interest = { 'poloniex' : { 'BTC' : { 'rate' : 0.002, 'target' : 100.0 } } }
+_nuconfig = '%s/.nu/nu.conf'%os.getenv("HOME") # path to nu.conf
 _wrappers = { 'poloniex' : Poloniex() }
 _tolerance = 100000
 _sampling = 12
+_minpayout = 0.1
 
 keys = {}
-payout = {}
 price = {'BTC' : 0.003666}
 
-def calculate_interest(balance, amount, interest):
-  return interest['rate'] * (amount - (log(exp(interest['target']) + exp(balance + amount)) - log(exp(interest['target']) + exp(balance))))
+_lock = False
+def acquire_lock():
+  global _lock
+  while _lock: pass
+  _lock = True
+def release_lock():
+  global _lock
+  _lock = False
+
+def response(errcode = 0, message = 'success'):
+  return { 'code' : errcode, 'message' : message }
 
 def register(params):
-  if set(params.keys()) == set(['address', 'key']):
+  ret = response()
+  if set(params.keys()) == set(['address', 'key', 'name']):
     user = params['key'][0]
-    if not user in keys:
-      keys[user] = _markets.copy()
-      payout[user] = { 'address' : params['address'][0], 'balance' : 0.0 }
-      print "new user %s: %s" % (user, payout[user])
+    name = params['name'][0]
+    if name in _wrappers:
+      if not user in keys:
+        acquire_lock()
+        keys[user] = { 'name' : params['name'][0], 'address' : params['address'][0], 'balance' : 0.0, 'accepts' : 0, 'units' : {} }
+        for unit in _interest[name]:
+          keys[user]['units'][unit] = { 'request' : None, 'bid' : [], 'ask' : [] }
+        release_lock()
+        print "new user %s: %s" % (user, keys[user]['address'])
+      elif keys[user]['address'] != params['address'][0]:
+        ret = response(9, "user already exists with different address: %s" % user)
     else:
-      print >> sys.stderr, "user already exists:", user
+      ret = response(8, "unknown exchange requested: %s" % name)
   else:
-    print >> sys.stderr, "invalid registration data received:", params
+    ret = response(7, "invalid registration data received: %s" % str(params))
+  return ret
 
 def liquidity(params):
-  if set(params.keys() + ['name', 'unit', 'user', 'sign']) == set(params.keys()):
-    name = params.pop('name')[0]
-    if name in _markets.keys() and params['unit'][0] in _markets[name]:
-      user = params.pop('user')[0]
-      unit = params.pop('unit')[0]
-      sign = params.pop('sign')[0]
-      if user in keys:
-        keys[user][name][unit]['request'] = ({ p : v[0] for p,v in params.items() }, sign)
-        #print "liquidity received - user: %s exchange: %s unit: %s" % (user, name, unit)
+  ret = response()
+  if set(params.keys() + ['user', 'sign', 'unit']) == set(params.keys()):
+    user = params.pop('user')[0]
+    sign = params.pop('sign')[0]
+    unit = params.pop('unit')[0]
+    if user in keys:
+      if unit in _interest[keys[user]['name']]:
+        acquire_lock()
+        keys[user]['units'][unit]['request'] = ({ p : v[0] for p,v in params.items() }, sign)
+        release_lock()
       else:
-        print >> sys.stderr, "user not found:", user
+        ret = response(12, "%s market not supported on %s" % (params['unit'], params['name']))
     else:
-      print >> sys.stderr, "%s market not supported on %s" % (params['unit'], params['name'])
+        ret = response(11, "user not found: %s" % user)
   else:
-    print >> sys.stderr, "invalid liquidity data received:", params
+    ret = response(10, "invalid liquidity data received: %s" % str(params))
+  return ret
+
+def userstats(user):
+  res = { 'name' : keys[user]['name'], 'address' : keys[user]['address'], 'balance' : keys[user]['balance'], 'accepts' : keys[user]['accepts'] }
+  res['orders'] = {}
+  for unit in keys[user]['units']:
+    bid = [x for x in keys[user]['units'][unit]['bid'] if x]
+    ask = [x for x in keys[user]['units'][unit]['ask'] if x]
+    if len(bid) > 0 or len(ask) > 0:
+      bid, ask = [[]] + bid, [[]] + ask
+      res['orders'][unit] = { 'bid' : bid[-1], 'ask' : ask[-1] }
+  return res
 
 class RequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
   def do_POST(self):
@@ -61,11 +93,25 @@ class RequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         length = int(self.headers.getheader('content-length'))
         params = cgi.parse_qs(self.rfile.read(length), keep_blank_values = 1)
         if self.path == 'liquidity':
-          liquidity(params)
+          ret = liquidity(params)
         elif self.path == 'register':
-          register(params)
-      self.send_response(301)
+          ret = register(params)
+      self.send_response(200)
+      self.send_header('Content-Type', 'application/json')
+      self.wfile.write("\n")
+      self.wfile.write(json.dumps(ret))
       self.end_headers()
+
+  def do_GET(self):
+    method = self.path[1:]
+    if method in keys:
+      self.send_response(200)
+      self.send_header('Content-Type', 'application/json')
+      self.wfile.write("\n")
+      self.wfile.write(json.dumps(userstats(method)))
+      self.end_headers()
+    else:
+      self.send_response(404)
 
   def log_message(self, format, *args): pass
 
@@ -75,54 +121,71 @@ def update_price():
 def validate():
   liquidity = { 'bid' : 0.0, 'ask' : 0.0 }
   for user in keys:
-    for name in keys[user]:
-      for unit in keys[user][name]:
-        valid = { 'bid': [], 'ask' : [] }
-        if keys[user][name][unit]['request']:
-          orders = _wrappers[name].validate_request(user, *keys[user][name][unit]['request'])
-          if orders != None:
-            for order in orders:
-              if abs(order['price'] - price[unit]) < _tolerance:
-                valid[order['type']].append((order['id'], order['amount']))
-                print "liquidity validated - user: %s exchange: %s unit: %s" % (user, name, unit)
-              else:
-                print >> sys.stderr, "warning: order deviates too much from current price"
-          else:
-            print >> sys.stderr, "ERROR: unable to validate request:", keys[user][name][unit]['request']
+    for unit in keys[user]['units']:
+      if keys[user]['units'][unit]['request']:
+        orders = _wrappers[keys[user]['name']].validate_request(user, *keys[user]['units'][unit]['request'])
+        keys[user]['units'][unit]['request'] = None
+        if orders != None:
+          valid = { 'bid': [], 'ask' : [] }
+          for order in orders:
+            if abs(order['price'] - price[unit]) < _tolerance:
+              valid[order['type']].append((order['id'], order['amount']))
+            else:
+              logging.warning("order of deviates too much from current price for user %s at exchange %s on market %s" % (user, keys[user]['name'], unit))
+          for side in [ 'bid', 'ask' ]:
+            keys[user]['units'][unit][side].append(valid[side])
+            liquidity[side] += sum([ order[1] for order in valid[side]])
         else:
-            print >> sys.stderr, "WARNING: no request received from user", user
-        for side in [ 'bid', 'ask' ]:
-          keys[user][name][unit][side].append(valid[side])
-          liquidity[side] += sum([ order[1] for order in valid[side]])
-        keys[user][name][unit]['request'] = None
+          logging.error("unable to validate request for user %s at exchange %s on market %s" % (user, keys[user]['name'], unit))
+      else:
+        logging.warning("no request received for user %s at exchange %s on market %s" % (user, keys[user]['name'], unit))
   return liquidity
+
+def calculate_interest(balance, amount, interest):
+  return interest['rate'] * (amount - (log(exp(interest['target']) + exp(balance + amount)) - log(exp(interest['target']) + exp(balance))))
 
 def credit():
   for name in _interest:
     for unit in _interest[name]:
+      users = [ u for u in keys if keys[u]['name'] == name and unit in keys[u]['units'] ]
       for side in [ 'bid', 'ask' ]:
-        for user in keys:
-          if len(keys[user][name][unit][side]) < _sampling:
-            keys[user][name][unit][side] = [ [] * (_sampling - len(keys[user][name][unit][side])) ] + keys[user][name][unit][side]
+        for user in users:
+          if len(keys[user]['units'][unit][side]) < _sampling:
+            keys[user]['units'][unit][side] = [ [] ] * (_sampling - len(keys[user]['units'][unit][side])) + keys[user]['units'][unit][side]
+          keys[user]['accepts'] += len(keys[user]['units'][unit][side]) - keys[user]['units'][unit][side].count([])
         for sample in xrange(_sampling):
           orders = []
-          for user in keys:
-            orders += [ (user, order) for order in keys[user][name][unit][side][sample] ]
+          for user in users:
+            orders += [ (user, order) for order in keys[user]['units'][unit][side][sample] ]
           orders.sort(key = lambda x: x[1][0])
           balance = 0.0
           for user, order in orders:
-            payout[user]['balance'] += calculate_interest(balance, order[1], _interest[name][unit]) / (_sampling * 60 * 24)
+            keys[user]['balance'] += calculate_interest(balance, order[1], _interest[name][unit]) / (_sampling * 60 * 24)
             balance += order[1]
-        for user in keys:
-          keys[user][name][unit][side] = []
-
-  print "current payout:"
-  for user in payout:
-    print user, payout[user]['balance']
+        for user in users:
+          keys[user]['units'][unit][side] = []
 
 def pay():
-  for user in payout:
-    payout[user]['balance'] = 0
+  txout = {}
+  for user in keys:
+    if keys[user]['balance'] > _minpayout:
+      txout[keys[user]['address']] = keys[user]['balance']
+  if txout:
+    # rpc connection
+    opts = dict(tuple(line.strip().replace(' ','').split('=')) for line in open(_nuconfig).readlines())
+    assert 'rpcuser' in opts.keys() and 'rpcpassword' in opts.keys(), "RPC parameters could not be read"
+    rpc = jsonrpc.ServiceProxy("http://%s:%s@127.0.0.1:%s"%(
+    opts['rpcuser'],opts['rpcpassword'],opts.pop('rpcport', 14002)))
+    if _passphrase: # unlock wallet if required
+      try: rpc.walletpassphrase(_passphrase, 30, False)
+      except:pass
+    # send the transactions
+    try: rpc.sendmany("", txout)
+    except: print "failed to send transactions:", txout
+    else:
+      for user in keys:
+        if keys[user]['balance'] > _minpayout:
+          keys[user]['balance'] = 0
 
 httpd = BaseHTTPServer.HTTPServer(("", _port), RequestHandler)
 sa = httpd.socket.getsockname()
@@ -134,11 +197,19 @@ lq = []
 while True:
   ts = (ts % 86400) + 5
   curtime = time.time()
-  if ts % (60 / _sampling) == 0: lq.append(validate())
+  if ts % (60 / _sampling) == 0:
+    acquire_lock()
+    lq.append(validate())
+    release_lock()
   if ts % 60 == 0:
-    credit()
+    acquire_lock()
     print "submitted liquidity:", 'buy:', sum([l['bid'] for l in lq]) / len(lq), 'ask:', sum([l['ask'] for l in lq])  / len(lq)
+    credit()
+    print "current payout:"
+    for user in keys:
+      print user, keys[user]['balance']
     lq = []
+    release_lock()
   if ts % 120 == 0: update_price()
   if ts % 86400 == 0: pay()
   try: time.sleep(5.0 - (time.time() - curtime) / 1000.0)

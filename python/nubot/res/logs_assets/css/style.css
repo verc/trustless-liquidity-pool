@@ -1,0 +1,219 @@
+*{
+	font-family:"Lucida Sans Unicode","Lucida Grande",sans-serif;
+	padding: 0;
+	margin: 0;
+	font-size: 12px;
+	color: rgb(80,79,79);
+}
+
+body{
+	background-color:rgb(238,238,238);
+}
+
+.container{
+    width: 1170px;
+  	padding-right: 15px;
+  	padding-left: 15px;
+  	margin-right: auto;
+  	margin-left: auto;
+}
+
+.title{
+	margin-top: 15px;
+	margin-bottom: 15px;
+	background: url(../img/logo.png) no-repeat 0px 14px;
+}
+
+.title h1{
+	padding-left: 35px;
+	color: rgb(80,79,79);
+	font-size: 28px;
+	line-height: 60px;
+}
+
+.tableHeader{
+	color: rgb(238,238,238);
+	padding-top: 10px;
+	padding-bottom: 10px;
+	font-size: 14px;
+	background-color: rgb(80,79,79);
+}
+
+.mes{
+	width: 30%;
+	max-width: 251px;
+	word-wrap: break-word;
+}
+
+.cla{
+	width: 40%
+}
+
+.met{
+	width: 15%;
+}
+
+.tim{
+	width: 15%;
+}
+
+table{
+    border-collapse: collapse; 
+    width: 80%;
+    float: left;
+ 	box-shadow: 0 1px 20px rgba(0, 0, 0, 0.2);
+
+	margin-bottom: 160px;
+}
+
+thead{
+}
+
+tbody{
+
+	outline: 0px none;
+}
+
+
+td{
+	padding-left: 15px;
+	padding-right: 15px;
+	padding-top: 10px;
+	padding-bottom: 10px;
+}
+
+tr:nth-child(odd){
+	background: rgb(230,230,230);
+}
+
+tr:nth-child(even){
+	background: rgb(237,237,237);
+}
+
+thead th:first-child {
+	border-top-left-radius:3px; 
+}
+
+thead th:last-child {
+	border-top-right-radius:3px; 
+}
+
+.info{
+	-webkit-box-shadow: inset 6px 0px 0px 0px #f9f9f9;
+	-moz-box-shadow: inset 6px 0px 0px 0px #f9f9f9;
+	box-shadow: inset 6px 0px 0px 0px #f9f9f9;
+}
+
+.trades{
+	-webkit-box-shadow: inset 6px 0px 0px 0px #0074a0;
+	-moz-box-shadow: inset 6px 0px 0px 0px #0074a0;
+	box-shadow: inset 6px 0px 0px 0px #0074a0;
+}
+
+.errors{
+	-webkit-box-shadow: inset 6px 0px 0px 0px #ef3614;
+	-moz-box-shadow: inset 6px 0px 0px 0px #ef3614;
+	box-shadow: inset 6px 0px 0px 0px #ef3614;
+}
+
+.filter{
+	width: 20%;
+	float: left;
+}
+
+.filterBox{
+	text-align: left;
+	padding-left: 15px;
+	padding-top: 10px;
+	padding-bottom: 10px;
+}
+
+/*general styles for the Checkboxes*/
+label {
+-webkit-touch-callout: none;
+-webkit-user-select: none;
+-khtml-user-select: none;
+-moz-user-select: none;
+-ms-user-select: none;
+user-select: none;
+}
+
+input[type=checkbox].css-checkbox {
+	  position: absolute; 
+    overflow: hidden; 
+    clip: rect(0 0 0 0); 
+    height:1px; 
+    width:1px; 
+    margin:-1px; 
+    padding:0;
+    border:0;
+}
+
+input[type=checkbox].css-checkbox + label.css-label {
+	padding-left:20px;
+	height:15px; 
+	display:inline-block;
+	line-height:15px;
+	background-repeat:no-repeat;
+	background-position: 0 0;
+	font-size:15px;
+	vertical-align:middle;
+	cursor:pointer;
+}
+
+input[type=checkbox].css-checkbox:checked + label.css-label {
+	background-position: 0 -15px;
+}
+
+.vlad{background-image:url(../img/vlad.png);}
+
+input[type=checkbox].css-checkbox.med + label.css-label.med {
+	padding-left:22px;
+    height:17px; 
+	display:inline-block;
+	line-height:17px;
+	background-repeat:no-repeat;
+	background-position: 0 0;
+	font-size:15px;
+	vertical-align:middle;
+    cursor:pointer;
+}
+
+input[type=checkbox].css-checkbox.med:checked + label.css-label.med {
+
+    background-position: 0 -17px;
+}
+input[type=checkbox].css-checkbox.sme + label.css-label.sme {
+	padding-left:22px;
+    height:16px; 
+	display:inline-block;
+	line-height:16px;
+	background-repeat:no-repeat;
+	background-position: 0 0;
+	font-size:15px;
+	vertical-align:middle;
+    cursor:pointer;
+}
+
+input[type=checkbox].css-checkbox.sme:checked + label.css-label.sme{
+
+    background-position: 0 -16px;
+}
+input[type=checkbox].css-checkbox.lrg + label.css-label.lrg {
+	font-weight: 100;
+	padding-left:25px;
+    height:20px; 
+	display:inline-block;
+	line-height:20px;
+	background-repeat:no-repeat;
+	background-position: 0 0;
+	font-size:12px;
+	vertical-align:middle;
+    cursor:pointer;
+}
+
+input[type=checkbox].css-checkbox.lrg:checked + label.css-label.lrg{
+
+    background-position: 0 -20px;
+}
+

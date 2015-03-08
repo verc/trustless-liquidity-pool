@@ -35,6 +35,23 @@ class Poloniex(Exchange):
 
   def __repr__(self): return "poloniex"
 
+  def get_markets(self):
+    ret = urllib2.urlopen(urllib2.Request('https://poloniex.com/public', urllib.urlencode({'command' : 'returnTicker'})))
+    return [ unit.split('_')[0] for unit in json.loads(ret).keys() if unit.split('_')[1] == 'NBT' ]
+
+  def get_balance(self, key, secret):
+    request = { 'command' : 'returnCompleteBalances', 'nonce' : int((time.time() + self._shift) * 1000) }
+    data = urllib.urlencode(request)
+    sign = hmac.new(secret, data, hashlib.sha512).hexdigest()
+    headers = { 'Sign' : sign, 'Key' : key }
+    ret = urllib2.urlopen(urllib2.Request('https://poloniex.com/tradingApi', urllib.urlencode(data), headers))
+    response = json.loads(ret.read())
+    if 'error' in response: return None
+    for unit in self.get_markets():
+      data = response[unit.split('_')[0]]
+      res[unit] = float(data['available']) + float(data['onOrders'])
+    return res
+
   def create_request(self, unit, secret = None):
     if not secret: return None, None
     request = { 'command' : 'returnOpenOrders', 'nonce' : int((time.time() + self._shift) * 1000),  'currencyPair' : "%s_NBT"%unit.upper()}
@@ -45,7 +62,7 @@ class Poloniex(Exchange):
   def validate_request(self, key, data, sign):
     headers = { 'Sign' : sign, 'Key' : key }
     ret = urllib2.urlopen(urllib2.Request('https://poloniex.com/tradingApi', urllib.urlencode(data), headers))
-    response = json.loads(ret.read()) #self.post('returnOpenOrders', urllib.urlencode(data), headers)
+    response = json.loads(ret.read())
     if 'error' in response: return None
     return [ {
       'id' : int(order['orderNumber']),
