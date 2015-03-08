@@ -132,6 +132,6 @@ try:
 except KeyboardInterrupt:
   for user in users:
     for unit in user['units']:
-      if os.killpg(user['nubot'][unit]):
+      if user['nubot'][unit]:
         logger.info("stopping NuBot on exchange %s" % user['name'])
         os.killpg(user['nubot'][unit].pid, signal.SIGTERM) 
