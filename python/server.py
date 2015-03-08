@@ -6,6 +6,7 @@ import cgi
 import logging
 import urllib
 import sys, os
+import errno
 import time
 from math import log, exp
 from thread import start_new_thread
@@ -23,6 +24,13 @@ fh.setFormatter(formatter)
 ch.setFormatter(formatter)
 logger.addHandler(fh)
 logger.addHandler(ch)
+
+try:
+  os.makedirs('logs')
+except OSError as exc:
+  if exc.errno == errno.EEXIST and os.path.isdir(path):
+    pass
+  else: raise
 
 _port = 2019
 _interest = { 'poloniex' : { 'btc' : { 'rate' : 0.002, 'target' : 100.0 } }, 'ccedk' : { 'btc' : { 'rate' : 0.002, 'target' : 100.0 } } }
