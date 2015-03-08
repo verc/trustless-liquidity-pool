@@ -65,17 +65,17 @@ class Poloniex(Exchange):
 class CCEDK(Exchange):
   def __init__(self):
     super(CCEDK, self).__init__('www.ccedk.com')
-    self._shift = 1
+    self._shift = 10
     self._id = {}
     markets = json.loads(urllib2.urlopen(urllib2.Request(
-      'https://ccedk.com/api/v1/stats/marketdepthfull?' + urllib.urlencode({ 'nonce' : int(time.time()) }))).read())
+      'https://ccedk.com/api/v1/stats/marketdepthfull?' + urllib.urlencode({ 'nonce' : int(time.time() + self._shift) }))).read())
     for unit in markets['response']['entities']:
       if unit['pair_name'][:4] == 'NBT/':
         self._id[unit['pair_name'][4:]] = unit['pair_id']
 
   def create_request(self, unit, key = None, secret = None):
     if not secret: return None, None
-    request = { 'nonce' : int(time.time()) }
+    request = { 'nonce' : int(time.time()  + self._shift) }
     data = urllib.urlencode(request)
     sign = hmac.new(secret, data, hashlib.sha512).hexdigest()
     return request, sign
