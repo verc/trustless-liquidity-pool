@@ -12,7 +12,7 @@ from thread import start_new_thread
 from exchanges import *
 
 try: os.makedirs('logs')
-except Exception as e: print e
+except: pass
 
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
