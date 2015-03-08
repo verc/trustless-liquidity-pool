@@ -45,12 +45,12 @@ _feeds = { 'btc' : {  'main-feed' : 'bitfinex',
                       } }, 'usd' : None }
 
 def get(method):
-  connection = httplib.HTTPConnection('127.0.0.1:2019', timeout=60)
+  connection = httplib.HTTPConnection(_server, timeout=60)
   connection.request('GET', '/' + method)
   return json.loads(connection.getresponse().read())
 
 def post(method, params):
-  connection = httplib.HTTPConnection('127.0.0.1:2019', timeout=60)
+  connection = httplib.HTTPConnection(_server, timeout=60)
   headers = { "Content-type": "application/x-www-form-urlencoded" }
   connection.request('POST', method, urllib.urlencode(params), headers = headers)
   return json.loads(connection.getresponse().read())
