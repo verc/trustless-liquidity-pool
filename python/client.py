@@ -36,7 +36,7 @@ logger.addHandler(fh)
 logger.addHandler(ch)
 
 _server = sys.argv[1]
-_wrappers = { 'poloniex' : Poloniex() }
+_wrappers = { 'poloniex' : Poloniex(), 'ccedk' : CCEDK() }
 _feeds = { 'btc' : {  'main-feed' : 'bitfinex',
                       'backup-feeds' : {  
                         'backup1' : { 'name' : 'blockchain' },
@@ -59,7 +59,7 @@ def register(key, name, address):
   return post('register', {'address' : address, 'key' : key, 'name' : name})
 
 def submit(key, name, unit, secret):
-  data, sign = _wrappers[name].create_request(unit, secret)
+  data, sign = _wrappers[name].create_request(unit, key, secret)
   params = {
     'unit' : unit,
     'user' : key,
@@ -82,54 +82,56 @@ for user in userdata:
       users.append({'address' : user[0], 'units' : units, 'name' : user[2], 'key' : user[3], 'secret' : user[4], 'nubot' : {}})
 
 # submit liquidity
-ts = 0
-while True:
-  ts = (ts % 60) + 3
-  for user in users:
-    for unit in user['units']:
-      # submit requests
-      ret = submit(user['key'], user['name'], unit, user['secret'])
-      if ret['code'] != 0:
-        logger.error("submit: %s" % ret['message'])
-      # check if NuBot is alive
-      if not unit in user['nubot'] or user['nubot'][unit].poll():
-        logger.info("starting NuBot on exchange %s" % user['name'])
-        options = {
-          'exchangename' : user['name'],
-          'apikey' : user['key'],
-          'apisecret' : user['secret'],
-          'txfee' : 0.2,
-          'pair' : 'nbt_' + unit,
-          'submit-liquidity' : False,
-          'dualside' : True,
-          'multiple-custodians' : True,
-          'executeorders' : True,
-          'mail-notifications' : False,
-          'hipchat' : False
-        }
-        if unit != 'usd':
-          options['secondary-peg-options'] = {
-            'wallshift-threshold' : 0.3,
-            'spread' : 0
-          }
-          options['secondary-peg-options'].update(_feeds[unit])
-        out = tempfile.NamedTemporaryFile(delete = False)
-        out.write(json.dumps({ 'options' : options }))
-        out.close()
-        with open(os.devnull, 'w') as fp:
-          user['nubot'][unit] = subprocess.Popen("java -jar NuBot.jar %s" % out.name,
-            stdout=fp, stderr=fp, shell=True, preexec_fn=os.setsid, cwd = 'nubot')
-  if ts == 60: # print some info
-    for user in users:
-      stats = get(user['key'])
-      orders = {}
-      for unit in stats['orders']:
-        orders[unit] = { 'bid' : sum([x[1] for x in stats['orders'][unit]['bid']]),
-                         'ask' : sum([x[1] for x in stats['orders'][unit]['ask']]) }
-      logger.info("Balance: %.8f Exchange: %s Orders: %s" % (stats['balance'], stats['name'], orders))
-  try: time.sleep(3) # send every 3 seconds
-  except KeyboardInterrupt:
+try:
+  ts = 0
+  while True:
+    ts = (ts % 60) + 3
     for user in users:
       for unit in user['units']:
+        # submit requests
+        ret = submit(user['key'], user['name'], unit, user['secret'])
+        if ret['code'] != 0:
+          logger.error("submit: %s" % ret['message'])
+        # check if NuBot is alive
+        if not unit in user['nubot'] or user['nubot'][unit].poll():
+          logger.info("starting NuBot on exchange %s" % user['name'])
+          options = {
+            'exchangename' : user['name'],
+            'apikey' : user['key'],
+            'apisecret' : user['secret'],
+            'txfee' : 0.2,
+            'pair' : 'nbt_' + unit,
+            'submit-liquidity' : False,
+            'dualside' : True,
+            'multiple-custodians' : True,
+            'executeorders' : True,
+            'mail-notifications' : False,
+            'hipchat' : False
+          }
+          if unit != 'usd':
+            options['secondary-peg-options'] = {
+              'wallshift-threshold' : 0.3,
+              'spread' : 0
+            }
+            options['secondary-peg-options'].update(_feeds[unit])
+          out = tempfile.NamedTemporaryFile(delete = False)
+          out.write(json.dumps({ 'options' : options }))
+          out.close()
+          with open(os.devnull, 'w') as fp:
+            user['nubot'][unit] = subprocess.Popen("java -jar NuBot.jar %s" % out.name,
+              stdout=fp, stderr=fp, shell=True, preexec_fn=os.setsid, cwd = 'nubot')
+    if ts == 60: # print some info
+      for user in users:
+        stats = get(user['key'])
+        orders = {}
+        for unit in stats['orders']:
+          orders[unit] = { 'bid' : sum([x[1] for x in stats['orders'][unit]['bid']]),
+                           'ask' : sum([x[1] for x in stats['orders'][unit]['ask']]) }
+        logger.info("Balance: %.8f Exchange: %s Orders: %s" % (stats['balance'], stats['name'], orders))
+    time.sleep(3)
+except KeyboardInterrupt:
+  for user in users:
+    for unit in user['units']:
+      if os.killpg(user['nubot'][unit]):
+        logger.info("stopping NuBot on exchange %s" % user['name'])
         os.killpg(user['nubot'][unit].pid, signal.SIGTERM) 
-    break

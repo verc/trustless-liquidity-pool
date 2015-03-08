@@ -25,9 +25,9 @@ logger.addHandler(fh)
 logger.addHandler(ch)
 
 _port = 2019
-_interest = { 'poloniex' : { 'btc' : { 'rate' : 0.002, 'target' : 100.0 } } }
+_interest = { 'poloniex' : { 'btc' : { 'rate' : 0.002, 'target' : 100.0 } }, 'ccedk' : { 'btc' : { 'rate' : 0.002, 'target' : 100.0 } } }
 _nuconfig = '%s/.nu/nu.conf'%os.getenv("HOME") # path to nu.conf
-_wrappers = { 'poloniex' : Poloniex() }
+_wrappers = { 'poloniex' : Poloniex(), 'ccedk' : CCEDK() }
 _tolerance = 0.03
 _sampling = 12
 _minpayout = 0.1
@@ -129,15 +129,18 @@ class RequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
   def log_message(self, format, *args): pass
 
 def update_price():
-  ret = json.loads(urllib2.urlopen(urllib2.Request('https://api.bitfinex.com/v1//pubticker/btcusd')).read())
-  price = {'btc' : 1.0 / float(ret['mid'])}
+  try:
+    ret = json.loads(urllib2.urlopen(urllib2.Request('https://api.bitfinex.com/v1//pubticker/btcusd')).read())
+    price['btc'] = 1.0 / float(ret['mid'])
+  except:
+    logging.error("unable to update price for BTC")
 
 def validate():
   liquidity = { 'bid' : 0.0, 'ask' : 0.0 }
   for user in keys:
     for unit in keys[user]['units']:
       if keys[user]['units'][unit]['request']:
-        orders = _wrappers[keys[user]['name']].validate_request(user, *keys[user]['units'][unit]['request'])
+        orders = _wrappers[keys[user]['name']].validate_request(user, unit, *keys[user]['units'][unit]['request'])
         keys[user]['units'][unit]['request'] = None
         if not 'error' in orders:
           valid = { 'bid': [], 'ask' : [] }
@@ -150,7 +153,7 @@ def validate():
             keys[user]['units'][unit][side].append(valid[side])
             liquidity[side] += sum([ order[1] for order in valid[side]])
         else:
-          logger.error("unable to validate request for user %s at exchange %s on market %s: %s" % (user, keys[user]['name'], unit, orders))
+          logger.error("unable to validate request for user %s at exchange %s on market %s: %s" % (user, keys[user]['name'], unit, orders['error']))
       else:
         logger.warning("no request received for user %s at exchange %s on market %s" % (user, keys[user]['name'], unit))
   return liquidity
