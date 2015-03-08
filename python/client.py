@@ -15,12 +15,8 @@ if len(sys.argv) < 2:
   print "usage:", sys.argv[0], "server[:port] [users.dat]"
   sys.exit(1)
 
-try:
+if not os.path.isdir('logs'):
   os.makedirs('logs')
-except OSError as exc:
-  if exc.errno == errno.EEXIST and os.path.isdir(path):
-    pass
-  else: raise
 
 userfile = 'users.dat'
 if len(sys.argv) == 3:
