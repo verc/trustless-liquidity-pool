@@ -86,6 +86,9 @@ class CCEDK(Exchange):
     if not response['response']:
       response['error'] = ",".join(response['errors'].values())
       return response
+    if not response['response']['entities']:
+      response['error'] = "invalid data in response"
+      return response
     return [ {
       'id' : int(order['order_id']),
       'price' : float(order['price']),
