@@ -188,7 +188,7 @@ def validate():
 def calculate_interest(balance, amount, interest):
   try:
     return interest['rate'] * (amount - (log(exp(interest['target']) + exp(balance + amount)) - log(exp(interest['target']) + exp(balance))))
-  except: OverflowError:
+  except OverflowError:
     return 0.00000001
 
 def credit():
