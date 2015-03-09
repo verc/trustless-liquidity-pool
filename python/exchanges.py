@@ -65,13 +65,16 @@ class CCEDK(Exchange):
   def __init__(self):
     super(CCEDK, self).__init__('www.ccedk.com')
     self._id = {}
-    markets = json.loads(urllib2.urlopen(urllib2.Request(
-      'https://www.ccedk.com/api/v1/stats/marketdepthfull?' + urllib.urlencode({ 'nonce' : int(time.time()) }))).read())
-    if not markets['response']:
-      print >> sys.stderr, "unable to initialize ccedk:", ",".join(markets['errors'].values())
-    for unit in markets['response']['entities']:
-      if unit['pair_name'][:4] == 'NBT/':
-        self._id[unit['pair_name'][4:]] = unit['pair_id']
+    while not self._id:
+      markets = json.loads(urllib2.urlopen(urllib2.Request(
+        'https://www.ccedk.com/api/v1/stats/marketdepthfull?' + urllib.urlencode({ 'nonce' : int(time.time()) }))).read())
+      if not markets['response']:
+        print >> sys.stderr, "unable to initialize ccedk:", ",".join(markets['errors'].values())
+      for unit in markets['response']['entities']:
+        if unit['pair_name'][:4] == 'NBT/':
+          self._id[unit['pair_name'][4:]] = unit['pair_id']
+      if not self._id: print sys.stderr, "could not retrieve ccedk pair ids, will retry in 5 seconds ..."
+      time.sleep(5)
 
   def create_request(self, unit, key = None, secret = None):
     if not secret: return None, None
