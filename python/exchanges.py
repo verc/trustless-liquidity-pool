@@ -68,15 +68,16 @@ class CCEDK(Exchange):
     while not self._id:
       try:
         markets = json.loads(urllib2.urlopen(urllib2.Request(
-          'https://www.ccedk.com/api/v1/stats/marketdepthfull?' + urllib.urlencode({ 'nonce' : int(time.time()) }))).read())
+          'https://www.ccedk.com/api/v1/stats/marketdepthfull?' + urllib.urlencode({ 'nonce' : int(time.time() + self._shift) }))).read())
         if not markets['response']:
           print >> sys.stderr, "unable to initialize ccedk:", ",".join(markets['errors'].values())
         for unit in markets['response']['entities']:
           if unit['pair_name'][:4] == 'NBT/':
             self._id[unit['pair_name'][4:]] = unit['pair_id']
-      except:
-        print sys.stderr, "could not retrieve ccedk pair ids, will retry in 5 seconds ..."
-        time.sleep(5)
+      except TypeError:
+        self._shift = ((self._shift + 3) % 20) - 10 # -6 7 0 -7 6 -1 -8 5 -2 -9 4 -3 -10 3 -4 9 2 -5 8 1
+        print >> sys.stderr, "could not retrieve ccedk pair ids, will adjust shift to", self._shift
+        time.sleep(1)
 
   def create_request(self, unit, key = None, secret = None):
     if not secret: return None, None
