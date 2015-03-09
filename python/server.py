@@ -168,10 +168,11 @@ def validate():
           keys[user]['units'][unit]['last_error'] = ""
           valid = { 'bid': [], 'ask' : [] }
           for order in orders:
-            if 1.0 - min(order['price'], price[unit]) / max(order['price'], price[unit]) < _tolerance:
+            deviation = 1.0 - min(order['price'], price[unit]) / max(order['price'], price[unit])
+            if deviation < _tolerance:
               valid[order['type']].append((order['id'], order['amount']))
             else:
-              logger.warning("order of deviates too much from current price for user %s at exchange %s on market %s" % (user, keys[user]['name'], unit))
+              logger.warning("order of deviates too much from current price for user %s at exchange %s on market %s (%.02f < %.2f)" % (user, keys[user]['name'], unit, _tolerance, deviation))
           for side in [ 'bid', 'ask' ]:
             keys[user]['units'][unit][side].append(valid[side])
             liquidity[side] += sum([ order[1] for order in valid[side]])
