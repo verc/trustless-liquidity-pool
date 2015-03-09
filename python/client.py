@@ -105,7 +105,7 @@ try:
   ts = 0
   basestatus = get('status')
   validations = basestatus['validations']
-  sampling = max(1, basestatus['sampling'] - 1)
+  sampling = min(45, basestatus['sampling'] + 1)
   efficiency = { user['key'] : [0,0] for user in users }
   logger.debug('starting liquidity propagation with sampling %d' % sampling)
   while True:
