@@ -146,7 +146,7 @@ def validate():
         try:
           orders = _wrappers[keys[user]['name']].validate_request(user, unit, *keys[user]['units'][unit]['request'])
           keys[user]['units'][unit]['request'] = None
-        except:
+        except Exception as e:
           orders = { 'error' : 'exception caught: %s' % str(e)}
         if not 'error' in orders:
           valid = { 'bid': [], 'ask' : [] }
