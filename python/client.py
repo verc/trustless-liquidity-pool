@@ -159,8 +159,6 @@ try:
           missing += stats['units'][unit]['missing']
           units[unit] = { 'bid' : sum([x[1] for x in stats['units'][unit]['bid']]),
                           'ask' : sum([x[1] for x in stats['units'][unit]['ask']]),
-                          'rejects' : stats['units'][unit]['rejects'],
-                          'missing' : stats['units'][unit]['missing'],
                           'last_error' : stats['units'][unit]['last_error'] }
         if validations - basestatus['validations'] > status['sampling']: # do not adjust in initial phase
           if missing - efficiency[user['key']][0] > passed / 5:
@@ -171,10 +169,12 @@ try:
               time.sleep(0.7)
               logger.warning('too many missing requests, sleeping a short while')
           if rejects - efficiency[user['key']][1] > passed / 5:
-            _wrappers[stats['name']]._shift = ((_wrappers[stats['name']]._shift + 3) % 20) - 10 # -6 7 0 -7 6 -1 -8 5 -2 -9 4 -3 -10 3 -4 9 2 -5 8 1
+            _wrappers[stats['name']]._shift = ((_wrappers[stats['name']]._shift + 7) % 200) - 100 # -92 15 -78 29 -64 43 -50 57 ...
             logger.warning('too many rejected requests on exchange %s, trying to adjust nonce of exchange to %d', stats['name'], _wrappers[stats['name']]._shift)
-        logger.info("%s: balance: %.8f exchange: %s efficiency: %.2f%% units: %s" % (user['key'],
-          stats['balance'], stats['name'], 100 * (1.0 - ((missing - efficiency[user['key']][0]) + (rejects - efficiency[user['key']][1])) / float(len(stats['units']) * passed)), units))
+        newmissing = missing - efficiency[user['key']][0]
+        newreject = rejects - efficiency[user['key']][1]
+        logger.info("%s: balance: %.8f exchange: %s rejects: %d missing: %d efficiency: %.2f%% units: %s" % (user['key'],
+          stats['balance'], stats['name'], newreject, newmissing, 100 * (1.0 - (newmissing + newreject) / float(len(stats['units']) * passed)), units))
         efficiency[user['key']][0] = missing
         efficiency[user['key']][1] = rejects
     time.sleep(60 / sampling - (time.time() - curtime) / 1000)
