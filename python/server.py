@@ -186,7 +186,10 @@ def validate():
   return liquidity
 
 def calculate_interest(balance, amount, interest):
-  return interest['rate'] * (amount - (log(exp(interest['target']) + exp(balance + amount)) - log(exp(interest['target']) + exp(balance))))
+  try:
+    return interest['rate'] * (amount - (log(exp(interest['target']) + exp(balance + amount)) - log(exp(interest['target']) + exp(balance))))
+  except: OverflowError:
+    return 0.00000001
 
 def credit():
   for name in _interest:
