@@ -70,7 +70,7 @@ class CCEDK(Exchange):
     markets = json.loads(urllib2.urlopen(urllib2.Request(
       'https://ccedk.com/api/v1/stats/marketdepthfull?' + urllib.urlencode({ 'nonce' : int(time.time()) }))).read())
     if not response['response']:
-      print ",".join(response['errors'].values())
+      print >> sys.stderr, ",".join(response['errors'].values())
       raise
     for unit in markets['response']['entities']:
       if unit['pair_name'][:4] == 'NBT/':
