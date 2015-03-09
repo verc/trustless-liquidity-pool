@@ -122,5 +122,5 @@ class BitcoinCoId(Exchange):
       'id' : int(order['order_id']),
       'price' : float(order['price']),
       'type' : 'ask' if order['type'] == 'sell' else 'bid',
-      'amount' : float(order['remain_' + (unit.lower() if order['type'] == 'ask' else 'nbt')]),
+      'amount' : float(order['remain_idr']),
       } for order in response['return']['orders']]
