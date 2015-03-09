@@ -165,8 +165,8 @@ try:
                             'last_error' : stats['units'][unit]['last_error'] }
           if validations - basestatus['validations'] > status['sampling']: # do not adjust in initial phase
             if missing - efficiency[user['key']][0] > passed / 5:
-              if sampling > 2: # just send more requests
-                sampling -= 1
+              if sampling < 45: # just send more requests
+                sampling += 1
                 logger.warning('too many missing requests, adjusting sampling to %d', sampling)
               else: # just wait a little bit
                 time.sleep(0.7)
