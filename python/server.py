@@ -179,11 +179,11 @@ def validate():
         else:
           keys[user]['units'][unit]['rejects'] += 1
           keys[user]['units'][unit]['last_error'] = "unable to validate request: " + orders['error']
-          logger.error("unable to validate request for user %s at exchange %s on market %s: %s" % (user, keys[user]['name'], unit, orders['error']))
+          logger.warning("unable to validate request for user %s at exchange %s on market %s: %s" % (user, keys[user]['name'], unit, orders['error']))
       else:
         keys[user]['units'][unit]['missing'] += 1
         keys[user]['units'][unit]['last_error'] = "no request received"
-        logger.warning("no request received for user %s at exchange %s on market %s" % (user, keys[user]['name'], unit))
+        logger.debug("no request received for user %s at exchange %s on market %s" % (user, keys[user]['name'], unit))
   return liquidity
 
 def calculate_interest(balance, amount, interest):

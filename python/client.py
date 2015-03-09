@@ -90,7 +90,7 @@ def submit(key, name, unit, secret):
 # register users
 users = []
 for user in userdata:
-  ret = register(user[3], user[2], user[0])
+  ret = register(user[3], user[2].lower(), user[0])
   if ret['code'] != 0:
     logger.error("register: %s" % ret['message'])
   else:
@@ -98,7 +98,7 @@ for user in userdata:
     if len([unit for unit in units if not unit in _feeds]) > 0:
       logger.error("register: no feed available for unit %s" % unit)
     else:
-      users.append({'address' : user[0], 'units' : units, 'name' : user[2], 'key' : user[3], 'secret' : user[4], 'nubot' : {}})
+      users.append({'address' : user[0], 'units' : units, 'name' : user[2].lower(), 'key' : user[3], 'secret' : user[4], 'nubot' : {}})
 
 # submit liquidity
 try:
