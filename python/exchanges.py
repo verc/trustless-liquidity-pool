@@ -43,7 +43,7 @@ class Poloniex(Exchange):
 
   def create_request(self, unit, key = None, secret = None):
     if not secret: return None, None
-    request = { 'command' : 'returnOpenOrders', 'nonce' : int((time.time() + self._shift) * 1000),  'currencyPair' : "%s_NBT"%unit.upper()}
+    request = { 'command' : 'returnOpenOrders', 'nonce' : int(time.time() + self._shift) * 1000,  'currencyPair' : "%s_NBT"%unit.upper()}
     data = urllib.urlencode(request)
     sign = hmac.new(secret, data, hashlib.sha512).hexdigest()
     return request, sign
@@ -69,8 +69,6 @@ class CCEDK(Exchange):
       try:
         markets = json.loads(urllib2.urlopen(urllib2.Request(
           'https://www.ccedk.com/api/v1/stats/marketdepthfull?' + urllib.urlencode({ 'nonce' : int(time.time() + self._shift) }))).read())
-        if not markets['response']:
-          print >> sys.stderr, "unable to initialize ccedk:", ",".join(markets['errors'].values())
         for unit in markets['response']['entities']:
           if unit['pair_name'][:4] == 'NBT/':
             self._id[unit['pair_name'][4:]] = unit['pair_id']
@@ -100,3 +98,29 @@ class CCEDK(Exchange):
       'type' : 'ask' if order['type'] == 'sell' else 'bid',
       'amount' : float(order['volume']),
       } for order in response['response']['entities'] if order['pair_id'] == self._id[unit.upper()]]
+
+
+class BitcoinCoId(Exchange):
+  def __init__(self):
+    super(BitcoinCoId, self).__init__('vip.bitcoin.co.id/tapi')
+
+  def create_request(self, unit, key = None, secret = None):
+    if not secret: return None, None
+    request = { 'nonce' : int(time.time()  + self._shift) * 1000, 'pair' : 'nbt_' + unit.lower(), 'method' : 'openOrders' }
+    data = urllib.urlencode(request)
+    sign = hmac.new(secret, data, hashlib.sha512).hexdigest()
+    return request, sign
+
+  def validate_request(self, key, unit, data, sign):
+    headers = {"Key": key, "Sign": sign}
+    response = json.loads(urllib2.urlopen(urllib2.Request('https://vip.bitcoin.co.id/tapi', urllib.urlencode(data), headers)).read())
+    if response['success'] == 0:
+      return response
+    if not response['return']['orders']:
+      response['return']['orders'] = []
+    return [ {
+      'id' : int(order['order_id']),
+      'price' : float(order['price']),
+      'type' : 'ask' if order['type'] == 'sell' else 'bid',
+      'amount' : float(order['remain_' + unit.lower()]),
+      } for order in response['return']['orders']]

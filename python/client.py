@@ -40,7 +40,7 @@ logger.addHandler(fh)
 logger.addHandler(ch)
 
 _server = sys.argv[1]
-_wrappers = { 'poloniex' : Poloniex(), 'ccedk' : CCEDK() }
+_wrappers = { 'poloniex' : Poloniex(), 'ccedk' : CCEDK(), 'bitcoincoid' : BitcoinCoId() }
 _feeds = { 'btc' : {  'main-feed' : 'bitfinex',
                       'backup-feeds' : {  
                         'backup1' : { 'name' : 'blockchain' },
@@ -58,7 +58,7 @@ def json_request(request, method, params, headers, callback):
   except httplib.BadStatusLine:
     logging.error("server could not be reached, retrying in 15 seconds ...")
   except ValueError:
-    logging.error("server response invalid, retrying in 15 seconds ...")
+    logging.error("server response invalid, retrying in 15 seconds ... %s", content)
     print content
   except socket.error:
     logging.error("socket error, retrying in 15 seconds ...")
@@ -116,6 +116,8 @@ try:
         # submit requests
         ret = submit(user['key'], user['name'], unit, user['secret'])
         if ret['code'] != 0:
+          if ret['code'] == 11: # user not found, just register again
+            register(user['key'], user['name'], user['address'])
           logger.error("submit: %s" % ret['message'])
         # check if NuBot is alive
         if not unit in user['nubot'] or user['nubot'][unit].poll():
@@ -149,34 +151,35 @@ try:
       status = get('status')
       passed = status['validations'] - validations
       validations = status['validations']
-      for user in users:
-        stats = get(user['key'])
-        units = {}
-        rejects = 0
-        missing = 0
-        for unit in stats['units']:
-          rejects += stats['units'][unit]['rejects']
-          missing += stats['units'][unit]['missing']
-          units[unit] = { 'bid' : sum([x[1] for x in stats['units'][unit]['bid']]),
-                          'ask' : sum([x[1] for x in stats['units'][unit]['ask']]),
-                          'last_error' : stats['units'][unit]['last_error'] }
-        if validations - basestatus['validations'] > status['sampling']: # do not adjust in initial phase
-          if missing - efficiency[user['key']][0] > passed / 5:
-            if sampling > 2: # just send more requests
-              sampling -= 1
-              logger.warning('too many missing requests, adjusting sampling to %d', sampling)
-            else: # just wait a little bit
-              time.sleep(0.7)
-              logger.warning('too many missing requests, sleeping a short while')
-          if rejects - efficiency[user['key']][1] > passed / 5:
-            _wrappers[stats['name']]._shift = ((_wrappers[stats['name']]._shift + 7) % 200) - 100 # -92 15 -78 29 -64 43 -50 57 ...
-            logger.warning('too many rejected requests on exchange %s, trying to adjust nonce of exchange to %d', stats['name'], _wrappers[stats['name']]._shift)
-        newmissing = missing - efficiency[user['key']][0]
-        newreject = rejects - efficiency[user['key']][1]
-        logger.info("%s: balance: %.8f exchange: %s rejects: %d missing: %d efficiency: %.2f%% units: %s" % (user['key'],
-          stats['balance'], stats['name'], newreject, newmissing, 100 * (1.0 - (newmissing + newreject) / float(len(stats['units']) * passed)), units))
-        efficiency[user['key']][0] = missing
-        efficiency[user['key']][1] = rejects
+      if passed > 0:
+        for user in users:
+          stats = get(user['key'])
+          units = {}
+          rejects = 0
+          missing = 0
+          for unit in stats['units']:
+            rejects += stats['units'][unit]['rejects']
+            missing += stats['units'][unit]['missing']
+            units[unit] = { 'bid' : sum([x[1] for x in stats['units'][unit]['bid']]),
+                            'ask' : sum([x[1] for x in stats['units'][unit]['ask']]),
+                            'last_error' : stats['units'][unit]['last_error'] }
+          if validations - basestatus['validations'] > status['sampling']: # do not adjust in initial phase
+            if missing - efficiency[user['key']][0] > passed / 5:
+              if sampling > 2: # just send more requests
+                sampling -= 1
+                logger.warning('too many missing requests, adjusting sampling to %d', sampling)
+              else: # just wait a little bit
+                time.sleep(0.7)
+                logger.warning('too many missing requests, sleeping a short while')
+            if rejects - efficiency[user['key']][1] > passed / 5:
+              _wrappers[stats['name']]._shift = ((_wrappers[stats['name']]._shift + 7) % 200) - 100 # -92 15 -78 29 -64 43 -50 57 ...
+              logger.warning('too many rejected requests on exchange %s, trying to adjust nonce of exchange to %d', stats['name'], _wrappers[stats['name']]._shift)
+          newmissing = missing - efficiency[user['key']][0]
+          newrejects = rejects - efficiency[user['key']][1]
+          logger.info("%s: balance: %.8f exchange: %s rejects: %d missing: %d efficiency: %.2f%% units: %s" % (user['key'],
+            stats['balance'], stats['name'], newrejects, newmissing, 100 * (1.0 - (newmissing + newrejects) / float(len(stats['units']) * passed)), units))
+          efficiency[user['key']][0] = missing
+          efficiency[user['key']][1] = rejects
     time.sleep(60 / sampling - (time.time() - curtime) / 1000)
 except KeyboardInterrupt:
   pass
