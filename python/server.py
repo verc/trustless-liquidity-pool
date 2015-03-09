@@ -34,7 +34,7 @@ _interest = { 'poloniex' : { 'btc' : { 'rate' : 0.002, 'target' : 100.0 } },
             }
 _nuconfig = '%s/.nu/nu.conf'%os.getenv("HOME") # path to nu.conf
 _wrappers = { 'poloniex' : Poloniex(), 'ccedk' : CCEDK(), 'bitcoincoid' : BitcoinCoId() }
-_tolerance = 0.03
+_tolerance = 0.08
 _sampling = 12
 _minpayout = 0.1
 _validations = 0
@@ -96,7 +96,7 @@ def liquidity(params):
   return ret
 
 def poolstats():
-  return { 'liquidity' : ([ (0,0) ] + _liquidity)[-1], 'sampling' : _sampling, 'validations' : _validations }
+  return { 'liquidity' : ([ (0,0) ] + _liquidity)[-1], 'sampling' : _sampling, 'validations' : _validations, 'users' : len(keys.keys()) }
 
 def userstats(user):
   res = { 'name' : keys[user]['name'], 'address' : keys[user]['address'], 'balance' : keys[user]['balance'] }
