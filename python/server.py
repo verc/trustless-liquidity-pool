@@ -34,6 +34,8 @@ _wrappers = { 'poloniex' : Poloniex(), 'ccedk' : CCEDK() }
 _tolerance = 0.03
 _sampling = 12
 _minpayout = 0.1
+_validations = 0
+_liquidity = []
 
 keys = {}
 price = {'btc' : 0.003666}
@@ -60,7 +62,7 @@ def register(params):
         acquire_lock()
         keys[user] = { 'name' : params['name'][0], 'address' : params['address'][0], 'balance' : 0.0, 'accepts' : 0, 'units' : {} }
         for unit in _interest[name]:
-          keys[user]['units'][unit] = { 'request' : None, 'bid' : [], 'ask' : [] }
+          keys[user]['units'][unit] = { 'request' : None, 'bid' : [], 'ask' : [], 'rejects' : 0, 'missing' : 0, 'last_error' : "" }
         release_lock()
         logger.info("new user %s: %s" % (user, keys[user]['address']))
       elif keys[user]['address'] != params['address'][0]:
@@ -90,15 +92,20 @@ def liquidity(params):
     ret = response(10, "invalid liquidity data received: %s" % str(params))
   return ret
 
+def poolstats():
+  return { 'liquidity' : [ [ (0,0) ] + _liquidity ] [-1], 'sampling' : _sampling, 'validations' : _validations }
+
 def userstats(user):
-  res = { 'name' : keys[user]['name'], 'address' : keys[user]['address'], 'balance' : keys[user]['balance'], 'accepts' : keys[user]['accepts'] }
-  res['orders'] = {}
+  res = { 'name' : keys[user]['name'], 'address' : keys[user]['address'], 'balance' : keys[user]['balance'] }
+  res['units'] = {}
   for unit in keys[user]['units']:
     bid = [ x for x in keys[user]['units'][unit]['bid'] if x ]
     ask = [ x for x in keys[user]['units'][unit]['ask'] if x ]
-    if len(bid) > 0 or len(ask) > 0:
-      bid, ask = [[]] + bid, [[]] + ask
-      res['orders'][unit] = { 'bid' : bid[-1], 'ask' : ask[-1] }
+    bid, ask = [[]] + bid, [[]] + ask
+    res['units'][unit] = { 'bid' : bid[-1], 'ask' : ask[-1], 
+                           'rejects' : keys[user]['units'][unit]['rejects'],
+                           'missing' : keys[user]['units'][unit]['missing'],
+                           'last_error' :  keys[user]['units'][unit]['last_error'] }
   return res
 
 class RequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
@@ -120,7 +127,13 @@ class RequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
 
   def do_GET(self):
     method = self.path[1:]
-    if method in keys:
+    if method == 'status':
+      self.send_response(200)
+      self.send_header('Content-Type', 'application/json')
+      self.wfile.write("\n")
+      self.wfile.write(json.dumps(poolstats()))
+      self.end_headers()
+    elif method in keys:
       self.send_response(200)
       self.send_header('Content-Type', 'application/json')
       self.wfile.write("\n")
@@ -149,6 +162,7 @@ def validate():
         except Exception as e:
           orders = { 'error' : 'exception caught: %s' % str(e)}
         if not 'error' in orders:
+          keys[user]['units'][unit]['last_error'] = ""
           valid = { 'bid': [], 'ask' : [] }
           for order in orders:
             if 1.0 - min(order['price'], price[unit]) / max(order['price'], price[unit]) < _tolerance:
@@ -159,8 +173,12 @@ def validate():
             keys[user]['units'][unit][side].append(valid[side])
             liquidity[side] += sum([ order[1] for order in valid[side]])
         else:
+          keys[user]['units'][unit]['rejects'] += 1
+          keys[user]['units'][unit]['last_error'] = "unable to validate request: " + orders['error']
           logger.error("unable to validate request for user %s at exchange %s on market %s: %s" % (user, keys[user]['name'], unit, orders['error']))
       else:
+        keys[user]['units'][unit]['missing'] += 1
+        keys[user]['units'][unit]['last_error'] = "no request received"
         logger.warning("no request received for user %s at exchange %s on market %s" % (user, keys[user]['name'], unit))
   return liquidity
 
@@ -175,7 +193,6 @@ def credit():
         for user in users:
           if len(keys[user]['units'][unit][side]) < _sampling:
             keys[user]['units'][unit][side] = [ [] ] * (_sampling - len(keys[user]['units'][unit][side])) + keys[user]['units'][unit][side]
-          keys[user]['accepts'] += len(keys[user]['units'][unit][side]) - keys[user]['units'][unit][side].count([])
         for sample in xrange(_sampling):
           orders = []
           for user in users:
@@ -227,11 +244,13 @@ while True:
     acquire_lock()
     lq.append(validate())
     release_lock()
+    _validations += 1
   if ts % 60 == 0:
     acquire_lock()
     bid = sum([l['bid'] for l in lq]) / len(lq)
     ask = sum([l['ask'] for l in lq])  / len(lq)
     logger.info("liquidity buy: %.8f sell: %.08f", bid, ask)
+    _liquidity.append((bid, ask))
     credit()
     lq = []
     release_lock()

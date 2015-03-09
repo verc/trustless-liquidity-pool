@@ -40,7 +40,6 @@ class Exchange(object):
 class Poloniex(Exchange):
   def __init__(self):
     super(Poloniex, self).__init__('poloniex.com/tradingApi')
-    self._shift = 1
 
   def create_request(self, unit, key = None, secret = None):
     if not secret: return None, None
@@ -65,12 +64,11 @@ class Poloniex(Exchange):
 class CCEDK(Exchange):
   def __init__(self):
     super(CCEDK, self).__init__('www.ccedk.com')
-    self._shift = 10
     self._id = {}
     markets = json.loads(urllib2.urlopen(urllib2.Request(
       'https://www.ccedk.com/api/v1/stats/marketdepthfull?' + urllib.urlencode({ 'nonce' : int(time.time()) }))).read())
     if not markets['response']:
-      print >> sys.stderr, ",".join(markets['errors'].values())
+      print >> sys.stderr, "unable to initialize ccedk:", ",".join(markets['errors'].values())
     for unit in markets['response']['entities']:
       if unit['pair_name'][:4] == 'NBT/':
         self._id[unit['pair_name'][4:]] = unit['pair_id']
