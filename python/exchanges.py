@@ -118,6 +118,7 @@ class BitcoinCoId(Exchange):
       return response
     if not response['return']['orders']:
       response['return']['orders'] = []
+    print response
     return [ {
       'id' : int(order['order_id']),
       'price' : float(order['price']),
