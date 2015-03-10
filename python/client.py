@@ -47,8 +47,9 @@ _feeds = { 'btc' : {  'main-feed' : 'bitfinex',
                         'backup2' : { 'name' : 'coinbase' },
                         'backup3' : { 'name' : 'bitstamp' }
                       } }, 'usd' : None }
+_spread = 0.002
 
-def json_request(request, method, params, headers, callback):
+def json_request(request, method, params, headers):
   connection = httplib.HTTPConnection(_server, timeout=60)
   try:
     connection.request(request, method, urllib.urlencode(params), headers = headers)
@@ -56,23 +57,23 @@ def json_request(request, method, params, headers, callback):
     content = response.read()
     return json.loads(content)
   except httplib.BadStatusLine:
-    logging.error("server could not be reached, retrying in 15 seconds ...")
+    logging.error("%s: server could not be reached, retrying in 15 seconds ...", method)
   except ValueError:
-    logging.error("server response invalid, retrying in 15 seconds ... %s", content)
+    logging.error("%s: server response invalid, retrying in 15 seconds ... %s", method, content)
     print content
   except socket.error:
-    logging.error("socket error, retrying in 15 seconds ...")
+    logging.error("%s: socket error, retrying in 15 seconds ...", method)
   time.sleep(15)
-  return callback(method, params)
+  return json_request(request, method, params, headers)
 
 def get(method, params = None):
   if not params: params = {}
-  return json_request('GET', '/' + method, params, {}, get)
+  return json_request('GET', '/' + method, params, {})
 
 def post(method, params = None):
   if not params: params = {}
   headers = { "Content-type": "application/x-www-form-urlencoded" }
-  return json_request('POST', method, params, headers, post)
+  return json_request('POST', method, params, headers)
 
 def register(key, name, address):
   return post('register', {'address' : address, 'key' : key, 'name' : name})
@@ -86,6 +87,32 @@ def submit(key, name, unit, secret):
   }
   params.update(data)
   return post('liquidity', params)
+
+_exchanges = { 'time' : 0 }
+def place(unit, side, name, key, secret, price):
+  global _exchanges
+  if side == 'ask':
+    exunit = 'nbt'
+    price *= (1.0 + _spread)
+  else:
+    exunit = unit
+    price *= (1.0 - _spread)
+  response = _wrappers[name].get_balance(exunit, key, secret)
+  if 'error' in response:
+    logger.error('unable to receive balance for unit %s on exchange %s: %s', exunit, name, response['error'])
+    return False
+  elif response['balance'] > 0:
+    balance = response['balance']
+    if time.time() - _exchanges['time'] > 30: # this will be used to rebalance nbts
+      _exchanges = get('exchanges')
+      _exchanges['time'] = time.time()
+    response = _wrappers[name].place_order(unit, side, key, secret, balance, price)
+    if 'error' in response:
+      logger.error('unable to place order for unit %s on exchange %s: %s', exunit, name, response['error'])
+    else:
+      amount = balance if exunit == 'nbt' else balance / price
+      logger.info('successfully placed %s %s order of %.4f NBT at %.8f on exchange %s', side, exunit, amount, price, name)
+  return True
 
 # register users
 users = []
@@ -104,51 +131,48 @@ for user in userdata:
 try:
   ts = 0
   basestatus = get('status')
+  price = get('price')
+  newprice = None
   validations = basestatus['validations']
   sampling = min(45, basestatus['sampling'] + 1)
   efficiency = { user['key'] : [0,0] for user in users }
   logger.debug('starting liquidity propagation with sampling %d' % sampling)
+  exchanges = get('exchanges')
+  exchanges['time'] = time.time()
   while True:
     ts = (ts % 30) + 60 / sampling
     curtime = time.time()
     for user in users:
       for unit in user['units']:
+        # check orders
+        if newprice:
+          deviation = 1.0 - min(price[unit], newprice[unit]) / max(price[unit], newprice[unit])
+          if deviation > 0.05:
+            price = newprice
+            response = _wrappers[user['name']].cancel_orders(unit, user['key'], user['secret'])
+            if 'error' in response:
+              logger.error('unable to cancel orders for unit %s on exchange %s: %s', unit, user['name'], response['error'])
+              deviation = 0
+            else:
+              logger.info('successfully deleted all orders for unit %s on exchange %s', unit, user['name'])
+        else:
+          newprice = get('price')
+          price = newprice
+          deviation = 1
+        if deviation > 0.05:
+          if not place(unit, 'bid', user['name'], user['key'], user['secret'], price[unit]): newprice = None
+          if not place(unit, 'ask', user['name'], user['key'], user['secret'], price[unit]): newprice = None
+
         # submit requests
         ret = submit(user['key'], user['name'], unit, user['secret'])
         if ret['code'] != 0:
           if ret['code'] == 11: # user not found, just register again
             register(user['key'], user['name'], user['address'])
           logger.error("submit: %s" % ret['message'])
-        # check if NuBot is alive
-        if not unit in user['nubot'] or user['nubot'][unit].poll():
-          logger.info("starting NuBot on exchange %s" % user['name'])
-          options = {
-            'exchangename' : user['name'],
-            'apikey' : user['key'],
-            'apisecret' : user['secret'],
-            'txfee' : 0.2,
-            'pair' : 'nbt_' + unit,
-            'submit-liquidity' : False,
-            'dualside' : True,
-            'multiple-custodians' : True,
-            'executeorders' : True,
-            'mail-notifications' : False,
-            'hipchat' : False
-          }
-          if unit != 'usd':
-            options['secondary-peg-options'] = {
-              'wallshift-threshold' : 0.3,
-              'spread' : 0
-            }
-            options['secondary-peg-options'].update(_feeds[unit])
-          out = tempfile.NamedTemporaryFile(delete = False)
-          out.write(json.dumps({ 'options' : options }))
-          out.close()
-          with open(os.devnull, 'w') as fp:
-            user['nubot'][unit] = subprocess.Popen("java -jar NuBot.jar %s" % out.name,
-              stdout=fp, stderr=fp, shell=True, preexec_fn=os.setsid, cwd = 'nubot')
+
     if ts >= 30: # print some info
       status = get('status')
+      newprice = get('price')
       passed = status['validations'] - validations
       validations = status['validations']
       if passed > 0:
@@ -183,8 +207,11 @@ try:
     time.sleep(60 / sampling - (time.time() - curtime) / 1000)
 except KeyboardInterrupt:
   pass
+
 for user in users:
   for unit in user['units']:
-    if user['nubot'][unit]:
-      logger.info("stopping NuBot on exchange %s" % user['name'])
-      os.killpg(user['nubot'][unit].pid, signal.SIGTERM)
+    response = _wrappers[user['name']].cancel_orders(unit, user['key'], user['secret'])
+    if 'error' in response:
+      logger.error('unable to cancel orders for unit %s on exchange %s: %s', unit, user['name'], response['error'])
+    else:
+      logger.info('successfully deleted all orders for unit %s on exchange %s', unit, user['name'])

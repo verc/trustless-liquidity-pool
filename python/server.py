@@ -28,9 +28,9 @@ logger.addHandler(fh)
 logger.addHandler(ch)
 
 _port = 2019
-_interest = { 'poloniex' : { 'btc' : { 'rate' : 0.002, 'target' : 100.0 } },
-              'ccedk' : { 'btc' : { 'rate' : 0.002, 'target' : 100.0 } },
-              'bitcoincoid' : { 'btc' : { 'rate' : 0.002, 'target' : 100.0 } }
+_interest = { 'poloniex' : { 'btc' : { 'rate' : 0.002, 'target' : 100.0, 'fee' : 0.002 } },
+              'ccedk' : { 'btc' : { 'rate' : 0.002, 'target' : 100.0, 'fee' : 0.002 } },
+              'bitcoincoid' : { 'btc' : { 'rate' : 0.002, 'target' : 100.0, 'fee' : 0.0 } }
             }
 _nuconfig = '%s/.nu/nu.conf'%os.getenv("HOME") # path to nu.conf
 _wrappers = { 'poloniex' : Poloniex(), 'ccedk' : CCEDK(), 'bitcoincoid' : BitcoinCoId() }
@@ -130,11 +130,16 @@ class RequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
 
   def do_GET(self):
     method = self.path[1:]
-    if method == 'status':
+    if method in [ 'status', 'price', 'exchanges' ]:
       self.send_response(200)
       self.send_header('Content-Type', 'application/json')
       self.wfile.write("\n")
-      self.wfile.write(json.dumps(poolstats()))
+      if method == 'status':
+        self.wfile.write(json.dumps(poolstats()))
+      elif method == 'price':
+        self.wfile.write(json.dumps(price))
+      elif method == 'exchanges':
+        self.wfile.write(json.dumps(_interest))
       self.end_headers()
     elif method in keys:
       self.send_response(200)
@@ -156,6 +161,10 @@ def update_price():
 
 def validate():
   liquidity = { 'bid' : 0.0, 'ask' : 0.0 }
+  for name in _interest:
+    for unit in _interest[name]:
+      _interest[name][unit]['ask'] = 0
+      _interest[name][unit]['bid'] = 0
   for user in keys:
     for unit in keys[user]['units']:
       if keys[user]['units'][unit]['request']:
@@ -175,7 +184,9 @@ def validate():
               logger.warning("order of deviates too much from current price for user %s at exchange %s on market %s (%.02f < %.2f)" % (user, keys[user]['name'], unit, _tolerance, deviation))
           for side in [ 'bid', 'ask' ]:
             keys[user]['units'][unit][side].append(valid[side])
-            liquidity[side] += sum([ order[1] for order in valid[side]])
+            total = sum([ order[1] for order in valid[side]])
+            liquidity[side] += total
+            _interest[keys[user]['name']][unit][side] += total
         else:
           keys[user]['units'][unit]['rejects'] += 1
           keys[user]['units'][unit]['last_error'] = "unable to validate request: " + orders['error']
@@ -206,11 +217,16 @@ def credit():
             orders += [ (user, order) for order in keys[user]['units'][unit][side][sample] ]
           orders.sort(key = lambda x: x[1][0])
           balance = 0.0
+          previd = -1
           for user, order in orders:
-            payout = calculate_interest(balance, order[1], _interest[name][unit]) / (_sampling * 60 * 24)
-            keys[user]['balance'] += payout
-            balance += order[1]
-            logger.info("credit %.8f NBT to %s for providing %.8f %s liquidity on the %s market of %s", payout, user, order[1], side, unit, keys[user]['name'])
+            if order[0] != previd:
+              previd = order[0]
+              payout = calculate_interest(balance, order[1], _interest[name][unit]) / (_sampling * 60 * 24)
+              keys[user]['balance'] += payout
+              balance += order[1]
+              logger.info("credit %.8f NBT to %s for providing %.8f %s liquidity on the %s market of %s", payout, user, order[1], side, unit, keys[user]['name'])
+            else:
+              logger.warning("duplicate order id detected for user %s on exchange %s: %d", user, keys[user]['name'], previd)
         for user in users:
           keys[user]['units'][unit][side] = []
 
