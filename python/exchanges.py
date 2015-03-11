@@ -26,7 +26,7 @@ class Poloniex(Exchange):
     if "Nonce must be greater than" in error: # (TODO: regex)
       if ':' in error: error = error.split(':')[1].strip()
       error = error.replace('.', '').split()
-      self._shift += 1 + (int(error[5]) - int(error[8])) / 1000
+      self._shift += 10 + (int(error[5]) - int(error[8])) / 1000
     else:
       self._shift = (self._shift + 10) % 1800
 
