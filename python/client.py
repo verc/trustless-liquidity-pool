@@ -207,7 +207,7 @@ try:
                 time.sleep(0.7)
                 logger.warning('too many missing requests, sleeping a short while')
             if rejects - efficiency[user['key']][1] > passed / 5:
-              _wrappers[stats['name']].adjust()
+              _wrappers[stats['name']].adjust(stats['units'][unit]['last_error'])
               logger.warning('too many rejected requests on exchange %s, trying to adjust nonce of exchange to %d', stats['name'], _wrappers[stats['name']]._shift)
           newmissing = missing - efficiency[user['key']][0]
           newrejects = rejects - efficiency[user['key']][1]
