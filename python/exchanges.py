@@ -20,6 +20,7 @@ class Poloniex(Exchange):
   def __init__(self):
     super(Poloniex, self).__init__('poloniex.com/tradingApi')
     self._shift = 1
+    self._nonce = 0
 
   def adjust(self, error):
     if error[:5] == 'Nonce': # Nonce must be greater than 1426131710000. You provided 1426032513010. (TODO: regex)
@@ -30,6 +31,9 @@ class Poloniex(Exchange):
 
   def post(self, method, params, key, secret):
     request = { 'nonce' : int(time.time() + self._shift) * 1000, 'command' : method }
+    if self._nonce >= request['nonce']:
+      request['nonce'] += 1
+    self._nonce = request['nonce']
     request.update(params)
     data = urllib.urlencode(request)
     sign = hmac.new(secret, data, hashlib.sha512).hexdigest()
