@@ -117,8 +117,8 @@ def place(unit, side, name, key, secret, price):
   return response
 
 def reset(user, unit, price, cancel = True):
+  print user, unit, price, cancel
   response = { 'error' : True }
-  tries = 0
   while 'error' in response:
     response = {}
     if cancel:
