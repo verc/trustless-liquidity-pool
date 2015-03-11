@@ -153,11 +153,19 @@ class RequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
   def log_message(self, format, *args): pass
 
 def update_price():
-  try:
+  try: # bitfinex
     ret = json.loads(urllib2.urlopen(urllib2.Request('https://api.bitfinex.com/v1//pubticker/btcusd')).read())
     price['btc'] = 1.0 / float(ret['mid'])
   except:
-    logging.error("unable to update price for BTC")
+    try: # coinbase
+      ret = json.loads(urllib2.urlopen(urllib2.Request('https://coinbase.com/api/v1/prices/spot_rate?currency=USD')).read())
+      price['btc'] = 1.0 / float(ret['amount'])
+    except:
+      try: # bitstamp
+        ret = json.loads(urllib2.urlopen(urllib2.Request('https://www.bitstamp.net/api/ticker/')).read())
+        price['btc'] = 2.0 / (float(ret['ask']) + float(ret['bid']))
+      except:
+        logging.error("unable to update price for BTC")
 
 def validate():
   liquidity = { 'bid' : 0.0, 'ask' : 0.0 }
