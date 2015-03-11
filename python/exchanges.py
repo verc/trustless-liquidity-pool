@@ -102,7 +102,7 @@ class CCEDK(Exchange):
             'https://www.ccedk.com/api/v1/currency/list?' + urllib.urlencode({ 'nonce' : int(time.time() + self._shift) }))).read())
           for unit in response['response']['entities']:
             self.currency_id[unit['iso'].lower()] = unit['currency_id']
-      except TypeError:
+      except:
         self.adjust(",".join(response['errors'].values()))
         print >> sys.stderr, "could not retrieve ccedk ids, will adjust shift to", self._shift
         time.sleep(1)

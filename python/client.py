@@ -98,7 +98,10 @@ def place(unit, side, name, key, secret, price):
     exunit = unit
     price *= (1.0 - _spread)
   price = ceil(price * 10**8) / float(10**8) # truncate floating point precision after 8th position
-  response = _wrappers[name].get_balance(exunit, key, secret)
+  try:
+    response = _wrappers[name].get_balance(exunit, key, secret)
+  except:
+    response = { 'error' : 'exception caught' }
   if 'error' in response:
     logger.error('unable to receive balance for unit %s on exchange %s: %s', exunit, name, response['error'])
     _wrappers[name].adjust(response['error'])
@@ -107,7 +110,10 @@ def place(unit, side, name, key, secret, price):
     if time.time() - _exchanges['time'] > 30: # this will be used to rebalance nbts
       _exchanges = get('exchanges')
       _exchanges['time'] = time.time()
-    response = _wrappers[name].place_order(unit, side, key, secret, balance, price)
+    try:
+      response = _wrappers[name].place_order(unit, side, key, secret, balance, price)
+    except:
+      response = { 'error' : 'exception caught' }
     if 'error' in response:
       logger.error('unable to place %s %s order iof %.4f NBT at %.8f on exchange %s: %s', side, exunit, balance, price, name, response['error'])
       _wrappers[name].adjust(response['error'])
@@ -120,7 +126,10 @@ def reset(user, unit, price, cancel = True):
   while 'error' in response:
     response = {}
     if cancel:
-      response = _wrappers[user['name']].cancel_orders(unit, user['key'], user['secret'])
+      try:
+        response = _wrappers[user['name']].cancel_orders(unit, user['key'], user['secret'])
+      except:
+        response = { 'error' : 'exception caught' }
       if 'error' in response:
         logger.error('unable to cancel orders for unit %s on exchange %s: %s', unit, user['name'], response['error'])
       else:
