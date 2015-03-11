@@ -42,13 +42,16 @@ logger.addHandler(ch)
 
 _server = sys.argv[1]
 _wrappers = { 'poloniex' : Poloniex(), 'ccedk' : CCEDK(), 'bitcoincoid' : BitcoinCoId() }
-_feeds = { 'btc' : {  'main-feed' : 'bitfinex',
-                      'backup-feeds' : {  
-                        'backup1' : { 'name' : 'blockchain' },
-                        'backup2' : { 'name' : 'coinbase' },
-                        'backup3' : { 'name' : 'bitstamp' }
-                      } }, 'usd' : None }
 _spread = 0.002
+
+def update_price():
+  price = {}
+  try:
+    ret = json.loads(urllib2.urlopen(urllib2.Request('https://api.bitfinex.com/v1//pubticker/btcusd')).read())
+    price['btc'] = 1.0 / float(ret['mid'])
+  except:
+    logging.error("unable to update price for BTC")
+  return price
 
 def json_request(request, method, params, headers):
   connection = httplib.HTTPConnection(_server, timeout=60)
@@ -130,12 +133,9 @@ def reset(user, unit, price, cancel = True):
   while 'error' in response:
     response = {}
     if cancel:
-      try:
-        response = _wrappers[user['name']].cancel_orders(unit, user['key'], user['secret'])
-      except KeyboardInterrupt:
-        raise
-      except:
-        response = { 'error' : 'exception caught' }
+      try: response = _wrappers[user['name']].cancel_orders(unit, user['key'], user['secret'])
+      except KeyboardInterrupt: raise
+      except: response = { 'error' : 'exception caught' }
       if 'error' in response:
         logger.error('unable to cancel orders for unit %s on exchange %s: %s', unit, user['name'], response['error'])
       else:
@@ -156,10 +156,7 @@ for user in userdata:
     logger.error("register: %s" % ret['message'])
   else:
     units = [ unit.lower() for unit in user[1].split(',') ]
-    if len([unit for unit in units if not unit in _feeds]) > 0:
-      logger.error("register: no feed available for unit %s" % unit)
-    else:
-      users.append({'address' : user[0], 'units' : units, 'name' : user[2].lower(), 'key' : user[3], 'secret' : user[4], 'nubot' : {}})
+    users.append({'address' : user[0], 'units' : units, 'name' : user[2].lower(), 'key' : user[3], 'secret' : user[4], 'nubot' : {}})
 
 # submit liquiditys
 try:
@@ -173,10 +170,14 @@ try:
   logger.debug('starting liquidity propagation with sampling %d' % sampling)
   exchanges = get('exchanges')
   exchanges['time'] = time.time()
+  userprice = update_price()
 
   # initialize walls
   for user in users:
     for unit in user['units']:
+      if not unit in price:
+        logger.error('unit for user %s unknown: %s', unit['key'], unit)
+        sys.exit(1)
       reset(user, unit, price[unit])
 
   while True:
@@ -194,14 +195,23 @@ try:
     if ts >= 30:
       # check orders
       newprice = get('price')
-      for unit in price:
-        deviation = 1.0 - min(price[unit], newprice[unit]) / max(price[unit], newprice[unit])
-        if deviation > 0.02:
-          logger.info('Price of unit %s moved from %.8f to %.8f, will try to reset orders', unit, price[unit], newprice[unit])
-          price[unit] = newprice[unit]
+      userprice = update_price()
+      if 1.0 - min(newprice[unit], userprice[unit]) / max(newprice[unit], userprice[unit]) > 0.02:
+        logger.error('server price %.8f for unit %s deviates too much from price %.8f received from ticker, will delete all orders for this unit', newprice[unit], unit, userprice[unit])
         for user in users:
           if unit in user['units']:
-            reset(user, unit, price[unit], deviation > 0.02)
+            try: response = _wrappers[user['name']].cancel_orders(unit, user['key'], user['secret'])
+            except KeyboardInterrupt: raise
+            except: response = { 'error' : 'exception caught' }
+      else:
+        for unit in price:
+          deviation = 1.0 - min(price[unit], newprice[unit]) / max(price[unit], newprice[unit])
+          if deviation > 0.02:
+            logger.info('price of unit %s moved from %.8f to %.8f, will try to reset orders', unit, price[unit], newprice[unit])
+            price[unit] = newprice[unit]
+          for user in users:
+            if unit in user['units']:
+              reset(user, unit, price[unit], deviation > 0.02)
       # print some info
       status = get('status')
       passed = status['validations'] - validations
