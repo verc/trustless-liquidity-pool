@@ -104,7 +104,7 @@ class CCEDK(Exchange):
             self.currency_id[unit['iso'].lower()] = unit['currency_id']
       except:
         self.adjust(",".join(response['errors'].values()))
-        print >> sys.stderr, "could not retrieve ccedk ids, will adjust shift to", self._shift
+        print >> sys.stderr, "could not retrieve ccedk ids, will adjust shift to", self._shift, "reason:", ",".join(response['errors'].values())
         time.sleep(1)
 
   def adjust(self, error):
@@ -113,15 +113,12 @@ class CCEDK(Exchange):
       minimum = int(error.strip().split()[-3].replace('`', ''))
       maximum = int(error.strip().split()[-1].replace('`', ''))
       current = int(time.time()) #int(error.split()[2].split('`')[3])
-      if maximum == current:
-        super(CCEDK, self).adjust(error)
+      if current < maximum:
+        self._shift = (minimum + 2 * maximum) / 3  - current
       else:
-        if current < maximum:
-          self._shift = (minimum + 2 * maximum) / 3  - current
-        else:
-          self._shift = (minimum + maximum) / 2 - current
+        self._shift = (minimum + maximum) / 2 - current
     else:
-      super(CCEDK, self).adjust(error)
+        super(CCEDK, self).adjust(error)
 
   def post(self, method, params, key, secret):
     request = { 'nonce' : int(time.time()  + self._shift) }
@@ -189,6 +186,62 @@ class CCEDK(Exchange):
 class BitcoinCoId(Exchange):
   def __init__(self):
     super(BitcoinCoId, self).__init__('vip.bitcoin.co.id/tapi')
+    self._nonce = 0
+
+  def adjust(self, error):
+    if "Invalid nonce" in error: #(TODO: regex)
+      try:
+        response = json.loads(urllib2.urlopen(urllib2.Request('https://vip.bitcoin.co.id/api/summaries')).read())
+        delta = float(response['tickers']['btc_idr']['server_time']) - time.time()
+        if abs(delta) < 2:
+          super(BitcoinCoId, self).adjust(error)
+        else:
+          self._shift = delta + 10
+      except:
+        print >> sys.stderr, "exception caught when trying to retrieve server time of Bitcoin.co.id"
+        super(BitcoinCoId, self).adjust(error)
+    else:
+      super(BitcoinCoId, self).adjust(error)
+
+  def post(self, method, params, key, secret):
+    request = { 'nonce' : int(time.time()  + self._shift) * 1000, 'method' : method }
+    if self._nonce >= request['nonce']:
+      request['nonce'] = self._nonce + self._shift * 1000
+    self._nonce = request['nonce']
+    request.update(params)
+    data = urllib.urlencode(request)
+    sign = hmac.new(secret, data, hashlib.sha512).hexdigest()
+    headers = { 'Sign' : sign, 'Key' : key }
+    return json.loads(urllib2.urlopen(urllib2.Request('https://vip.bitcoin.co.id/tapi', data, headers)).read())
+
+  def cancel_orders(self, unit, key, secret):
+    response = self.post('openOrders', {'pair' : 'nbt_' + unit.lower()}, key, secret)
+    if response['success'] == 0 or not response['return']['orders']: return response
+    for order in response['return']['orders']:
+      params = { 'pair' : 'nbt_' + unit.lower(), 'order_id' : order['order_id'], 'type' :  order['type'] }
+      ret = self.post('cancelOrder', params, key, secret)
+      if 'error' in ret:
+        if not 'error' in response: response['error'] = ""
+        response['error'] += "," + ret['error']
+    return response
+
+  def place_order(self, unit, side, key, secret, amount, price):
+    params = { 'pair' : 'nbt_' + unit.lower(), 'type' : 'buy' if side == 'bid' else 'sell', 'price' : price }
+    if side == 'bid':
+      params[unit.lower()] = amount
+    else:
+      params['nbt'] = amount
+      params[unit] = amount * price
+    response = self.post('trade', params, key, secret)
+    if response['success'] == 1:
+      response['id'] = response['return']['order_id']
+    return response
+
+  def get_balance(self, unit, key, secret):
+    response = self.post('getInfo', {}, key, secret)
+    if response['success'] == 1:
+      response['balance'] = float(response['return']['balance'][unit.lower()])
+    return response
 
   def create_request(self, unit, key = None, secret = None):
     if not secret: return None, None

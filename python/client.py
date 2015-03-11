@@ -100,6 +100,8 @@ def place(unit, side, name, key, secret, price):
   price = ceil(price * 10**8) / float(10**8) # truncate floating point precision after 8th position
   try:
     response = _wrappers[name].get_balance(exunit, key, secret)
+  except KeyboardInterrupt:
+    raise
   except:
     response = { 'error' : 'exception caught' }
   if 'error' in response:
@@ -112,6 +114,8 @@ def place(unit, side, name, key, secret, price):
       _exchanges['time'] = time.time()
     try:
       response = _wrappers[name].place_order(unit, side, key, secret, balance, price)
+    except KeyboardInterrupt:
+      raise
     except:
       response = { 'error' : 'exception caught' }
     if 'error' in response:
@@ -128,6 +132,8 @@ def reset(user, unit, price, cancel = True):
     if cancel:
       try:
         response = _wrappers[user['name']].cancel_orders(unit, user['key'], user['secret'])
+      except KeyboardInterrupt:
+        raise
       except:
         response = { 'error' : 'exception caught' }
       if 'error' in response:
