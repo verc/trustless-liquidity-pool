@@ -89,18 +89,18 @@ class CCEDK(Exchange):
     while not self.pair_id or not self.currency_id:
       try:
         if not self.pair_id:
-          markets = json.loads(urllib2.urlopen(urllib2.Request(
+          response = json.loads(urllib2.urlopen(urllib2.Request(
             'https://www.ccedk.com/api/v1/stats/marketdepthfull?' + urllib.urlencode({ 'nonce' : int(time.time() + self._shift) }))).read())
-          for unit in markets['response']['entities']:
+          for unit in response['response']['entities']:
             if unit['pair_name'][:4] == 'NBT/':
               self.pair_id[unit['pair_name'][4:]] = unit['pair_id']
         if not self.currency_id:
-          currencies = json.loads(urllib2.urlopen(urllib2.Request(
+          response = json.loads(urllib2.urlopen(urllib2.Request(
             'https://www.ccedk.com/api/v1/currency/list?' + urllib.urlencode({ 'nonce' : int(time.time() + self._shift) }))).read())
-          for unit in currencies['response']['entities']:
+          for unit in response['response']['entities']:
             self.currency_id[unit['iso'].lower()] = unit['currency_id']
       except TypeError:
-        self.adjust()
+        self.adjust(",".join(response['errors'].values()))
         print >> sys.stderr, "could not retrieve ccedk ids, will adjust shift to", self._shift
         time.sleep(1)
 
