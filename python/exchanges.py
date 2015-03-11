@@ -26,6 +26,8 @@ class Poloniex(Exchange):
     if error[:5] == 'Nonce': # Nonce must be greater than 1426131710000. You provided 1426032513010. (TODO: regex)
       error = error.replace('.', '').split()
       self._shift += 1 + (int(error[5]) - int(error[8])) / 1000
+    else:
+      self.shift += 10
 
   def post(self, method, params, key, secret):
     request = { 'nonce' : int(time.time() + self._shift) * 1000 + self._offset, 'command' : method }
