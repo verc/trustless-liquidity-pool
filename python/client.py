@@ -61,7 +61,6 @@ def json_request(request, method, params, headers):
     logging.error("%s: server could not be reached, retrying in 15 seconds ...", method)
   except ValueError:
     logging.error("%s: server response invalid, retrying in 15 seconds ... %s", method, content)
-    print content
   except socket.error:
     logging.error("%s: socket error, retrying in 15 seconds ...", method)
   time.sleep(15)
@@ -92,7 +91,6 @@ def submit(key, name, unit, secret):
 _exchanges = { 'time' : 0 }
 def place(unit, side, name, key, secret, price):
   global _exchanges
-  print side, name, price
   if side == 'ask':
     exunit = 'nbt'
     price *= (1.0 + _spread)
@@ -105,7 +103,6 @@ def place(unit, side, name, key, secret, price):
     logger.error('unable to receive balance for unit %s on exchange %s: %s', exunit, name, response['error'])
     _wrappers[name].adjust(response['error'])
   elif response['balance'] >  0.0001:
-    print response['balance']
     balance = response['balance'] if exunit == 'nbt' else response['balance'] / price
     if time.time() - _exchanges['time'] > 30: # this will be used to rebalance nbts
       _exchanges = get('exchanges')
@@ -116,8 +113,6 @@ def place(unit, side, name, key, secret, price):
       _wrappers[name].adjust(response['error'])
     else:
       logger.info('successfully placed %s %s order of %.4f NBT at %.8f on exchange %s', side, exunit, balance, price, name)
-  else:
-    print response['balance']
   return response
 
 def reset(user, unit, price, cancel = True):
@@ -130,7 +125,6 @@ def reset(user, unit, price, cancel = True):
         logger.error('unable to cancel orders for unit %s on exchange %s: %s', unit, user['name'], response['error'])
       else:
         logger.info('successfully deleted all orders for unit %s on exchange %s', unit, user['name'])
-    print response
     if not 'error' in response:
       response = place(unit, 'bid', user['name'], user['key'], user['secret'], price)
       if not 'error' in response:
@@ -190,7 +184,8 @@ try:
         if deviation > 0.02:
           logger.info('Price of unit %s moved from %.8f to %.8f, will try to reset orders', unit, price[unit], newprice[unit])
           price[unit] = newprice[unit]
-        reset(user, unit, price[unit], deviation > 0.02)
+        for user in users if unit in users['units']:
+          reset(user, unit, price[unit], deviation > 0.02)
       # print some info
       status = get('status')
       passed = status['validations'] - validations
