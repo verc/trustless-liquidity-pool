@@ -184,8 +184,9 @@ try:
         if deviation > 0.02:
           logger.info('Price of unit %s moved from %.8f to %.8f, will try to reset orders', unit, price[unit], newprice[unit])
           price[unit] = newprice[unit]
-        for user in users if unit in user['units']:
-          reset(user, unit, price[unit], deviation > 0.02)
+        for user in users:
+          if unit in user['units']:
+            reset(user, unit, price[unit], deviation > 0.02)
       # print some info
       status = get('status')
       passed = status['validations'] - validations
