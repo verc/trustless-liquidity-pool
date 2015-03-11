@@ -111,7 +111,6 @@ class CCEDK(Exchange):
       #minimum = int(error.strip().split()[-3].replace('`', ''))
       maximum = int(error.strip().split()[-1].replace('`', ''))
       current = int(error.split()[2].split('`')[3])
-      print maximum, current, self._shift, self._shift + maximum - current
       if maximum == current:
         super(CCEDK, self).adjust(error)
       else:
