@@ -93,10 +93,10 @@ def place(unit, side, name, key, secret, price):
   global _exchanges
   if side == 'ask':
     exunit = 'nbt'
-    realprice *= (1.0 + _spread)
+    realprice = price * (1.0 + _spread)
   else:
     exunit = unit
-    realprice *= (1.0 - _spread)
+    realprice = price * (1.0 - _spread)
   response = _wrappers[name].get_balance(exunit, key, secret)
   if 'error' in response:
     logger.error('unable to receive balance for unit %s on exchange %s: %s', exunit, name, response['error'])
