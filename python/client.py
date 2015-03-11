@@ -115,8 +115,10 @@ def place(unit, side, name, key, secret, price):
       _wrappers[name].adjust(response['error'])
     else:
       logger.info('successfully placed %s %s order of %.4f NBT at %.8f on exchange %s', side, exunit, balance, price, name)
-  if not 'error' in response:
+  if balance:
     print balance
+  elif 'balance' in response:
+    print response['balance']
   return response
 
 def reset(user, unit, price, cancel = True):
