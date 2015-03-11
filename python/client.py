@@ -116,7 +116,7 @@ def place(unit, side, name, key, secret, price):
     else:
       logger.info('successfully placed %s %s order of %.4f NBT at %.8f on exchange %s', side, exunit, balance, price, name)
   if not 'error' in response:
-    print response['balance']
+    print balance
   return response
 
 def reset(user, unit, price, cancel = True):
