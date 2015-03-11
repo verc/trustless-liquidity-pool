@@ -112,14 +112,14 @@ class CCEDK(Exchange):
       if ':' in error: error = error.split(':')[1].strip()
       minimum = int(error.strip().split()[-3].replace('`', ''))
       maximum = int(error.strip().split()[-1].replace('`', ''))
-      current = int(error.split()[2].split('`')[3])
+      current = int(time.time()) #int(error.split()[2].split('`')[3])
       if maximum == current:
         super(CCEDK, self).adjust(error)
       else:
         if current < maximum:
-          self._shift += (minimum + 2 * maximum) / 3  - current - 1
+          self._shift = (minimum + 2 * maximum) / 3  - current
         else:
-          self._shift += (minimum + maximum) / 2 - current + 1
+          self._shift = (minimum + maximum) / 2 - current
     else:
       super(CCEDK, self).adjust(error)
 
