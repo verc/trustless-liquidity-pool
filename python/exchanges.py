@@ -27,7 +27,7 @@ class Poloniex(Exchange):
       error = error.replace('.', '').split()
       self._shift += 1 + (int(error[5]) - int(error[8])) / 1000
     else:
-      self.shift = (self.shift + 10) % 1800
+      self._shift = (self._shift + 10) % 1800
 
   def post(self, method, params, key, secret):
     request = { 'nonce' : int(time.time() + self._shift) * 1000, 'command' : method }
