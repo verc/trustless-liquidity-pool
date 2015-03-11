@@ -92,6 +92,7 @@ def submit(key, name, unit, secret):
 _exchanges = { 'time' : 0 }
 def place(unit, side, name, key, secret, price):
   global _exchanges
+  print side, name, price
   if side == 'ask':
     exunit = 'nbt'
     price *= (1.0 + _spread)
@@ -117,7 +118,6 @@ def place(unit, side, name, key, secret, price):
   return response
 
 def reset(user, unit, price, cancel = True):
-  print user, unit, price, cancel
   response = { 'error' : True }
   while 'error' in response:
     response = {}
@@ -127,6 +127,7 @@ def reset(user, unit, price, cancel = True):
         logger.error('unable to cancel orders for unit %s on exchange %s: %s', unit, user['name'], response['error'])
       else:
         logger.info('successfully deleted all orders for unit %s on exchange %s', unit, user['name'])
+    print response
     if not 'error' in response:
       response = place(unit, 'bid', user['name'], user['key'], user['secret'], price)
       if not 'error' in response:
