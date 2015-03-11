@@ -119,7 +119,7 @@ class CCEDK(Exchange):
         if current < maximum:
           self._shift += maximum - current
         else:
-          self._shift += minimum - current
+          self._shift += (minimum + maximum) / 2 - current
     else:
       super(CCEDK, self).adjust(error)
 
