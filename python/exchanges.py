@@ -20,18 +20,16 @@ class Poloniex(Exchange):
   def __init__(self):
     super(Poloniex, self).__init__('poloniex.com/tradingApi')
     self._shift = 1
-    self._offset = 1
 
   def adjust(self, error):
     if error[:5] == 'Nonce': # Nonce must be greater than 1426131710000. You provided 1426032513010. (TODO: regex)
       error = error.replace('.', '').split()
       self._shift += 1 + (int(error[5]) - int(error[8])) / 1000
     else:
-      self.shift += 10
+      self.shift = (self.shift + 10) % 1800
 
   def post(self, method, params, key, secret):
-    request = { 'nonce' : int(time.time() + self._shift) * 1000 + self._offset, 'command' : method }
-    self._offset = (self._offset + 1) % 1000
+    request = { 'nonce' : int(time.time() + self._shift) * 1000, 'command' : method }
     request.update(params)
     data = urllib.urlencode(request)
     sign = hmac.new(secret, data, hashlib.sha512).hexdigest()
@@ -49,9 +47,7 @@ class Poloniex(Exchange):
     return response
 
   def place_order(self, unit, side, key, secret, amount, price):
-    params = { 'currencyPair' : "%s_NBT"%unit.upper(),
-               "rate" : price,
-               "amount" : amount }
+    params = { 'currencyPair' : "%s_NBT"%unit.upper(), "rate" : price, "amount" : amount }
     response = self.post('buy' if side == 'bid' else 'sell', params, key, secret)
     if not 'error' in response:
       response['id'] = response['orderNumber']
