@@ -105,6 +105,7 @@ def place(unit, side, name, key, secret, price):
     logger.error('unable to receive balance for unit %s on exchange %s: %s', exunit, name, response['error'])
     _wrappers[name].adjust(response['error'])
   elif response['balance'] >  0.0001:
+    print balance
     balance = response['balance'] if exunit == 'nbt' else response['balance'] / price
     if time.time() - _exchanges['time'] > 30: # this will be used to rebalance nbts
       _exchanges = get('exchanges')
