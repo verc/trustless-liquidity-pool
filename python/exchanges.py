@@ -228,7 +228,7 @@ class BitcoinCoId(Exchange):
   def place_order(self, unit, side, key, secret, amount, price):
     params = { 'pair' : 'nbt_' + unit.lower(), 'type' : 'buy' if side == 'bid' else 'sell', 'price' : price }
     if side == 'bid':
-      params[unit.lower()] = amount
+      params[unit.lower()] = amount * price
     else:
       params['nbt'] = amount
       params[unit] = amount * price
