@@ -13,10 +13,53 @@ class Exchange(object):
     self._domain = domain
     self._shift = 1
 
+  def adjust(self, error = None):
+    self._shift = ((self._shit + 7) % 200) - 100 # -92 15 -78 29 -64 43 -50 57 ...
 
 class Poloniex(Exchange):
   def __init__(self):
     super(Poloniex, self).__init__('poloniex.com/tradingApi')
+    self._shift = 1
+    self._offset = 1
+
+  def adjust(self, error):
+    if error[:5] == 'Nonce': # Nonce must be greater than 1426131710000. You provided 1426032513010. TODO: regex
+      error = error.replace('.', '').split()
+      self._shift += 1 + (int(error[5]) - int(error[8])) / 1000
+
+  def post(self, method, params, key, secret):
+    request = { 'nonce' : int(time.time() + self._shift) * 1000 + self._offset, 'command' : method }
+    self._offset = (self._offset + 1) % 1000
+    request.update(params)
+    data = urllib.urlencode(request)
+    sign = hmac.new(secret, data, hashlib.sha512).hexdigest()
+    headers = { 'Sign' : sign, 'Key' : key }
+    return json.loads(urllib2.urlopen(urllib2.Request('https://poloniex.com/tradingApi', data, headers)).read())
+
+  def cancel_orders(self, unit, key, secret):
+    response = self.post('returnOpenOrders', {'currencyPair' : "%s_NBT"%unit.upper()}, key, secret)
+    if 'error' in response: return response
+    for order in response:
+      ret = self.post('cancelOrder', { 'currencyPair' : "%s_NBT"%unit.upper(), 'orderNumber' : order['orderNumber'] }, key, secret)
+      if 'error' in ret:
+        if isinstance(response,list): response = { 'error': "" }
+        response['error'] += "," + ret['error']
+    return response
+
+  def place_order(self, unit, side, key, secret, amount, price):
+    params = { 'currencyPair' : "%s_NBT"%unit.upper(),
+               "rate" : price,
+               "amount" : amount }
+    response = self.post('buy' if side == 'bid' else 'sell', params, key, secret)
+    if not 'error' in response:
+      response['id'] = response['orderNumber']
+    return response
+
+  def get_balance(self, unit, key, secret):
+    response = self.post('returnBalances', {}, key, secret)
+    if not 'error' in response:
+      response['balance'] = float(response[unit.upper()])
+    return response
 
   def create_request(self, unit, key = None, secret = None):
     if not secret: return None, None
@@ -80,6 +123,7 @@ class CCEDK(Exchange):
       if order['pair_id'] == self.pair_id[unit.upper()]:
         ret = self.post('order/cancel', { 'order_id' : order['order_id'] }, key, secret)
         if not ret['response']:
+          if not response['error']: response['error'] = ""
           response['error'] += ",".join(ret['errors'].values())
     return response
 

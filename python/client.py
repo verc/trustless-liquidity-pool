@@ -100,8 +100,8 @@ def place(unit, side, name, key, secret, price):
   response = _wrappers[name].get_balance(exunit, key, secret)
   if 'error' in response:
     logger.error('unable to receive balance for unit %s on exchange %s: %s', exunit, name, response['error'])
-    return False
-  elif response['balance'] > 0:
+    _wrappers[name]._shift = ((_wrappers[name]._shift + 7) % 200) - 100
+  elif response['balance'] >  0.0001:
     balance = response['balance']
     if time.time() - _exchanges['time'] > 30: # this will be used to rebalance nbts
       _exchanges = get('exchanges')
@@ -109,10 +109,29 @@ def place(unit, side, name, key, secret, price):
     response = _wrappers[name].place_order(unit, side, key, secret, balance, price)
     if 'error' in response:
       logger.error('unable to place order for unit %s on exchange %s: %s', exunit, name, response['error'])
+      _wrappers[name]._shift = ((_wrappers[name]._shift + 7) % 200) - 100
     else:
       amount = balance if exunit == 'nbt' else balance / price
       logger.info('successfully placed %s %s order of %.4f NBT at %.8f on exchange %s', side, exunit, amount, price, name)
-  return True
+  return response
+
+def reset(user, unit, price):
+  response = { 'error' : True }
+  tries = 0
+  while 'error' in response:
+    tries = tries + 1
+    response = _wrappers[user['name']].cancel_orders(unit, user['key'], user['secret'])
+    if 'error' in response:
+      logger.error('unable to cancel orders for unit %s on exchange %s: %s', unit, user['name'], response['error'])
+    else:
+      logger.info('successfully deleted all orders for unit %s on exchange %s', unit, user['name'])
+      response = place(unit, 'bid', user['name'], user['key'], user['secret'], price)
+      if not 'error' in response:
+        response = place(unit, 'ask', user['name'], user['key'], user['secret'], price)
+    if 'error' in response:
+      if tries % 10 == 0:
+        _wrappers[user['name']].adjust(response['error'])
+        logger.info('trying to adjust nonce of exchange %s to %d', user['name'], _wrappers[user['name']]._shift)
 
 # register users
 users = []
@@ -127,7 +146,7 @@ for user in userdata:
     else:
       users.append({'address' : user[0], 'units' : units, 'name' : user[2].lower(), 'key' : user[3], 'secret' : user[4], 'nubot' : {}})
 
-# submit liquidity
+# submit liquiditys
 try:
   ts = 0
   basestatus = get('status')
@@ -139,30 +158,17 @@ try:
   logger.debug('starting liquidity propagation with sampling %d' % sampling)
   exchanges = get('exchanges')
   exchanges['time'] = time.time()
+
+  # initialize walls
+  for user in users:
+    for unit in user['units']:
+      reset(user, unit, price[unit])
+
   while True:
     ts = (ts % 30) + 60 / sampling
     curtime = time.time()
     for user in users:
       for unit in user['units']:
-        # check orders
-        if newprice:
-          deviation = 1.0 - min(price[unit], newprice[unit]) / max(price[unit], newprice[unit])
-          if deviation > 0.05:
-            price = newprice
-            response = _wrappers[user['name']].cancel_orders(unit, user['key'], user['secret'])
-            if 'error' in response:
-              logger.error('unable to cancel orders for unit %s on exchange %s: %s', unit, user['name'], response['error'])
-              deviation = 0
-            else:
-              logger.info('successfully deleted all orders for unit %s on exchange %s', unit, user['name'])
-        else:
-          newprice = get('price')
-          price = newprice
-          deviation = 1
-        if deviation > 0.05:
-          if not place(unit, 'bid', user['name'], user['key'], user['secret'], price[unit]): newprice = None
-          if not place(unit, 'ask', user['name'], user['key'], user['secret'], price[unit]): newprice = None
-
         # submit requests
         ret = submit(user['key'], user['name'], unit, user['secret'])
         if ret['code'] != 0:
@@ -170,9 +176,15 @@ try:
             register(user['key'], user['name'], user['address'])
           logger.error("submit: %s" % ret['message'])
 
-    if ts >= 30: # print some info
-      status = get('status')
+    if ts >= 30:
+      # check orders
       newprice = get('price')
+      deviation = 1.0 - min(price[unit], newprice[unit]) / max(price[unit], newprice[unit])
+      if deviation > 0.05:
+        price = newprice
+        reset(user, unit, price[unit])
+      # print some info
+      status = get('status')
       passed = status['validations'] - validations
       validations = status['validations']
       if passed > 0:
@@ -196,7 +208,7 @@ try:
                 time.sleep(0.7)
                 logger.warning('too many missing requests, sleeping a short while')
             if rejects - efficiency[user['key']][1] > passed / 5:
-              _wrappers[stats['name']]._shift = ((_wrappers[stats['name']]._shift + 7) % 200) - 100 # -92 15 -78 29 -64 43 -50 57 ...
+              _wrappers[stats['name']].adjust()
               logger.warning('too many rejected requests on exchange %s, trying to adjust nonce of exchange to %d', stats['name'], _wrappers[stats['name']]._shift)
           newmissing = missing - efficiency[user['key']][0]
           newrejects = rejects - efficiency[user['key']][1]
