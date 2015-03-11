@@ -108,29 +108,30 @@ def place(unit, side, name, key, secret, price):
       _exchanges['time'] = time.time()
     response = _wrappers[name].place_order(unit, side, key, secret, balance, price)
     if 'error' in response:
-      logger.error('unable to place order for unit %s on exchange %s: %s', exunit, name, response['error'])
+      logger.error('unable to place %s %s order iof %.4f NBT at %.8f on exchange %s: %s', side, exunit, balance, price, name, response['error'])
       _wrappers[name].adjust(response['error'])
     else:
       logger.info('successfully placed %s %s order of %.4f NBT at %.8f on exchange %s', side, exunit, balance, price, name)
   return response
 
-def reset(user, unit, price):
+def reset(user, unit, price, cancel = True):
   response = { 'error' : True }
   tries = 0
   while 'error' in response:
-    tries = tries + 1
-    response = _wrappers[user['name']].cancel_orders(unit, user['key'], user['secret'])
-    if 'error' in response:
-      logger.error('unable to cancel orders for unit %s on exchange %s: %s', unit, user['name'], response['error'])
-    else:
-      logger.info('successfully deleted all orders for unit %s on exchange %s', unit, user['name'])
+    response = {}
+    if cancel:
+      response = _wrappers[user['name']].cancel_orders(unit, user['key'], user['secret'])
+      if 'error' in response:
+        logger.error('unable to cancel orders for unit %s on exchange %s: %s', unit, user['name'], response['error'])
+      else:
+        logger.info('successfully deleted all orders for unit %s on exchange %s', unit, user['name'])
+    if not 'error' in response:
       response = place(unit, 'bid', user['name'], user['key'], user['secret'], price)
       if not 'error' in response:
         response = place(unit, 'ask', user['name'], user['key'], user['secret'], price)
     if 'error' in response:
-      if tries % 10 == 0:
-        _wrappers[user['name']].adjust(response['error'])
-        logger.info('trying to adjust nonce of exchange %s to %d', user['name'], _wrappers[user['name']]._shift)
+      _wrappers[user['name']].adjust(response['error'])
+      logger.info('trying to adjust nonce of exchange %s to %d', user['name'], _wrappers[user['name']]._shift)
 
 # register users
 users = []
@@ -181,7 +182,7 @@ try:
       deviation = 1.0 - min(price[unit], newprice[unit]) / max(price[unit], newprice[unit])
       if deviation > 0.05:
         price = newprice
-        reset(user, unit, price[unit])
+      reset(user, unit, price[unit], deviation > 0.05)
       # print some info
       status = get('status')
       passed = status['validations'] - validations
