@@ -108,13 +108,16 @@ class CCEDK(Exchange):
 
   def adjust(self, error):
     if error[:15] == 'incorrect range': # Nonce must be greater than 1426131710000. You provided 1426032513010. (TODO: regex)
-      #minimum = int(error.strip().split()[-3].replace('`', ''))
+      minimum = int(error.strip().split()[-3].replace('`', ''))
       maximum = int(error.strip().split()[-1].replace('`', ''))
       current = int(error.split()[2].split('`')[3])
       if maximum == current:
         super(CCEDK, self).adjust(error)
       else:
-        self._shift += maximum - current
+        if current < maximum:
+          self._shift += maximum - current
+        else:
+          self._shift += minimum - current
     else:
       super(CCEDK, self).adjust(error)
 
