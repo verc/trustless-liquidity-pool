@@ -14,7 +14,7 @@ class Exchange(object):
     self._shift = 1
 
   def adjust(self, error = None):
-    self._shift = ((self._shit + 7) % 200) - 100 # -92 15 -78 29 -64 43 -50 57 ...
+    self._shift = ((self._shift + 7) % 200) - 100 # -92 15 -78 29 -64 43 -50 57 ...
 
 class Poloniex(Exchange):
   def __init__(self):
@@ -23,7 +23,7 @@ class Poloniex(Exchange):
     self._offset = 1
 
   def adjust(self, error):
-    if error[:5] == 'Nonce': # Nonce must be greater than 1426131710000. You provided 1426032513010. TODO: regex
+    if error[:5] == 'Nonce': # Nonce must be greater than 1426131710000. You provided 1426032513010. (TODO: regex)
       error = error.replace('.', '').split()
       self._shift += 1 + (int(error[5]) - int(error[8])) / 1000
 
