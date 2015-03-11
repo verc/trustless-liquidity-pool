@@ -102,7 +102,7 @@ def place(unit, side, name, key, secret, price):
     logger.error('unable to receive balance for unit %s on exchange %s: %s', exunit, name, response['error'])
     _wrappers[name]._shift = ((_wrappers[name]._shift + 7) % 200) - 100
   elif response['balance'] >  0.0001:
-    balance = response['balance']
+    balance = response['balance'] if exunit == 'nbt' else response['balance'] / price
     if time.time() - _exchanges['time'] > 30: # this will be used to rebalance nbts
       _exchanges = get('exchanges')
       _exchanges['time'] = time.time()
@@ -111,8 +111,7 @@ def place(unit, side, name, key, secret, price):
       logger.error('unable to place order for unit %s on exchange %s: %s', exunit, name, response['error'])
       _wrappers[name]._shift = ((_wrappers[name]._shift + 7) % 200) - 100
     else:
-      amount = balance if exunit == 'nbt' else balance / price
-      logger.info('successfully placed %s %s order of %.4f NBT at %.8f on exchange %s', side, exunit, amount, price, name)
+      logger.info('successfully placed %s %s order of %.4f NBT at %.8f on exchange %s', side, exunit, balance, price, name)
   return response
 
 def reset(user, unit, price):
