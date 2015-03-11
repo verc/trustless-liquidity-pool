@@ -106,10 +106,10 @@ class CCEDK(Exchange):
 
   def adjust(self, error):
     if error[:9] == 'incorrect': # Nonce must be greater than 1426131710000. You provided 1426032513010. (TODO: regex)
-      minimum = int(error.strip().split()[-3].replace('`'. ''))
-      maximum = int(error.strip().split()[-1].replace('`'. ''))
+      minimum = int(error.strip().split()[-3].replace('`', ''))
+      maximum = int(error.strip().split()[-1].replace('`', ''))
       current = int(error.strip()[2].split('`')[3])
-      self._shift += maximum - current
+      self._shift += (maximum - minimum) / 2 - current
     else:
       super(CCEDK, self).adjust()
 
