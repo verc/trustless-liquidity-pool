@@ -184,7 +184,7 @@ try:
       for unit in price:
         deviation = 1.0 - min(price[unit], newprice[unit]) / max(price[unit], newprice[unit])
         if deviation > 0.02:
-          logger.info('Price of unit move from %.8f to %.8f. Will try to reset orders.', price[unit], newprice[unit])
+          logger.info('Price of unit %s moved from %.8f to %.8f, will try to reset orders', unit, price[unit], newprice[unit])
           price[unit] = newprice[unit]
         reset(user, unit, price[unit], deviation > 0.05)
       # print some info
