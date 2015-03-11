@@ -98,7 +98,7 @@ def place(unit, side, name, key, secret, price):
   else:
     exunit = unit
     price *= (1.0 - _spread)
-  price = ceil(price * 10**8) / float(10**8)
+  price = ceil(price * 10**8) / float(10**8) # truncate floating point precision after 8th position
   response = _wrappers[name].get_balance(exunit, key, secret)
   if 'error' in response:
     logger.error('unable to receive balance for unit %s on exchange %s: %s', exunit, name, response['error'])
@@ -182,7 +182,7 @@ try:
       # check orders
       newprice = get('price')
       deviation = 1.0 - min(price[unit], newprice[unit]) / max(price[unit], newprice[unit])
-      if deviation > 0.05:
+      if deviation > 0.02:
         price = newprice
       reset(user, unit, price[unit], deviation > 0.05)
       # print some info
