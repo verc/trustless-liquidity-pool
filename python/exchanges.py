@@ -33,7 +33,7 @@ class Poloniex(Exchange):
   def post(self, method, params, key, secret):
     request = { 'nonce' : int(time.time() + self._shift) * 1000, 'command' : method }
     if self._nonce >= request['nonce']:
-      request['nonce'] = self._nonce + 1
+      request['nonce'] = self._nonce + self._shift * 1000
     self._nonce = request['nonce']
     request.update(params)
     data = urllib.urlencode(request)
