@@ -9,6 +9,7 @@ import signal
 import subprocess
 import logging
 import socket
+from math import ceil
 from exchanges import *
 
 if len(sys.argv) < 2:
@@ -93,10 +94,11 @@ def place(unit, side, name, key, secret, price):
   global _exchanges
   if side == 'ask':
     exunit = 'nbt'
-    realprice = price * (1.0 + _spread)
+    price *= (1.0 + _spread)
   else:
     exunit = unit
-    realprice = price * (1.0 - _spread)
+    price *= (1.0 - _spread)
+  price = ceil(price * 10**8) / float(10**8)
   response = _wrappers[name].get_balance(exunit, key, secret)
   if 'error' in response:
     logger.error('unable to receive balance for unit %s on exchange %s: %s', exunit, name, response['error'])
@@ -106,12 +108,12 @@ def place(unit, side, name, key, secret, price):
     if time.time() - _exchanges['time'] > 30: # this will be used to rebalance nbts
       _exchanges = get('exchanges')
       _exchanges['time'] = time.time()
-    response = _wrappers[name].place_order(unit, side, key, secret, balance, realprice)
+    response = _wrappers[name].place_order(unit, side, key, secret, balance, price)
     if 'error' in response:
-      logger.error('unable to place %s %s order iof %.4f NBT at %.8f on exchange %s: %s', side, exunit, balance, realprice, name, response['error'])
+      logger.error('unable to place %s %s order iof %.4f NBT at %.8f on exchange %s: %s', side, exunit, balance, price, name, response['error'])
       _wrappers[name].adjust(response['error'])
     else:
-      logger.info('successfully placed %s %s order of %.4f NBT at %.8f on exchange %s', side, exunit, balance, realprice, name)
+      logger.info('successfully placed %s %s order of %.4f NBT at %.8f on exchange %s', side, exunit, balance, price, name)
   return response
 
 def reset(user, unit, price, cancel = True):
