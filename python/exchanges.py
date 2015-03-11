@@ -111,7 +111,7 @@ class CCEDK(Exchange):
       current = int(error.strip()[2].split('`')[3])
       self._shift += (maximum - minimum) / 2 - current
     else:
-      super(CCEDK, self).adjust()
+      super(CCEDK, self).adjust("")
 
   def post(self, method, params, key, secret):
     request = { 'nonce' : int(time.time()  + self._shift) }
