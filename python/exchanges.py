@@ -100,9 +100,16 @@ class CCEDK(Exchange):
           for unit in currencies['response']['entities']:
             self.currency_id[unit['iso'].lower()] = unit['currency_id']
       except TypeError:
-        self._shift = ((self._shift + 3) % 20) - 10 # -6 7 0 -7 6 -1 -8 5 -2 -9 4 -3 -10 3 -4 9 2 -5 8 1
+        self.adjust()
         print >> sys.stderr, "could not retrieve ccedk ids, will adjust shift to", self._shift
         time.sleep(1)
+
+  def adjust(self, error):
+    if error[:9] == 'incorrect': # Nonce must be greater than 1426131710000. You provided 1426032513010. (TODO: regex)
+      minimum = int(error.strip().split()[-3].replace('`'. ''))
+      maximum = int(error.strip().split()[-1].replace('`'. ''))
+      current = int(error.strip()[2].split('`')[3])
+      self._shift += (maximum - minimum) / 2 - current
 
   def post(self, method, params, key, secret):
     request = { 'nonce' : int(time.time()  + self._shift) }
