@@ -107,7 +107,7 @@ class CCEDK(Exchange):
         time.sleep(1)
 
   def adjust(self, error):
-    if error[:15] == 'incorrect range': # Nonce must be greater than 1426131710000. You provided 1426032513010. (TODO: regex)
+    if "incorrect range" in error: #(TODO: regex)
       minimum = int(error.strip().split()[-3].replace('`', ''))
       maximum = int(error.strip().split()[-1].replace('`', ''))
       current = int(error.split()[2].split('`')[3])
@@ -140,7 +140,7 @@ class CCEDK(Exchange):
       if order['pair_id'] == self.pair_id[unit.upper()]:
         ret = self.post('order/cancel', { 'order_id' : order['order_id'] }, key, secret)
         if not ret['response']:
-          if not response['error']: response['error'] = ""
+          if not 'error' in response: response['error'] = ""
           response['error'] += ",".join(ret['errors'].values())
     return response
 
