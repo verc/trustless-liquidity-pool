@@ -30,6 +30,10 @@ except:
   print "%s could not be read" % userfile
   sys.exit(1)
 
+dummylogger = logging.getLogger('null')
+dummylogger.addHandler(logging.NullHandler())
+dummylogger.propagate = False
+
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 fh = logging.FileHandler('logs/%d.log' % time.time())
@@ -47,8 +51,10 @@ _wrappers = { 'poloniex' : Poloniex(), 'ccedk' : CCEDK(), 'bitcoincoid' : Bitcoi
 
 class Connection():
   def __init__(self, server, logger = None):
-    self.logger = logger
     self.server = server
+    self.logger = logger
+    if not logger:
+      self.logger = logging.getLogger('null')
 
   def json_request(self, request, method, params, headers):
     connection = httplib.HTTPConnection(self.server, timeout=60)
@@ -58,13 +64,13 @@ class Connection():
       content = response.read()
       return json.loads(content)
     except httplib.BadStatusLine:
-      if self.logger: self.logger.error("%s: server could not be reached, retrying in 15 seconds ...", method)
+      self.logger.error("%s: server could not be reached, retrying in 15 seconds ...", method)
     except ValueError:
-      if self.logger: self.logger.error("%s: server response invalid, retrying in 15 seconds ... %s", method, content)
+      self.logger.error("%s: server response invalid, retrying in 15 seconds ... %s", method, content)
     except socket.error:
-      if self.logger: self.logger.error("%s: socket error, retrying in 15 seconds ...", method)
+      self.logger.error("%s: socket error, retrying in 15 seconds ...", method)
     except:
-      if self.logger: self.logger.error("%s: unknown connection error, retrying in 15 seconds ...", method)
+      self.logger.error("%s: unknown connection error, retrying in 15 seconds ...", method)
     time.sleep(15)
     return self.json_request(request, method, params, headers)
 
@@ -89,7 +95,7 @@ class RequestThread(ConnectionThread):
 
   def run(self):
     ret = self.conn.post('register', {'address' : self.address, 'key' : self.key, 'name' : repr(self.exchange)})
-    if ret['code'] != 0 and self.logger: self.logger.error("register: %s" % ret['message'])
+    if ret['code'] != 0: self.logger.error("register: %s" % ret['message'])
     while self.active:
       curtime = time.time()
       data, sign = self.exchange.create_request(self.unit, self.key, self.secret)
@@ -97,7 +103,7 @@ class RequestThread(ConnectionThread):
       params.update(data)
       ret = self.conn.post('liquidity', params)
       if ret['code'] != 0:
-        if self.logger: self.logger.error("submit: %s" % ret['message'])
+        self.logger.error("submit: %s" % ret['message'])
         if ret['code'] == 11: # user unknown, just register again
           self.conn.post('register', {'address' : self.address, 'key' : self.key, 'name' : repr(self.exchange)})
       time.sleep(max(60 / self.sampling - time.time() + curtime, 0))
