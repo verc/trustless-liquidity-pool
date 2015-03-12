@@ -93,6 +93,7 @@ class CCEDK(Exchange):
     self.currency_id = {}
     while not self.pair_id or not self.currency_id:
       try:
+        response = None
         if not self.pair_id:
           response = json.loads(urllib2.urlopen(urllib2.Request(
             'https://www.ccedk.com/api/v1/stats/marketdepthfull?' + urllib.urlencode({ 'nonce' : int(time.time() + self._shift) }))).read())
@@ -105,8 +106,11 @@ class CCEDK(Exchange):
           for unit in response['response']['entities']:
             self.currency_id[unit['iso'].lower()] = unit['currency_id']
       except:
-        self.adjust(",".join(response['errors'].values()))
-        print >> sys.stderr, "could not retrieve ccedk ids, will adjust shift to", self._shift, "reason:", ",".join(response['errors'].values())
+        if response:
+          self.adjust(",".join(response['errors'].values()))
+          print >> sys.stderr, "could not retrieve ccedk ids, will adjust shift to", self._shift, "reason:", ",".join(response['errors'].values())
+        else:
+          print >> sys.stderr, "could not retrieve ccedk ids, server is unreachable"
         time.sleep(1)
 
   def __repr__(self): return "ccedk"
