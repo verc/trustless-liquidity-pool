@@ -15,6 +15,10 @@ from exchanges import *
 try: os.makedirs('logs')
 except: pass
 
+dummylogger = logging.getLogger('null')
+dummylogger.addHandler(logging.NullHandler())
+dummylogger.propagate = False
+
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 fh = logging.FileHandler('logs/%d.log' % time.time())
@@ -162,17 +166,45 @@ def update_price():
         logging.error("unable to update price for BTC")
 
 class User(threading.Thread):
-  def __init__(self, key, address, unit, exchange, tolerance):
+  def __init__(self, key, address, unit, exchange, tolerance, logger = None):
     self.key = key
     self.addess = address
     self.unit = unit
     self.exchange = exchange
     self.tolerance = tolerance
     self.lock = threading.Lock()
+    self.active = False
+    self.logger = logger
+    self.time = time.time()
+    if not logger:
+      self.logger = logging.getLogger('null')
 
   def run(self):
-    self.lock.acquire() # wait for incoming request
-    self.lock.release()
+    while self.active:
+      self.lock.acquire() # wait for incoming request
+      self.lock.release()
+      try:
+        orders = self.exchange.validiate_request(self.user, self.unit, self.request)
+      except Exception as e:
+        orders = { 'error' : 'exception caught: %s' % str(e)}
+      if not 'error' in orders:
+        self.last_error = ""
+        valid = { 'bid': [], 'ask' : [] }
+        for order in orders:
+          deviation = 1.0 - min(order['price'], price[unit]) / max(order['price'], price[unit])
+          if deviation < _tolerance:
+            valid[order['type']].append((order['id'], order['amount']))
+          else:
+            logger.warning("order of deviates too much from current price for user %s at exchange %s on market %s (%.02f < %.2f)" % (user, keys[user]['name'], unit, _tolerance, deviation))
+        for side in [ 'bid', 'ask' ]:
+          keys[user]['units'][unit][side].append(valid[side])
+          total = sum([ order[1] for order in valid[side]])
+          liquidity[side] += total
+          _interest[keys[user]['name']][unit][side] += total
+      else:
+        self.rejects += 1
+        self.last_error = "unable to validate request: " + orders['error']
+        self.logger.warning("unable to validate request for user %s at exchange %s on market %s: %s" % (self.user, repr(self.exchange), self.unit, orders['error']))
 
 
 

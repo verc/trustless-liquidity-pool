@@ -311,31 +311,35 @@ class BTER(Exchange):
     response = self.post('placeorder', params, key, secret)
     if response['result']:
       response['id'] = response['order_id']
+    else:
+      response['error'] = response['msg']
     return response
 
   def get_balance(self, unit, key, secret):
-    response = self.post('getInfo', {}, key, secret)
-    if response['success'] == 1:
-      response['balance'] = float(response['return']['balance'][unit.lower()])
+    response = self.post('getfunds', {}, key, secret)
+    if response['result']:
+      response['balance'] = float(response['available_funds'][unit.upper()])
+    else: response['error'] = response['msg']
     return response
 
   def create_request(self, unit, key = None, secret = None):
     if not secret: return None, None
-    request = { 'nonce' : int(time.time()  + self._shift) * 1000, 'pair' : 'nbt_' + unit.lower(), 'method' : 'openOrders' }
+    request = { 'nonce' : int(time.time() + self._shift) }
     data = urllib.urlencode(request)
     sign = hmac.new(secret, data, hashlib.sha512).hexdigest()
     return request, sign
 
   def validate_request(self, key, unit, data, sign):
-    headers = {"Key": key, "Sign": sign}
-    response = json.loads(urllib2.urlopen(urllib2.Request('https://vip.bitcoin.co.id/tapi', urllib.urlencode(data), headers)).read())
-    if response['success'] == 0:
+    headers = { 'Sign' : sign, 'Key' : key, "Content-type": "application/x-www-form-urlencoded" }
+    response = json.loads(urllib2.urlopen(urllib2.Request('https://bter.com/api/1/private/orderlist', urllib.urlencode(data), headers)).read())
+    if not response['result']:
+      response['error'] = response['msg']
       return response
-    if not response['return']['orders']:
-      response['return']['orders'] = []
+    if not response['orders']:
+      response['orders'] = []
     return [ {
-      'id' : int(order['order_id']),
-      'price' : float(order['price']),
-      'type' : 'ask' if order['type'] == 'sell' else 'bid',
-      'amount' : float(order['remain_' + (unit.lower() if order['type'] == 'buy' else 'nbt')]) / (float(order['price']) if order['type'] == 'buy' else 1.0),
-      } for order in response['return']['orders']]
+      'id' : int(order['id']),
+      'price' : float(order['rate']),
+      'type' : 'ask' if order['buy_type'] == unit else 'bid',
+      'amount' : float(order['amount']) / float(order['rate']),
+      } for order in response['orders'] if order['pair'] == 'nbt_' + self.unit.lower() ]
