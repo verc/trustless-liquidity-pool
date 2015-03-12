@@ -7,10 +7,12 @@ import json
 import tempfile
 import signal
 import subprocess
+import threading
 import logging
 import socket
 from math import ceil
 from exchanges import *
+from trading import *
 
 if len(sys.argv) < 2:
   print "usage:", sys.argv[0], "server[:port] [users.dat]"
@@ -23,7 +25,7 @@ userfile = 'users.dat'
 if len(sys.argv) == 3:
   userfile = sys.argv[2]
 try:
-  userdata = [ line.strip().split() for line in open(userfile).readlines() ] # address units exchange key secret
+  userdata = [ line.strip().split() for line in open(userfile).readlines() ] # address units exchange key secret [trader]
 except:
   print "%s could not be read" % userfile
   sys.exit(1)
@@ -42,225 +44,148 @@ logger.addHandler(ch)
 
 _server = sys.argv[1]
 _wrappers = { 'poloniex' : Poloniex(), 'ccedk' : CCEDK(), 'bitcoincoid' : BitcoinCoId() }
-_spread = 0.002
 
-def update_price():
-  price = {}
-  try: # bitfinex
-    ret = json.loads(urllib2.urlopen(urllib2.Request('https://api.bitfinex.com/v1//pubticker/btcusd')).read())
-    price['btc'] = 1.0 / float(ret['mid'])
-  except:
-    try: # coinbase
-      ret = json.loads(urllib2.urlopen(urllib2.Request('https://coinbase.com/api/v1/prices/spot_rate?currency=USD')).read())
-      price['btc'] = 1.0 / float(ret['amount'])
-    except:
-      try: # bitstamp
-        ret = json.loads(urllib2.urlopen(urllib2.Request('https://www.bitstamp.net/api/ticker/')).read())
-        price['btc'] = 2.0 / (float(ret['ask']) + float(ret['bid']))
-      except:
-        logging.error("unable to update price for BTC")
-  return price
+class Connection():
+  def __init__(self, server, logger = None):
+    self.logger = logger
+    self.server = server
 
-def json_request(request, method, params, headers):
-  connection = httplib.HTTPConnection(_server, timeout=60)
-  try:
-    connection.request(request, method, urllib.urlencode(params), headers = headers)
-    response = connection.getresponse()
-    content = response.read()
-    return json.loads(content)
-  except httplib.BadStatusLine:
-    logging.error("%s: server could not be reached, retrying in 15 seconds ...", method)
-  except ValueError:
-    logging.error("%s: server response invalid, retrying in 15 seconds ... %s", method, content)
-  except socket.error:
-    logging.error("%s: socket error, retrying in 15 seconds ...", method)
-  time.sleep(15)
-  return json_request(request, method, params, headers)
-
-def get(method, params = None):
-  if not params: params = {}
-  return json_request('GET', '/' + method, params, {})
-
-def post(method, params = None):
-  if not params: params = {}
-  headers = { "Content-type": "application/x-www-form-urlencoded" }
-  return json_request('POST', method, params, headers)
-
-def register(key, name, address):
-  return post('register', {'address' : address, 'key' : key, 'name' : name})
-
-def submit(key, name, unit, secret):
-  data, sign = _wrappers[name].create_request(unit, key, secret)
-  params = {
-    'unit' : unit,
-    'user' : key,
-    'sign' : sign
-  }
-  params.update(data)
-  return post('liquidity', params)
-
-_exchanges = { 'time' : 0 }
-def place(unit, side, name, key, secret, price):
-  global _exchanges
-  if side == 'ask':
-    exunit = 'nbt'
-    price *= (1.0 + _spread)
-  else:
-    exunit = unit
-    price *= (1.0 - _spread)
-  price = ceil(price * 10**8) / float(10**8) # truncate floating point precision after 8th position
-  try:
-    response = _wrappers[name].get_balance(exunit, key, secret)
-  except KeyboardInterrupt:
-    raise
-  except:
-    response = { 'error' : 'exception caught' }
-  if 'error' in response:
-    logger.error('unable to receive balance for unit %s on exchange %s: %s', exunit, name, response['error'])
-    _wrappers[name].adjust(response['error'])
-  elif response['balance'] >  0.0001:
-    balance = response['balance'] if exunit == 'nbt' else response['balance'] / price
-    if time.time() - _exchanges['time'] > 30: # this will be used to rebalance nbts
-      _exchanges = get('exchanges')
-      _exchanges['time'] = time.time()
+  def json_request(self, request, method, params, headers):
+    connection = httplib.HTTPConnection(self.server, timeout=60)
     try:
-      response = _wrappers[name].place_order(unit, side, key, secret, balance, price)
-    except KeyboardInterrupt:
-      raise
+      connection.request(request, method, urllib.urlencode(params), headers = headers)
+      response = connection.getresponse()
+      content = response.read()
+      return json.loads(content)
+    except httplib.BadStatusLine:
+      if self.logger: self.logger.error("%s: server could not be reached, retrying in 15 seconds ...", method)
+    except ValueError:
+      if self.logger: self.logger.error("%s: server response invalid, retrying in 15 seconds ... %s", method, content)
+    except socket.error:
+      if self.logger: self.logger.error("%s: socket error, retrying in 15 seconds ...", method)
     except:
-      response = { 'error' : 'exception caught' }
-    if 'error' in response:
-      logger.error('unable to place %s %s order iof %.4f NBT at %.8f on exchange %s: %s', side, exunit, balance, price, name, response['error'])
-      _wrappers[name].adjust(response['error'])
-    else:
-      logger.info('successfully placed %s %s order of %.4f NBT at %.8f on exchange %s', side, exunit, balance, price, name)
-  return response
+      if self.logger: self.logger.error("%s: unknown connection error, retrying in 15 seconds ...", method)
+    time.sleep(15)
+    return self.json_request(request, method, params, headers)
 
-def reset(user, unit, price, cancel = True):
-  response = { 'error' : True }
-  while 'error' in response:
-    response = {}
-    if cancel:
-      try: response = _wrappers[user['name']].cancel_orders(unit, user['key'], user['secret'])
-      except KeyboardInterrupt: raise
-      except: response = { 'error' : 'exception caught' }
-      if 'error' in response:
-        logger.error('unable to cancel orders for unit %s on exchange %s: %s', unit, user['name'], response['error'])
-      else:
-        logger.info('successfully deleted all orders for unit %s on exchange %s', unit, user['name'])
-    if not 'error' in response:
-      response = place(unit, 'bid', user['name'], user['key'], user['secret'], price)
-      if not 'error' in response:
-        response = place(unit, 'ask', user['name'], user['key'], user['secret'], price)
-    if 'error' in response:
-      _wrappers[user['name']].adjust(response['error'])
-      logger.info('trying to adjust nonce of exchange %s to %d', user['name'], _wrappers[user['name']]._shift)
+  def get(self, method, params = None):
+    if not params: params = {}
+    return self.json_request('GET', '/' + method, params, {})
 
-# register users
-users = []
+  def post(self, method, params = None):
+    if not params: params = {}
+    headers = { "Content-type": "application/x-www-form-urlencoded" }
+    return self.json_request('POST', method, params, headers)
+
+class RequestThread(ConnectionThread):
+  def __init__(self, conn, key, secret, exchange, unit, address, sampling, logger = None):
+    super(RequestThread, self).__init__(conn, logger)
+    self.key = key
+    self.secret = secret
+    self.exchange = exchange
+    self.unit = unit
+    self.sampling = sampling
+    self.address = address
+
+  def run(self):
+    ret = self.conn.post('register', {'address' : self.address, 'key' : self.key, 'name' : repr(self.exchange)})
+    if ret['code'] != 0 and self.logger: self.logger.error("register: %s" % ret['message'])
+    while self.active:
+      curtime = time.time()
+      data, sign = self.exchange.create_request(self.unit, self.key, self.secret)
+      params = { 'unit' : self.unit, 'user' : self.key, 'sign' : sign }
+      params.update(data)
+      ret = self.conn.post('liquidity', params)
+      if ret['code'] != 0:
+        if self.logger: self.logger.error("submit: %s" % ret['message'])
+        if ret['code'] == 11: # user unknown, just register again
+          self.conn.post('register', {'address' : self.address, 'key' : self.key, 'name' : repr(self.exchange)})
+      time.sleep(60 / self.sampling - time.time() + curtime)
+
+# retreive initial data
+conn = Connection(_server)
+basestatus = conn.get('status')
+exchanges = conn.get('exchanges')
+exchanges['time'] = time.time()
+sampling = min(45, basestatus['sampling'] + 1)
+
+# parse user data
+users = {}
 for user in userdata:
-  ret = register(user[3], user[2].lower(), user[0])
-  if ret['code'] != 0:
-    logger.error("register: %s" % ret['message'])
-  else:
-    units = [ unit.lower() for unit in user[1].split(',') ]
-    users.append({'address' : user[0], 'units' : units, 'name' : user[2].lower(), 'key' : user[3], 'secret' : user[4], 'nubot' : {}})
+  key = user[3]
+  secret = user[4]
+  if not user[2].lower() in _wrappers:
+    logger.error("unknown exchange: %s", user[2])
+    sys.exit(2)
+  units = [ unit.lower() for unit in user[1].split(',') ]
+  exchange = _wrappers[user[2].lower()]
+  users[key] = {}
+  for unit in user[1].split(','):
+    unit = unit.lower()
+    users[key][unit] = { 'request' : RequestThread(conn, key, secret, exchange, unit, user[0], sampling, logger) }
+    users[key][unit]['request'].start()
+    bot = 'pybot'
+    if len(user) == 6: bot = user[5]
+    if bot == 'none':
+      users[key][unit]['order'] = None
+    elif bot == 'nubot': 
+      users[key][unit]['order'] = NuBot(conn, key, secret, exchange, unit, logger)
+    elif bot == 'pybot': 
+      users[key][unit]['order'] = PyBot(conn, key, secret, exchange, unit, logger)
+    else:
+      logger.error("unknown order handler: %s", bot)
+      users[key][unit]['order'] = None
+    if users[key][unit]['order']:
+      users[key][unit]['order'].start()
 
-# submit liquiditys
+validations = basestatus['validations']
+efficiency = { user : [0,0] for user in users }
+logger.debug('starting liquidity propagation with sampling %d' % sampling)
+
 try:
-  ts = 0
-  basestatus = get('status')
-  price = get('price')
-  newprice = None
-  validations = basestatus['validations']
-  sampling = min(45, basestatus['sampling'] + 1)
-  efficiency = { user['key'] : [0,0] for user in users }
-  logger.debug('starting liquidity propagation with sampling %d' % sampling)
-  exchanges = get('exchanges')
-  exchanges['time'] = time.time()
-  userprice = update_price()
-
-  # initialize walls
-  for user in users:
-    for unit in user['units']:
-      if not unit in price:
-        logger.error('unit for user %s unknown: %s', unit['key'], unit)
-        sys.exit(1)
-      reset(user, unit, price[unit])
-
-  while True:
-    ts = (ts % 30) + 60 / sampling
+  while True: # print some info every minute until program terminates
     curtime = time.time()
-    for user in users:
-      for unit in user['units']:
-        # submit requests
-        ret = submit(user['key'], user['name'], unit, user['secret'])
-        if ret['code'] != 0:
-          if ret['code'] == 11: # user not found, just register again
-            register(user['key'], user['name'], user['address'])
-          logger.error("submit: %s" % ret['message'])
-
-    if ts >= 30:
-      # check orders
-      newprice = get('price')
-      userprice = update_price()
-      if 1.0 - min(newprice[unit], userprice[unit]) / max(newprice[unit], userprice[unit]) > 0.02:
-        logger.error('server price %.8f for unit %s deviates too much from price %.8f received from ticker, will delete all orders for this unit', newprice[unit], unit, userprice[unit])
-        for user in users:
-          if unit in user['units']:
-            try: response = _wrappers[user['name']].cancel_orders(unit, user['key'], user['secret'])
-            except KeyboardInterrupt: raise
-            except: response = { 'error' : 'exception caught' }
-      else:
-        for unit in price:
-          deviation = 1.0 - min(price[unit], newprice[unit]) / max(price[unit], newprice[unit])
-          if deviation > 0.02:
-            logger.info('price of unit %s moved from %.8f to %.8f, will try to reset orders', unit, price[unit], newprice[unit])
-            price[unit] = newprice[unit]
-          for user in users:
-            if unit in user['units']:
-              reset(user, unit, price[unit], deviation > 0.02)
-      # print some info
-      status = get('status')
-      passed = status['validations'] - validations
-      validations = status['validations']
-      if passed > 0:
-        for user in users:
-          stats = get(user['key'])
-          units = {}
-          rejects = 0
-          missing = 0
-          for unit in stats['units']:
-            rejects += stats['units'][unit]['rejects']
-            missing += stats['units'][unit]['missing']
-            units[unit] = { 'bid' : sum([x[1] for x in stats['units'][unit]['bid']]),
-                            'ask' : sum([x[1] for x in stats['units'][unit]['ask']]),
-                            'last_error' : stats['units'][unit]['last_error'] }
-          if validations - basestatus['validations'] > status['sampling']: # do not adjust in initial phase
-            if missing - efficiency[user['key']][0] > passed / 5:
-              if sampling < 45: # just send more requests
-                sampling += 1
-                logger.warning('too many missing requests, adjusting sampling to %d', sampling)
-              else: # just wait a little bit
-                time.sleep(0.7)
-                logger.warning('too many missing requests, sleeping a short while')
-            if rejects - efficiency[user['key']][1] > passed / 5:
-              _wrappers[stats['name']].adjust(stats['units'][unit]['last_error'])
-              logger.warning('too many rejected requests on exchange %s, trying to adjust nonce of exchange to %d', stats['name'], _wrappers[stats['name']]._shift)
-          newmissing = missing - efficiency[user['key']][0]
-          newrejects = rejects - efficiency[user['key']][1]
-          logger.info("%s: balance: %.8f exchange: %s rejects: %d missing: %d efficiency: %.2f%% units: %s" % (user['key'],
-            stats['balance'], stats['name'], newrejects, newmissing, 100 * (1.0 - (newmissing + newrejects) / float(len(stats['units']) * passed)), units))
-          efficiency[user['key']][0] = missing
-          efficiency[user['key']][1] = rejects
-    time.sleep(60 / sampling - (time.time() - curtime) / 1000)
-except KeyboardInterrupt:
+    status = conn.get('status')
+    passed = status['validations'] - validations
+    validations = status['validations']
+    if passed > 0:
+      for user in users:
+        stats = conn.get(user)
+        units = {}
+        rejects = 0
+        missing = 0
+        for unit in stats['units']:
+          rejects += stats['units'][unit]['rejects']
+          missing += stats['units'][unit]['missing']
+          units[unit] = { 'bid' : sum([x[1] for x in stats['units'][unit]['bid']]),
+                          'ask' : sum([x[1] for x in stats['units'][unit]['ask']]),
+                          'last_error' : stats['units'][unit]['last_error'] }
+        if validations - basestatus['validations'] > status['sampling']: # do not adjust in initial phase
+          if missing - efficiency[user][0] > passed / 5:
+            if users[user]['request'].sampling < 45: # just send more requests
+              users[user]['request'].sampling += 1
+              logger.warning('too many missing requests, adjusting sampling to %d', sampling)
+            else: # just wait a little bit
+              time.sleep(0.7)
+              logger.warning('too many missing requests, sleeping a short while')
+          if rejects - efficiency[user][1] > passed / 5:
+            if users[user]['order']: users[user]['order'].acquire_lock()
+            users[user]['request'].exchange.adjust(stats['units'][unit]['last_error'])
+            if users[user]['order']: users[user]['order'].release_lock()
+            logger.warning('too many rejected requests on exchange %s, trying to adjust nonce of exchange to %d', repr(users[user]['request'].exchange), users[user]['request'].exchange._shift)
+        newmissing = missing - efficiency[user][0]
+        newrejects = rejects - efficiency[user][1]
+        logger.info("%s: balance: %.8f exchange: %s rejects: %d missing: %d efficiency: %.2f%% units: %s" % (user,
+          stats['balance'], stats['name'], newrejects, newmissing, 100 * (1.0 - (newmissing + newrejects) / float(len(stats['units']) * passed)), units))
+        efficiency[user][0] = missing
+        efficiency[user][1] = rejects
+    time.sleep(60 - time.time() + curtime)
+except KeyboardInterrupt: pass
+except Exception as e:
+  logger.error('exception caught: %s', str(e))
   pass
 
 for user in users:
-  for unit in user['units']:
-    response = _wrappers[user['name']].cancel_orders(unit, user['key'], user['secret'])
-    if 'error' in response:
-      logger.error('unable to cancel orders for unit %s on exchange %s: %s', unit, user['name'], response['error'])
-    else:
-      logger.info('successfully deleted all orders for unit %s on exchange %s', unit, user['name'])
+  for unit in users[user]:
+    if users[user][unit]['order']:
+      users[user][unit]['order'].shutdown()

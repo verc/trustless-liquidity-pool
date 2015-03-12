@@ -22,6 +22,8 @@ class Poloniex(Exchange):
     self._shift = 1
     self._nonce = 0
 
+  def __repr__(self): return "poloniex"
+
   def adjust(self, error):
     if "Nonce must be greater than" in error: # (TODO: regex)
       if ':' in error: error = error.split(':')[1].strip()
@@ -107,6 +109,8 @@ class CCEDK(Exchange):
         print >> sys.stderr, "could not retrieve ccedk ids, will adjust shift to", self._shift, "reason:", ",".join(response['errors'].values())
         time.sleep(1)
 
+  def __repr__(self): return "ccedk"
+
   def adjust(self, error):
     if "incorrect range" in error: #(TODO: regex)
       if ':' in error: error = error.split(':')[1].strip()
@@ -188,6 +192,8 @@ class BitcoinCoId(Exchange):
     super(BitcoinCoId, self).__init__('vip.bitcoin.co.id/tapi')
     self._nonce = 0
 
+  def __repr__(self): return "bitcoincoid"
+
   def adjust(self, error):
     if "Invalid nonce" in error: #(TODO: regex)
       try:
@@ -198,7 +204,7 @@ class BitcoinCoId(Exchange):
         else:
           self._shift = delta + 10
       except:
-        print >> sys.stderr, "exception caught when trying to retrieve server time of Bitcoin.co.id"
+        print >> sys.stderr, "exception caught when trying to retrieve server time of bitcoin.co.id"
         super(BitcoinCoId, self).adjust(error)
     else:
       super(BitcoinCoId, self).adjust(error)
