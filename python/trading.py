@@ -113,7 +113,6 @@ class PyBot(ConnectionThread):
   def update_price(self):
     curtime = time.time()
     if curtime - PyBot.price[0] > 30:
-      PyBot.price[0] = curtime
       try: # bitfinex
         ret = json.loads(urllib2.urlopen(urllib2.Request('https://api.bitfinex.com/v1//pubticker/btcusd')).read())
         PyBot.price[1]['btc'] = 1.0 / float(ret['mid'])
@@ -128,12 +127,13 @@ class PyBot(ConnectionThread):
           except:
             if self.logger: self.logger.error("unable to update price for BTC")
       PyBot.price[2] = self.conn.get('price')
+      PyBot.price[0] = curtime
 
   def update_interest(self):
     curtime = time.time()
     if curtime - PyBot.interest[0] > 120:
-      PyBot.interest[0] = curtime
       PyBot.interest[1] = self.conn.get('exchanges')
+      PyBot.interest[0] = curtime
 
   def place(self, side):
     price = PyBot.price[2][self.unit]
