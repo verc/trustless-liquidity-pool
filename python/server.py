@@ -7,6 +7,7 @@ import logging
 import urllib
 import sys, os
 import time
+import threading
 from math import log, exp
 from thread import start_new_thread
 from exchanges import *
@@ -30,7 +31,8 @@ logger.addHandler(ch)
 _port = 2019
 _interest = { 'poloniex' : { 'btc' : { 'rate' : 0.002, 'target' : 100.0, 'fee' : 0.002 } },
               'ccedk' : { 'btc' : { 'rate' : 0.002, 'target' : 100.0, 'fee' : 0.002 } },
-              'bitcoincoid' : { 'btc' : { 'rate' : 0.002, 'target' : 100.0, 'fee' : 0.0 } }
+              'bitcoincoid' : { 'btc' : { 'rate' : 0.002, 'target' : 100.0, 'fee' : 0.0 } },
+              'bter' : { 'btc' : { 'rate' : 0.002, 'target' : 100.0, 'fee' : 0.0 } }
             }
 _nuconfig = '%s/.nu/nu.conf'%os.getenv("HOME") # path to nu.conf
 _wrappers = { 'poloniex' : Poloniex(), 'ccedk' : CCEDK(), 'bitcoincoid' : BitcoinCoId() }
@@ -42,7 +44,7 @@ _liquidity = []
 
 keys = {}
 price = {'btc' : 0.003666}
-
+lock = threading.Lock()
 _lock = False
 def acquire_lock():
   global _lock
