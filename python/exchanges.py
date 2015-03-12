@@ -269,3 +269,73 @@ class BitcoinCoId(Exchange):
       'type' : 'ask' if order['type'] == 'sell' else 'bid',
       'amount' : float(order['remain_' + (unit.lower() if order['type'] == 'buy' else 'nbt')]) / (float(order['price']) if order['type'] == 'buy' else 1.0),
       } for order in response['return']['orders']]
+
+
+class BTER(Exchange):
+  def __init__(self):
+    super(BTER, self).__init__('data.bter.com')
+    self._nonce = 0
+
+  def __repr__(self): return "bter"
+
+  def adjust(self, error):
+    print error
+
+  def post(self, method, params, key, secret):
+    request = { 'nonce' : int(time.time()  + self._shift) }
+    if self._nonce >= request['nonce']:
+      request['nonce'] = self._nonce + 1
+    self._nonce = request['nonce']
+    request.update(params)
+    data = urllib.urlencode(request)
+    sign = hmac.new(secret, data, hashlib.sha512).hexdigest()
+    headers = { 'Sign' : sign, 'Key' : key, "Content-type": "application/x-www-form-urlencoded" }
+    return json.loads(urllib2.urlopen(urllib2.Request('https://bter.com/api/1/private/' + method, data, headers)).read())
+
+  def cancel_orders(self, unit, key, secret):
+    response = self.post('orderlist', {}, key, secret)
+    if not response['result']:
+      respsone['error'] = response['msg']
+      return response
+    if not response['orders']: response['orders'] = []
+    for order in response['orders']:
+      params = { 'order_id' : order['id'] }
+      ret = self.post('cancelorder', params, key, secret)
+      if not ret['result']:
+        if not 'error' in response: response['error'] = ""
+        response['error'] += "," + ret['msg']
+    return response
+
+  def place_order(self, unit, side, key, secret, amount, price):
+    params = { 'pair' : 'nbt_' + unit.lower(), 'type' : 'buy' if side == 'bid' else 'sell', 'rate' : price, 'amount' : amount }
+    response = self.post('placeorder', params, key, secret)
+    if response['result']:
+      response['id'] = response['order_id']
+    return response
+
+  def get_balance(self, unit, key, secret):
+    response = self.post('getInfo', {}, key, secret)
+    if response['success'] == 1:
+      response['balance'] = float(response['return']['balance'][unit.lower()])
+    return response
+
+  def create_request(self, unit, key = None, secret = None):
+    if not secret: return None, None
+    request = { 'nonce' : int(time.time()  + self._shift) * 1000, 'pair' : 'nbt_' + unit.lower(), 'method' : 'openOrders' }
+    data = urllib.urlencode(request)
+    sign = hmac.new(secret, data, hashlib.sha512).hexdigest()
+    return request, sign
+
+  def validate_request(self, key, unit, data, sign):
+    headers = {"Key": key, "Sign": sign}
+    response = json.loads(urllib2.urlopen(urllib2.Request('https://vip.bitcoin.co.id/tapi', urllib.urlencode(data), headers)).read())
+    if response['success'] == 0:
+      return response
+    if not response['return']['orders']:
+      response['return']['orders'] = []
+    return [ {
+      'id' : int(order['order_id']),
+      'price' : float(order['price']),
+      'type' : 'ask' if order['type'] == 'sell' else 'bid',
+      'amount' : float(order['remain_' + (unit.lower() if order['type'] == 'buy' else 'nbt')]) / (float(order['price']) if order['type'] == 'buy' else 1.0),
+      } for order in response['return']['orders']]
