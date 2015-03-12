@@ -100,7 +100,7 @@ class RequestThread(ConnectionThread):
         if self.logger: self.logger.error("submit: %s" % ret['message'])
         if ret['code'] == 11: # user unknown, just register again
           self.conn.post('register', {'address' : self.address, 'key' : self.key, 'name' : repr(self.exchange)})
-      time.sleep(60 / self.sampling - time.time() + curtime)
+      time.sleep(max(60 / self.sampling - time.time() + curtime, 0))
 
 # retreive initial data
 conn = Connection(_server)
@@ -162,24 +162,28 @@ try:
                           'last_error' : stats['units'][unit]['last_error'] }
         if validations - basestatus['validations'] > status['sampling']: # do not adjust in initial phase
           if missing - efficiency[user][0] > passed / 5:
-            if users[user]['request'].sampling < 45: # just send more requests
-              users[user]['request'].sampling += 1
-              logger.warning('too many missing requests, adjusting sampling to %d', sampling)
-            else: # just wait a little bit
-              time.sleep(0.7)
-              logger.warning('too many missing requests, sleeping a short while')
-          if rejects - efficiency[user][1] > passed / 5:
-            if users[user]['order']: users[user]['order'].acquire_lock()
-            users[user]['request'].exchange.adjust(stats['units'][unit]['last_error'])
-            if users[user]['order']: users[user]['order'].release_lock()
-            logger.warning('too many rejected requests on exchange %s, trying to adjust nonce of exchange to %d', repr(users[user]['request'].exchange), users[user]['request'].exchange._shift)
+            for unit in stats['units']:
+              if users[user][unit]['request'].sampling < 45: # just send more requests
+                users[user][unit]['request'].sampling += 1
+                logger.warning('too many missing requests, adjusting sampling to %d', sampling)
+              else: # just wait a little bit
+                time.sleep(0.7)
+                logger.warning('too many missing requests, sleeping a short while')
+          if rejects - efficiency[user][1] > passed / 5: # look for valid error and adjust nonce shift
+            for unit in stats['units']:
+              if stats['units'][unit]['last_error'] != "":
+                logger.warning('too many rejected requests on exchange %s, trying to adjust nonce of exchange to %d', repr(users[user]['request'].exchange), users[user]['request'].exchange._shift)
+                if users[user][unit]['order']: users[user][unit]['order'].acquire_lock()
+                users[user][unit]['order'].exchange.adjust(stats['units'][unit]['last_error'])
+                if users[user][unit]['order']: users[user][unit]['order'].release_lock()
+                break
         newmissing = missing - efficiency[user][0]
         newrejects = rejects - efficiency[user][1]
         logger.info("%s: balance: %.8f exchange: %s rejects: %d missing: %d efficiency: %.2f%% units: %s" % (user,
           stats['balance'], stats['name'], newrejects, newmissing, 100 * (1.0 - (newmissing + newrejects) / float(len(stats['units']) * passed)), units))
         efficiency[user][0] = missing
         efficiency[user][1] = rejects
-    time.sleep(60 - time.time() + curtime)
+    time.sleep(max(60 - time.time() + curtime, 0))
 except KeyboardInterrupt: pass
 except Exception as e:
   logger.error('exception caught: %s', str(e))

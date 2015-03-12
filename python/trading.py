@@ -211,5 +211,5 @@ class PyBot(ConnectionThread):
           if self.logger:
             self.logger.info('price of unit %s moved from %.8f to %.8f, will try to reset orders', unit, prevprice, newprice)
         self.reset(deviation > 0.02)
-      time.sleep(30 - time.time() + curtime)
+      time.sleep(max(30 - time.time() + curtime, 0))
     self.shutdown()
