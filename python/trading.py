@@ -159,10 +159,10 @@ class PyBot(ConnectionThread):
       except KeyboardInterrupt: raise
       except: response = { 'error' : 'exception caught' }
       if 'error' in response:
-        if self.logger: self.logger.error('unable to place %s %s order iof %.4f NBT at %.8f on exchange %s: %s', side, exunit, balance, price, repr(self.exchange), response['error'])
+        if self.logger: self.logger.error('unable to place %s %s order iof %.4f nbt at %.8f on exchange %s: %s', side, exunit, balance, price, repr(self.exchange), response['error'])
         self.exchange.adjust(response['error'])
       else:
-        if self.logger: self.logger.info('successfully placed %s %s order of %.4f NBT at %.8f on exchange %s', side, exunit, balance, price, repr(self.exchange))
+        if self.logger: self.logger.info('successfully placed %s %s order of %.4f nbt at %.8f on exchange %s', side, exunit, balance, price, repr(self.exchange))
     return response
 
   def reset(self, cancel = True):
