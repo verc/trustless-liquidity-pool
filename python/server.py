@@ -45,14 +45,6 @@ _liquidity = []
 keys = {}
 price = {'btc' : 0.003666}
 lock = threading.Lock()
-_lock = False
-def acquire_lock():
-  global _lock
-  while _lock: pass
-  _lock = True
-def release_lock():
-  global _lock
-  _lock = False
 
 def response(errcode = 0, message = 'success'):
   return { 'code' : errcode, 'message' : message }
@@ -64,11 +56,11 @@ def register(params):
     name = params['name'][0]
     if name in _wrappers:
       if not user in keys:
-        acquire_lock()
+        lock.acquire()
         keys[user] = { 'name' : params['name'][0], 'address' : params['address'][0], 'balance' : 0.0, 'accepts' : 0, 'units' : {} }
         for unit in _interest[name]:
           keys[user]['units'][unit] = { 'request' : None, 'bid' : [], 'ask' : [], 'rejects' : 0, 'missing' : 0, 'last_error' : "" }
-        release_lock()
+        lock.release()
         logger.info("new user %s: %s" % (user, keys[user]['address']))
       elif keys[user]['address'] != params['address'][0]:
         ret = response(9, "user already exists with different address: %s" % user)
@@ -86,9 +78,9 @@ def liquidity(params):
     unit = params.pop('unit')[0]
     if user in keys:
       if unit in _interest[keys[user]['name']]:
-        acquire_lock()
+        lock.acquire()
         keys[user]['units'][unit]['request'] = ({ p : v[0] for p,v in params.items() }, sign)
-        release_lock()
+        lock.release()
       else:
         ret = response(12, "%s market not supported on %s" % (unit, keys[user]['name']))
     else:
@@ -168,6 +160,21 @@ def update_price():
         price['btc'] = 2.0 / (float(ret['ask']) + float(ret['bid']))
       except:
         logging.error("unable to update price for BTC")
+
+class User(threading.Thread):
+  def __init__(self, key, address, unit, exchange, tolerance):
+    self.key = key
+    self.addess = address
+    self.unit = unit
+    self.exchange = exchange
+    self.tolerance = tolerance
+    self.lock = threading.Lock()
+
+  def run(self):
+    self.lock.acquire() # wait for incoming request
+    self.lock.release()
+
+
 
 def validate():
   liquidity = { 'bid' : 0.0, 'ask' : 0.0 }
@@ -274,19 +281,19 @@ while True:
   ts = (ts % 86400) + 5
   curtime = time.time()
   if ts % (60 / _sampling) == 0:
-    acquire_lock()
+    lock.acquire()
     lq.append(validate())
-    release_lock()
+    lock.release()
     _validations += 1
   if ts % 60 == 0:
-    acquire_lock()
+    lock.acquire()
     bid = sum([l['bid'] for l in lq]) / len(lq)
     ask = sum([l['ask'] for l in lq])  / len(lq)
     logger.info("liquidity buy: %.8f sell: %.08f", bid, ask)
     _liquidity.append((bid, ask))
     credit()
     lq = []
-    release_lock()
+    lock.release()
   if ts % 120 == 0: update_price()
   if ts % 86400 == 0: pay()
   try: time.sleep(5.0 - (time.time() - curtime) / 1000.0)
