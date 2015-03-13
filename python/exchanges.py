@@ -13,8 +13,9 @@ class Exchange(object):
     self._domain = domain
     self._shift = 1
 
-  def adjust(self, error = None):
-    self._shift = ((self._shift + 7) % 200) - 100 # -92 15 -78 29 -64 43 -50 57 ...
+  def adjust(self, error):
+    if not 'exception caught:' in error:
+      self._shift = ((self._shift + 7) % 200) - 100 # -92 15 -78 29 -64 43 -50 57 ...
 
 class Poloniex(Exchange):
   def __init__(self):

@@ -89,7 +89,7 @@ class PyBot(ConnectionThread):
       if 'error' in response:
         self.logger.error('unable to cancel orders for unit %s on exchange %s (trial %d): %s', self.unit, repr(self.exchange), trials + 1, response['error'])
         self.exchange.adjust(response['error'])
-        self.logger.info('trying to adjust nonce of exchange %s to %d', repr(self.exchange), self.exchange._shift)
+        self.logger.info('adjusting nonce of exchange %s to %d', repr(self.exchange), self.exchange._shift)
       else:
         self.logger.info('successfully deleted all orders for unit %s on exchange %s', self.unit, repr(self.exchange))
         break
@@ -156,7 +156,7 @@ class PyBot(ConnectionThread):
           response = self.place('ask')
       if 'error' in response:
         self.exchange.adjust(response['error'])
-        self.logger.info('trying to adjust nonce of exchange %s to %d', repr(self.exchange), self.exchange._shift)
+        self.logger.info('adjusting nonce of exchange %s to %d', repr(self.exchange), self.exchange._shift)
     self.release_lock()
 
   def run(self):
