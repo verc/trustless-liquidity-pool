@@ -9,6 +9,7 @@ import signal
 import subprocess
 import threading
 import logging
+import logging.handlers
 import socket
 from math import ceil
 from exchanges import *
@@ -24,13 +25,17 @@ if not os.path.isdir('logs'):
 
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
+sh = logging.handlers.SocketHandler('', 9463)
+sh.setLevel(logging.DEBUG)
 fh = logging.FileHandler('logs/%d.log' % time.time())
 fh.setLevel(logging.DEBUG)
 ch = logging.StreamHandler()
 ch.setLevel(logging.INFO)
 formatter = logging.Formatter(fmt = '%(asctime)s %(levelname)s: %(message)s', datefmt="%Y/%m/%d-%H:%M:%S")
+sh.setFormatter(formatter)
 fh.setFormatter(formatter)
 ch.setFormatter(formatter)
+logger.addHandler(sh)
 logger.addHandler(fh)
 logger.addHandler(ch)
 
