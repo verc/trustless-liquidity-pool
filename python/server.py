@@ -146,7 +146,7 @@ def register(params):
           keys[user][unit].start()
         lock.release()
         logger.info("new user %s on %s: %s" % (user, name, params['address'][0]))
-      elif keys[user].values()[0]['address'] != params['address'][0]:
+      elif keys[user].values()[0].address != params['address'][0]:
         ret = response(9, "user already exists with different address: %s" % user)
     else:
       ret = response(8, "unknown exchange requested: %s" % name)

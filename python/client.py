@@ -72,7 +72,7 @@ class RequestThread(ConnectionThread):
           self.conn.post('register', {'address' : self.address, 'key' : self.key, 'name' : repr(self.exchange)})
       time.sleep(max(60 / self.sampling - time.time() + curtime, 0))
 
-# retreive initial data
+# retrieve initial data
 conn = Connection(_server)
 basestatus = conn.get('status')
 exchanges = conn.get('exchanges')
