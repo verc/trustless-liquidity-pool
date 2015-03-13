@@ -9,22 +9,7 @@ import logging
 import tempfile
 import signal
 from math import ceil
-
-class ConnectionThread(threading.Thread):
-  def __init__(self, conn, logger = None):
-    threading.Thread.__init__(self)
-    self.daemon = True
-    self.active = True
-    self.logger = logger
-    if not logger:
-      self.logger = logging.getLogger('null')
-    self.conn = conn
-
-  def stop(self):
-    self.active = False
-
-  def acquire_lock(self): pass
-  def release_lock(self): pass
+from utils import *
 
 
 class NuBot(ConnectionThread):

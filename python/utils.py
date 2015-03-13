@@ -2,7 +2,12 @@ import threading
 import urllib2
 import urllib
 import json
+import logging
 import httplib
+
+nulllogger = logging.getLogger('null')
+nulllogger.addHandler(logging.NullHandler())
+nulllogger.propagate = False
 
 class Connection():
   def __init__(self, server, logger = None):
@@ -38,6 +43,21 @@ class Connection():
     headers = { "Content-type": "application/x-www-form-urlencoded" }
     return self.json_request('POST', method, params, headers)
 
+class ConnectionThread(threading.Thread):
+  def __init__(self, conn, logger = None):
+    threading.Thread.__init__(self)
+    self.daemon = True
+    self.active = True
+    self.logger = logger
+    if not logger:
+      self.logger = logging.getLogger('null')
+    self.conn = conn
+
+  def stop(self):
+    self.active = False
+
+  def acquire_lock(self): pass
+  def release_lock(self): pass
 
 class PriceFeed():
   def __init__(self, update_interval, logger):

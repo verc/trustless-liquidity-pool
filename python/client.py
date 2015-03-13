@@ -13,6 +13,7 @@ import socket
 from math import ceil
 from exchanges import *
 from trading import *
+from utils import *
 
 if len(sys.argv) < 2:
   print "usage:", sys.argv[0], "server[:port] [users.dat]"
@@ -29,10 +30,6 @@ try:
 except:
   print "%s could not be read" % userfile
   sys.exit(1)
-
-dummylogger = logging.getLogger('null')
-dummylogger.addHandler(logging.NullHandler())
-dummylogger.propagate = False
 
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
@@ -114,8 +111,8 @@ validations = basestatus['validations']
 efficiency = { user : [0,0] for user in users }
 logger.debug('starting liquidity propagation with sampling %d' % sampling)
 
-try:
-  while True: # print some info every minute until program terminates
+while True: # print some info every minute until program terminates
+  try:
     curtime = time.time()
     status = conn.get('status')
     passed = status['validations'] - validations
@@ -144,7 +141,7 @@ try:
           if rejects - efficiency[user][1] > passed / 5: # look for valid error and adjust nonce shift
             for unit in stats['units']:
               if stats['units'][unit]['last_error'] != "":
-                logger.warning('too many rejected requests on exchange %s, trying to adjust nonce of exchange to %d', repr(users[user]['request'].exchange), users[user]['request'].exchange._shift)
+                logger.warning('too many rejected requests on exchange %s, trying to adjust nonce of exchange to %d', repr(users[user][unit]['request'].exchange), users[user][unit]['request'].exchange._shift)
                 if users[user][unit]['order']: users[user][unit]['order'].acquire_lock()
                 users[user][unit]['order'].exchange.adjust(stats['units'][unit]['last_error'])
                 if users[user][unit]['order']: users[user][unit]['order'].release_lock()
@@ -156,10 +153,9 @@ try:
         efficiency[user][0] = missing
         efficiency[user][1] = rejects
     time.sleep(max(60 - time.time() + curtime, 0))
-except KeyboardInterrupt: pass
-except Exception as e:
-  logger.error('exception caught: %s', str(e))
-  pass
+  except KeyboardInterrupt: break
+  except Exception as e:
+    logger.error('exception caught: %s', str(e))
 
 for user in users:
   for unit in users[user]:
