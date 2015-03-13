@@ -8,6 +8,7 @@ import urllib
 import sys, os
 import time
 import threading
+import sys
 from math import log, exp
 from thread import start_new_thread
 from exchanges import *
@@ -95,8 +96,8 @@ class User(threading.Thread):
         if self.request:
           try:
             orders = self.exchange.validate_request(self.key, self.unit, *self.request)
-          except Exception as e:
-            orders = { 'error' : 'exception caught: %s' % str(e)}
+          except:
+            orders = { 'error' : 'exception caught: %s' % sys.exc_info()[0]}
           if not 'error' in orders:
             self.last_error = ""
             valid = { 'bid': [], 'ask' : [] }
