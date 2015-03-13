@@ -178,6 +178,8 @@ class User(threading.Thread):
     self.time = time.time()
     if not logger:
       self.logger = logging.getLogger('null')
+    if not hasattr(User, 'price'):
+      User.price = [0, {}, {}]
 
   def run(self):
     while self.active:
@@ -195,10 +197,10 @@ class User(threading.Thread):
           if deviation < _tolerance:
             valid[order['type']].append((order['id'], order['amount']))
           else:
-            logger.warning("order of deviates too much from current price for user %s at exchange %s on market %s (%.02f < %.2f)" % (user, keys[user]['name'], unit, _tolerance, deviation))
+            logger.warning("order of deviates too much from current price for user %s at exchange %s on market %s (%.02f < %.02f)" % (user, keys[user]['name'], unit, _tolerance, deviation))
         for side in [ 'bid', 'ask' ]:
           keys[user]['units'][unit][side].append(valid[side])
-          total = sum([ order[1] for order in valid[side]])
+          total = sum([ order[1] for order in valid[side] ])
           liquidity[side] += total
           _interest[keys[user]['name']][unit][side] += total
       else:

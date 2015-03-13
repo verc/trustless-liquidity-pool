@@ -49,40 +49,6 @@ logger.addHandler(ch)
 _server = sys.argv[1]
 _wrappers = { 'poloniex' : Poloniex(), 'ccedk' : CCEDK(), 'bitcoincoid' : BitcoinCoId() }
 
-class Connection():
-  def __init__(self, server, logger = None):
-    self.server = server
-    self.logger = logger
-    if not logger:
-      self.logger = logging.getLogger('null')
-
-  def json_request(self, request, method, params, headers):
-    connection = httplib.HTTPConnection(self.server, timeout=60)
-    try:
-      connection.request(request, method, urllib.urlencode(params), headers = headers)
-      response = connection.getresponse()
-      content = response.read()
-      return json.loads(content)
-    except httplib.BadStatusLine:
-      self.logger.error("%s: server could not be reached, retrying in 15 seconds ...", method)
-    except ValueError:
-      self.logger.error("%s: server response invalid, retrying in 15 seconds ... %s", method, content)
-    except socket.error:
-      self.logger.error("%s: socket error, retrying in 15 seconds ...", method)
-    except:
-      self.logger.error("%s: unknown connection error, retrying in 15 seconds ...", method)
-    time.sleep(15)
-    return self.json_request(request, method, params, headers)
-
-  def get(self, method, params = None):
-    if not params: params = {}
-    return self.json_request('GET', '/' + method, params, {})
-
-  def post(self, method, params = None):
-    if not params: params = {}
-    headers = { "Content-type": "application/x-www-form-urlencoded" }
-    return self.json_request('POST', method, params, headers)
-
 class RequestThread(ConnectionThread):
   def __init__(self, conn, key, secret, exchange, unit, address, sampling, logger = None):
     super(RequestThread, self).__init__(conn, logger)
