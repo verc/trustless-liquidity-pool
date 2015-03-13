@@ -207,8 +207,8 @@ class BitcoinCoId(Exchange):
       try:
         response = json.loads(urllib2.urlopen(urllib2.Request('https://vip.bitcoin.co.id/api/summaries')).read())
         delta = float(response['tickers']['btc_idr']['server_time']) - time.time()
-        if abs(delta) < 2:
-          super(BitcoinCoId, self).adjust(error)
+        if abs(delta - self._shift) < 2:
+          self._shift += 10
         else:
           self._shift = delta + 10
       except:
@@ -282,28 +282,35 @@ class BitcoinCoId(Exchange):
 class BTER(Exchange):
   def __init__(self):
     super(BTER, self).__init__('data.bter.com')
-    self._nonce = 0
+    #self._nonce = 0
 
   def __repr__(self): return "bter"
 
   def adjust(self, error):
     print error
 
+  def https_request(self, method, params, headers = None):
+    if not headers: headers = {}
+    connection = httplib.HTTPSConnection(self._domain, timeout=60)
+    connection.request('POST', '/api/1/private/' + method, params, headers)
+    response = connection.getresponse().read()
+    return json.loads(response)
+
   def post(self, method, params, key, secret):
-    request = { 'nonce' : int(time.time()  + self._shift) }
-    if self._nonce >= request['nonce']:
-      request['nonce'] = self._nonce + 1
-    self._nonce = request['nonce']
-    request.update(params)
-    data = urllib.urlencode(request)
+    #request = { 'nonce' : int(time.time() + self._shift) }
+    #if self._nonce >= request['nonce']:
+    #  request['nonce'] = self._nonce + 1
+    #self._nonce = request['nonce']
+    #request.update(params)
+    data = urllib.urlencode(params)
     sign = hmac.new(secret, data, hashlib.sha512).hexdigest()
     headers = { 'Sign' : sign, 'Key' : key, "Content-type": "application/x-www-form-urlencoded" }
-    return json.loads(urllib2.urlopen(urllib2.Request('https://bter.com/api/1/private/' + method, data, headers)).read())
+    return self.https_request(method, data, headers)
 
   def cancel_orders(self, unit, key, secret):
     response = self.post('orderlist', {}, key, secret)
     if not response['result']:
-      respsone['error'] = response['msg']
+      response['error'] = response['msg']
       return response
     if not response['orders']: response['orders'] = []
     for order in response['orders']:
@@ -326,20 +333,24 @@ class BTER(Exchange):
   def get_balance(self, unit, key, secret):
     response = self.post('getfunds', {}, key, secret)
     if response['result']:
-      response['balance'] = float(response['available_funds'][unit.upper()])
+      if unit.upper() in response['available_funds']:
+        response['balance'] = float(response['available_funds'][unit.upper()])
+      else:
+        response['balance'] = 0.0
     else: response['error'] = response['msg']
     return response
 
   def create_request(self, unit, key = None, secret = None):
     if not secret: return None, None
-    request = { 'nonce' : int(time.time() + self._shift) }
+    request = {} #'nonce' : int(time.time() + self._shift) }
     data = urllib.urlencode(request)
     sign = hmac.new(secret, data, hashlib.sha512).hexdigest()
     return request, sign
 
   def validate_request(self, key, unit, data, sign):
     headers = { 'Sign' : sign, 'Key' : key, "Content-type": "application/x-www-form-urlencoded" }
-    response = json.loads(urllib2.urlopen(urllib2.Request('https://bter.com/api/1/private/orderlist', urllib.urlencode(data), headers)).read())
+    response = self.https_request('orderlist', urllib.urlencode(data), headers)
+    #response = json.loads(urllib2.urlopen(urllib2.Request('https://bter.com/api/1/private/orderlist', urllib.urlencode(data), headers)).read())
     if not response['result']:
       response['error'] = response['msg']
       return response
@@ -349,5 +360,5 @@ class BTER(Exchange):
       'id' : int(order['id']),
       'price' : float(order['rate']),
       'type' : 'ask' if order['buy_type'] == unit else 'bid',
-      'amount' : float(order['amount']) / float(order['rate']),
-      } for order in response['orders'] if order['pair'] == 'nbt_' + self.unit.lower() ]
+      'amount' : float(order['amount']),
+      } for order in response['orders'] if order['pair'] == 'nbt_' + unit.lower() ]

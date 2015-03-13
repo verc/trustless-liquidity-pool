@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 import json
 import urllib
@@ -84,7 +85,7 @@ class PyBot(ConnectionThread):
       try:
         response = self.exchange.cancel_orders(self.unit, self.key, self.secret)
       except:
-        response = {'error' : 'exception caught'}
+        response = {'error' : 'exception caught: %s' % sys.exc_info()[1]}
       if 'error' in response:
         self.logger.error('unable to cancel orders for unit %s on exchange %s (trial %d): %s', self.unit, repr(self.exchange), trials + 1, response['error'])
         self.exchange.adjust(response['error'])
@@ -118,7 +119,7 @@ class PyBot(ConnectionThread):
     try:
       response = self.exchange.get_balance(exunit, self.key, self.secret)
     except KeyboardInterrupt: raise
-    except: response = { 'error' : 'exception caught' }
+    except: response = { 'error' : 'exception caught: %s' % sys.exc_info()[1] }
     if 'error' in response:
       self.logger.error('unable to receive balance for unit %s on exchange %s: %s', exunit, repr(self.exchange), response['error'])
       self.exchange.adjust(response['error'])
@@ -128,9 +129,9 @@ class PyBot(ConnectionThread):
       try:
         response = self.exchange.place_order(self.unit, side, self.key, self.secret, balance, price)
       except KeyboardInterrupt: raise
-      except: response = { 'error' : 'exception caught' }
+      except: response = { 'error' : 'exception caught: %s' % sys.exc_info()[1] }
       if 'error' in response:
-        self.logger.error('unable to place %s %s order iof %.4f nbt at %.8f on exchange %s: %s', side, exunit, balance, price, repr(self.exchange), response['error'])
+        self.logger.error('unable to place %s %s order of %.4f nbt at %.8f on exchange %s: %s', side, exunit, balance, price, repr(self.exchange), response['error'])
         self.exchange.adjust(response['error'])
       else:
         self.logger.info('successfully placed %s %s order of %.4f nbt at %.8f on exchange %s', side, exunit, balance, price, repr(self.exchange))
@@ -144,7 +145,7 @@ class PyBot(ConnectionThread):
       if cancel:
         try: response = self.exchange.cancel_orders(self.unit, self.key, self.secret)
         except KeyboardInterrupt: raise
-        except: response = { 'error' : 'exception caught' }
+        except: response = { 'error' : 'exception caught: %s' % sys.exc_info()[1] }
         if 'error' in response:
           self.logger.error('unable to cancel orders for unit %s on exchange %s: %s', self.unit, repr(self.exchange), response['error'])
         else:
@@ -173,7 +174,7 @@ class PyBot(ConnectionThread):
         self.logger.error('server price %.8f for unit %s deviates too much from price %.8f received from ticker, will delete all orders for this unit', serverprice, self.unit, userprice)
         try: response = self.exchange.cancel_orders(self.unit, self.key, self.secret)
         except KeyboardInterrupt: raise
-        except: response = { 'error' : 'exception caught' }
+        except: response = { 'error' : 'exception caught: %s' % sys.exc_info()[1] }
       else:
         deviation = 1.0 - min(prevprice, serverprice) / max(prevprice, serverprice)
         if deviation > 0.02:

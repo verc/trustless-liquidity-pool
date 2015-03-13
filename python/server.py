@@ -41,7 +41,7 @@ _interest = { 'poloniex' : { 'btc' : { 'rate' : 0.002, 'target' : 100.0, 'fee' :
               'bter' : { 'btc' : { 'rate' : 0.002, 'target' : 100.0, 'fee' : 0.0 } }
             }
 _nuconfig = '%s/.nu/nu.conf'%os.getenv("HOME") # path to nu.conf
-_wrappers = { 'poloniex' : Poloniex(), 'ccedk' : CCEDK(), 'bitcoincoid' : BitcoinCoId() }
+_wrappers = { 'poloniex' : Poloniex(), 'ccedk' : CCEDK(), 'bitcoincoid' : BitcoinCoId(), 'bter' : BTER() }
 _tolerance = 0.08
 _sampling = 12
 _minpayout = 0.1
@@ -97,7 +97,7 @@ class User(threading.Thread):
           try:
             orders = self.exchange.validate_request(self.key, self.unit, *self.request)
           except:
-            orders = { 'error' : 'exception caught: %s' % sys.exc_info()[0]}
+            orders = { 'error' : 'exception caught: %s' % sys.exc_info()[1]}
           if not 'error' in orders:
             self.last_error = ""
             valid = { 'bid': [], 'ask' : [] }
@@ -196,7 +196,12 @@ def userstats(user):
   return res
 
 def calculate_interest(balance, amount, interest):
-  return interest['rate'] * (amount - (log(exp(interest['target']) + exp(balance + amount)) - log(exp(interest['target']) + exp(balance))))
+  return max(min(amount, interest['target'] - balance) * interest['rate'], 0.0)
+  #try: # this is not possible with python floating arithmetic
+  #  return interest['rate'] * (amount - (log(exp(interest['target']) + exp(balance + amount)) - log(exp(interest['target']) + exp(balance))))
+  #except OverflowError:
+  #  logger.error("overflow error in interest calculation, balance: %.8f amount: %.8f", balance, amount)
+  #  return 0.00001
 
 def credit():
   for name in _interest:
@@ -337,6 +342,8 @@ while True:
         keys[user][unit].validate()
 
     time.sleep(max(float(60 / _sampling) - time.time() + curtime, 0))
-  except: break
+  except Exception as e:
+    logger.error('exception caught: %s', sys.exc_info()[1])
+    break
 
 httpd.socket.close()

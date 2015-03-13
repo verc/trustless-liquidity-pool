@@ -121,7 +121,7 @@ while True: # print some info every minute until program terminates
     time.sleep(max(60 - time.time() + curtime, 0))
   except KeyboardInterrupt: break
   except Exception as e:
-    logger.error('exception caught: %s', str(e))
+    logger.error('exception caught: %s', sys.exc_info()[1])
 
 for user in users:
   for unit in users[user]:
