@@ -204,18 +204,17 @@ class BitcoinCoId(Exchange):
 
   def adjust(self, error):
     if "Invalid nonce" in error: #(TODO: regex)
-      try:
-        response = json.loads(urllib2.urlopen(urllib2.Request('https://vip.bitcoin.co.id/api/summaries')).read())
-        delta = float(response['tickers']['btc_idr']['server_time']) - time.time()
-        if abs(delta - self._shift) < 2:
-          self._shift += 10
-        else:
-          self._shift = delta + 10
-      except:
-        print >> sys.stderr, "exception caught when trying to retrieve server time of bitcoin.co.id"
-        super(BitcoinCoId, self).adjust(error)
-    else:
-      super(BitcoinCoId, self).adjust(error)
+      #try:
+      #  response = json.loads(urllib2.urlopen(urllib2.Request('https://vip.bitcoin.co.id/api/summaries')).read())
+      #  delta = float(response['tickers']['btc_idr']['server_time']) - time.time()
+      #  if self._shift < delta + 10:
+      #    self._shift = delta + 10
+      #  else:
+      #    self._shift += 10
+      #except:
+      #  print >> sys.stderr, "exception caught when trying to retrieve server time of bitcoin.co.id"
+      self._shift += 10
+      if self._shift > 900: self._shift = 900
 
   def post(self, method, params, key, secret):
     request = { 'nonce' : int(time.time()  + self._shift) * 1000, 'method' : method }
