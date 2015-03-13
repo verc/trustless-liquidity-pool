@@ -155,9 +155,14 @@ class PyBot(ConnectionThread):
         if not 'error' in response:
           response = self.place('ask')
       if 'error' in response:
-        self.exchange.adjust(response['error'])
-        self.logger.info('adjusting nonce of exchange %s to %d', repr(self.exchange), self.exchange._shift)
+        if 'exception caught:' in response['error']:
+          self.logger.info('retrying in 5 seconds ...')
+          time.sleep(5)
+        else:
+          self.exchange.adjust(response['error'])
+          self.logger.info('adjusting nonce of exchange %s to %d', repr(self.exchange), self.exchange._shift)
     self.release_lock()
+    return response
 
   def run(self):
     self.logger.info("starting PyBot for unit %s on exchange %s", self.unit, repr(self.exchange))
@@ -172,9 +177,7 @@ class PyBot(ConnectionThread):
       userprice = PyBot.pricefeed.price(self.unit)
       if 1.0 - min(serverprice, userprice) / max(serverprice, userprice) > 0.02: # validate server price
         self.logger.error('server price %.8f for unit %s deviates too much from price %.8f received from ticker, will delete all orders for this unit', serverprice, self.unit, userprice)
-        try: response = self.exchange.cancel_orders(self.unit, self.key, self.secret)
-        except KeyboardInterrupt: raise
-        except: response = { 'error' : 'exception caught: %s' % sys.exc_info()[1] }
+        self.shutdown()
       else:
         deviation = 1.0 - min(prevprice, serverprice) / max(prevprice, serverprice)
         if deviation > 0.02:

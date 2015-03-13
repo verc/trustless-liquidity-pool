@@ -200,33 +200,32 @@ class BitcoinCoId(Exchange):
   def __init__(self):
     super(BitcoinCoId, self).__init__('vip.bitcoin.co.id/tapi')
     self._nonce = 0
+    self._shift = self.server_delta()
 
   def __repr__(self): return "bitcoincoid"
 
+  def server_delta(self):
+    try:
+      response = json.loads(urllib2.urlopen(urllib2.Request('https://vip.bitcoin.co.id/api/summaries')).read())
+      return float(response['tickers']['btc_idr']['server_time']) - time.time()
+    except:
+      return 0.0
+
   def adjust(self, error):
     if "Invalid nonce" in error: #(TODO: regex)
-      #try:
-      #  response = json.loads(urllib2.urlopen(urllib2.Request('https://vip.bitcoin.co.id/api/summaries')).read())
-      #  delta = float(response['tickers']['btc_idr']['server_time']) - time.time()
-      #  if self._shift < delta + 10:
-      #    self._shift = delta + 10
-      #  else:
-      #    self._shift += 10
-      #except:
-      #  print >> sys.stderr, "exception caught when trying to retrieve server time of bitcoin.co.id"
-      self._shift += 10
-      if self._shift > 900: self._shift = 900
+      self._shift += 25
 
   def post(self, method, params, key, secret):
-    request = { 'nonce' : int(time.time()  + self._shift) * 1000, 'method' : method }
+    request = { 'nonce' : int(time.time() + self._shift) * 1000, 'method' : method }
     if self._nonce >= request['nonce']:
-      request['nonce'] = self._nonce + self._shift * 1000
+      request['nonce'] = self._nonce + 1000
     self._nonce = request['nonce']
     request.update(params)
     data = urllib.urlencode(request)
     sign = hmac.new(secret, data, hashlib.sha512).hexdigest()
     headers = { 'Sign' : sign, 'Key' : key }
-    return json.loads(urllib2.urlopen(urllib2.Request('https://vip.bitcoin.co.id/tapi', data, headers)).read())
+    response = json.loads(urllib2.urlopen(urllib2.Request('https://vip.bitcoin.co.id/tapi', data, headers)).read())
+    return response
 
   def cancel_orders(self, unit, key, secret):
     response = self.post('openOrders', {'pair' : 'nbt_' + unit.lower()}, key, secret)

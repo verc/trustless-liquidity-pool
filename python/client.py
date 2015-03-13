@@ -98,7 +98,7 @@ for user in userdata:
   for unit in user[1].split(','):
     unit = unit.lower()
     users[key][unit] = { 'request' : RequestThread(conn, key, secret, exchange, unit, user[0], sampling, logger) }
-    users[key][unit]['request'].start()
+    #users[key][unit]['request'].start()
     bot = 'pybot'
     if len(user) == 6: bot = user[5]
     if bot == 'none':
@@ -121,7 +121,14 @@ while True: # print some info every minute until program terminates
   try:
     curtime = time.time()
     for user in users:
-      logger.info(conn.get(user))
+      response = conn.get(user)
+      logger.info('%s: balance: %.2f efficiency: %.2f%% rejects: %d missing: %d units: %s',
+        repr(users[user].values()[0]['request'].exchange),
+        response['balance'],
+        response['efficiency'] * 100,
+        response['rejects'],
+        response['missing'],
+        response['units'] )
         
     time.sleep(max(60 - time.time() + curtime, 0))
   except KeyboardInterrupt: break
