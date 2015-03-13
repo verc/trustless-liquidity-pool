@@ -68,13 +68,12 @@ class PyBot(ConnectionThread):
     self.exchange = exchange
     self.unit = unit
     self.spread = 0.002
-    self.interest = [0, {}]
     if not hasattr(PyBot, 'lock'):
       PyBot.lock = {}
     if not repr(exchange) in PyBot.lock:
       PyBot.lock[repr(exchange)] = threading.Lock()
-    if not hasattr(PyBot, 'price'):
-      PyBot.price = [0, {}, {}]
+    if not hasattr(PyBot, 'pricefeed'):
+      PyBot.pricefeed = PriceFeed(30, logger)
     if not hasattr(PyBot, 'interest'):
       PyBot.interest = [0, {}]
 
@@ -88,6 +87,8 @@ class PyBot(ConnectionThread):
         response = {'error' : 'exception caught'}
       if 'error' in response:
         self.logger.error('unable to cancel orders for unit %s on exchange %s (trial %d): %s', self.unit, repr(self.exchange), trials + 1, response['error'])
+        self.exchange.adjust(response['error'])
+        self.logger.info('trying to adjust nonce of exchange %s to %d', repr(self.exchange), self.exchange._shift)
       else:
         self.logger.info('successfully deleted all orders for unit %s on exchange %s', self.unit, repr(self.exchange))
         break
@@ -99,25 +100,6 @@ class PyBot(ConnectionThread):
   def release_lock(self):
     PyBot.lock[repr(self.exchange)].release()
 
-  def update_price(self):
-    curtime = time.time()
-    if curtime - PyBot.price[0] > 30:
-      try: # bitfinex
-        ret = json.loads(urllib2.urlopen(urllib2.Request('https://api.bitfinex.com/v1//pubticker/btcusd')).read())
-        PyBot.price[1]['btc'] = 1.0 / float(ret['mid'])
-      except:
-        try: # coinbase
-          ret = json.loads(urllib2.urlopen(urllib2.Request('https://coinbase.com/api/v1/prices/spot_rate?currency=USD')).read())
-          PyBot.price[1]['btc'] = 1.0 / float(ret['amount'])
-        except:
-          try: # bitstamp
-            ret = json.loads(urllib2.urlopen(urllib2.Request('https://www.bitstamp.net/api/ticker/')).read())
-            PyBot.price[1]['btc'] = 2.0 / (float(ret['ask']) + float(ret['bid']))
-          except:
-            self.logger.error("unable to update price for BTC")
-      PyBot.price[2] = self.conn.get('price')
-      PyBot.price[0] = curtime
-
   def update_interest(self):
     curtime = time.time()
     if curtime - PyBot.interest[0] > 120:
@@ -125,7 +107,7 @@ class PyBot(ConnectionThread):
       PyBot.interest[0] = curtime
 
   def place(self, side):
-    price = PyBot.price[2][self.unit]
+    price = PyBot.pricefeed.price(self.unit)
     if side == 'ask':
       exunit = 'nbt'
       price *= (1.0 + self.spread)
@@ -178,25 +160,25 @@ class PyBot(ConnectionThread):
 
   def run(self):
     self.logger.info("starting PyBot for unit %s on exchange %s", self.unit, repr(self.exchange))
-    self.update_price()
     self.update_interest()
     self.reset() # initialize walls
+    serverprice = self.conn.get('price')[self.unit]
+    prevprice = serverprice
     while self.active:
       curtime = time.time()
-      prevprice = PyBot.price[2][self.unit]
+      serverprice = self.conn.get('price')[self.unit]
       self.update_interest()
-      self.update_price()
-      userprice = PyBot.price[1][self.unit]
-      newprice = PyBot.price[2][self.unit]
-      if 1.0 - min(newprice, userprice) / max(newprice, userprice) > 0.02: # validate server price
-        self.logger.error('server price %.8f for unit %s deviates too much from price %.8f received from ticker, will delete all orders for this unit', newprice, self.unit, userprice)
+      userprice = PyBot.pricefeed.price(self.unit)
+      if 1.0 - min(serverprice, userprice) / max(serverprice, userprice) > 0.02: # validate server price
+        self.logger.error('server price %.8f for unit %s deviates too much from price %.8f received from ticker, will delete all orders for this unit', serverprice, self.unit, userprice)
         try: response = self.exchange.cancel_orders(self.unit, self.key, self.secret)
         except KeyboardInterrupt: raise
         except: response = { 'error' : 'exception caught' }
       else:
-        deviation = 1.0 - min(prevprice, newprice) / max(prevprice, newprice)
+        deviation = 1.0 - min(prevprice, serverprice) / max(prevprice, serverprice)
         if deviation > 0.02:
-          self.logger.info('price of unit %s moved from %.8f to %.8f, will try to reset orders', unit, prevprice, newprice)
+          self.logger.info('price of unit %s moved from %.8f to %.8f, will try to reset orders', unit, prevprice, serverprice)
+          prevprice = serverprice
         self.reset(deviation > 0.02)
       time.sleep(max(30 - time.time() + curtime, 0))
     self.shutdown()

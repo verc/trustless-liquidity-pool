@@ -22,15 +22,6 @@ if len(sys.argv) < 2:
 if not os.path.isdir('logs'):
   os.makedirs('logs')
 
-userfile = 'users.dat'
-if len(sys.argv) == 3:
-  userfile = sys.argv[2]
-try:
-  userdata = [ line.strip().split() for line in open(userfile).readlines() ] # address units exchange key secret [trader]
-except:
-  print "%s could not be read" % userfile
-  sys.exit(1)
-
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 fh = logging.FileHandler('logs/%d.log' % time.time())
@@ -43,9 +34,19 @@ ch.setFormatter(formatter)
 logger.addHandler(fh)
 logger.addHandler(ch)
 
-_server = sys.argv[1]
-_wrappers = { 'poloniex' : Poloniex(), 'ccedk' : CCEDK(), 'bitcoincoid' : BitcoinCoId() }
+userfile = 'users.dat'
+if len(sys.argv) == 3:
+  userfile = sys.argv[2]
+try:
+  userdata = [ line.strip().split() for line in open(userfile).readlines() ] # address units exchange key secret [trader]
+except:
+  logger.error("%s could not be read", userfile)
+  sys.exit(1)
 
+_server = sys.argv[1]
+_wrappers = { 'poloniex' : Poloniex(), 'ccedk' : CCEDK(), 'bitcoincoid' : BitcoinCoId(), 'bter' : BTER() }
+
+# one request signer thread for each key and unit
 class RequestThread(ConnectionThread):
   def __init__(self, conn, key, secret, exchange, unit, address, sampling, logger = None):
     super(RequestThread, self).__init__(conn, logger)
@@ -114,44 +115,9 @@ logger.debug('starting liquidity propagation with sampling %d' % sampling)
 while True: # print some info every minute until program terminates
   try:
     curtime = time.time()
-    status = conn.get('status')
-    passed = status['validations'] - validations
-    validations = status['validations']
-    if passed > 0:
-      for user in users:
-        stats = conn.get(user)
-        units = {}
-        rejects = 0
-        missing = 0
-        for unit in stats['units']:
-          rejects += stats['units'][unit]['rejects']
-          missing += stats['units'][unit]['missing']
-          units[unit] = { 'bid' : sum([x[1] for x in stats['units'][unit]['bid']]),
-                          'ask' : sum([x[1] for x in stats['units'][unit]['ask']]),
-                          'last_error' : stats['units'][unit]['last_error'] }
-        if validations - basestatus['validations'] > status['sampling']: # do not adjust in initial phase
-          if missing - efficiency[user][0] > passed / 5:
-            for unit in stats['units']:
-              if users[user][unit]['request'].sampling < 45: # just send more requests
-                users[user][unit]['request'].sampling += 1
-                logger.warning('too many missing requests, adjusting sampling to %d', sampling)
-              else: # just wait a little bit
-                time.sleep(0.7)
-                logger.warning('too many missing requests, sleeping a short while')
-          if rejects - efficiency[user][1] > passed / 5: # look for valid error and adjust nonce shift
-            for unit in stats['units']:
-              if stats['units'][unit]['last_error'] != "":
-                logger.warning('too many rejected requests on exchange %s, trying to adjust nonce of exchange to %d', repr(users[user][unit]['request'].exchange), users[user][unit]['request'].exchange._shift)
-                if users[user][unit]['order']: users[user][unit]['order'].acquire_lock()
-                users[user][unit]['order'].exchange.adjust(stats['units'][unit]['last_error'])
-                if users[user][unit]['order']: users[user][unit]['order'].release_lock()
-                break
-        newmissing = missing - efficiency[user][0]
-        newrejects = rejects - efficiency[user][1]
-        logger.info("%s: balance: %.8f exchange: %s rejects: %d missing: %d efficiency: %.2f%% units: %s" % (user,
-          stats['balance'], stats['name'], newrejects, newmissing, 100 * (1.0 - (newmissing + newrejects) / float(len(stats['units']) * passed)), units))
-        efficiency[user][0] = missing
-        efficiency[user][1] = rejects
+    for user in users:
+      logger.info(conn.get(user))
+        
     time.sleep(max(60 - time.time() + curtime, 0))
   except KeyboardInterrupt: break
   except Exception as e:
