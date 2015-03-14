@@ -97,7 +97,7 @@ for user in userdata:
   users[key] = {}
   for unit in user[1].split(','):
     unit = unit.lower()
-    users[key][unit] = { 'request' : RequestThread(conn, key, secret, exchange, unit, user[0], sampling, logger) }
+    users[key][unit] = { 'request' : RequestThread(conn, key, secret, exchange, unit, user[0], sampling + 2, logger) }
     #users[key][unit]['request'].start()
     bot = 'pybot'
     if len(user) == 6: bot = user[5]
@@ -113,23 +113,34 @@ for user in userdata:
     if users[key][unit]['order']:
       users[key][unit]['order'].start()
 
-validations = basestatus['validations']
-efficiency = { user : [0,0] for user in users }
 logger.debug('starting liquidity propagation with sampling %d' % sampling)
+starttime = time.time()
 
 while True: # print some info every minute until program terminates
   try:
     curtime = time.time()
     for user in users:
       response = conn.get(user)
-      logger.info('%s: balance: %.2f efficiency: %.2f%% rejects: %d missing: %d units: %s',
-        repr(users[user].values()[0]['request'].exchange),
-        response['balance'],
-        response['efficiency'] * 100,
-        response['rejects'],
-        response['missing'],
-        response['units'] )
-        
+      logger.info('%s: balance: %.2f efficiency: %.2f%% rejects: %d missing: %d units: %s - %s', repr(users[user].values()[0]['request'].exchange),
+        response['balance'], response['efficiency'] * 100, response['rejects'], response['missing'], response['units'], user )
+      
+      if response['efficiency'] < 0.8 and curtime - starttime > 90:
+        for unit in response['units']:
+          if response['units'][unit]['rejects'] / float(users[user][unit]['request'].sampling) >= 0.2: # look for valid error and adjust nonce shift
+            if response['units'][unit]['last_error'] != "":
+              logger.warning('too many rejected requests on exchange %s, adjusting nonce to %d', repr(users[user][unit]['request'].exchange), users[user][unit]['request'].exchange._shift)
+              users[user][unit]['request'].exchange.acquire_lock()
+              users[user][unit]['request'].exchange.adjust(response['units'][unit]['last_error'])
+              users[user][unit]['request'].exchange.release_lock()
+              break
+          if response['units'][unit]['missing'] / float(users[user][unit]['request'].sampling) >= 0.2: # look for valid error and adjust nonce shift
+            if users[user][unit]['request'].sampling < 45:  # just send more requests
+              users[user][unit]['request'].sampling = users[user][unit]['request'].sampling + 1
+              logger.warning('too many missing requests, increasing sampling to %d', users[user][unit]['request'].sampling)
+            else: # just wait a little bit
+              logger.warning('too many missing requests, sleeping a short while to synchronize')
+              time.sleep(0.7)
+
     time.sleep(max(60 - time.time() + curtime, 0))
   except KeyboardInterrupt: break
   except Exception as e:
