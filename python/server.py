@@ -220,7 +220,7 @@ def credit():
               previd = order[0]
               payout = calculate_interest(balance, order[1], _interest[name][unit]) / (_sampling * 60 * 24)
               keys[user][unit].balance += payout
-              logger.info("credit [%d/%d] %.8f nbt to %s for %.8f %s liquidity on %s for %s at balance %.8f", sample, _sampling, payout, user, order[1], side, name, unit, balance)
+              logger.info("credit [%d/%d] %.8f nbt to %s for %.8f %s liquidity on %s for %s at balance %.8f", sample + 1, _sampling, payout, user, order[1], side, name, unit, balance)
               balance += order[1]
             else:
               logger.warning("duplicate order id detected for user %s on exchange %s: %d", user, name, previd)
