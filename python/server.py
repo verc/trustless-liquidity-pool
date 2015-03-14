@@ -45,7 +45,6 @@ _wrappers = { 'poloniex' : Poloniex(), 'ccedk' : CCEDK(), 'bitcoincoid' : Bitcoi
 _tolerance = 0.08
 _sampling = 12
 _minpayout = 0.1
-_validations = 0
 _liquidity = []
 
 keys = {}
@@ -173,7 +172,7 @@ def liquidity(params):
   return ret
 
 def poolstats():
-  return { 'liquidity' : ([ (0,0) ] + _liquidity)[-1], 'sampling' : _sampling, 'validations' : _validations, 'users' : len(keys.keys()) }
+  return { 'liquidity' : ([ (0,0) ] + _liquidity)[-1], 'sampling' : _sampling, 'users' : len(keys.keys()) }
 
 def userstats(user):
   res = { 'balance' : 0.0, 'efficiency' : 0.0, 'rejects': 0, 'missing' : 0 }
