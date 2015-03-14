@@ -177,9 +177,10 @@ class PyBot(ConnectionThread):
     self.reset() # initialize walls
     serverprice = self.conn.get('price/' + self.unit)['price']
     prevprice = serverprice
+    curtime = time.time()
     while self.active:
+      time.sleep(max(30 - time.time() + curtime, 0))
       curtime = time.time()
-      serverprice = self.conn.get('price/' + self.unit, trials = 3)
       if self.pause:
         self.shutdown()
       else:
@@ -188,16 +189,15 @@ class PyBot(ConnectionThread):
           serverprice = serverprice['price']
           self.update_interest()
           userprice = PyBot.pricefeed.price(self.unit)
-          if 1.0 - min(serverprice, userprice) / max(serverprice, userprice) > 0.02: # validate server price
+          if 1.0 - min(serverprice, userprice) / max(serverprice, userprice) > 0.005: # validate server price
             self.logger.error('server price %.8f for unit %s deviates too much from price %.8f received from ticker, will delete all orders for this unit', serverprice, self.unit, userprice)
             self.shutdown()
           else:
             deviation = 1.0 - min(prevprice, serverprice) / max(prevprice, serverprice)
-            if deviation > 0.02:
+            if deviation > 0.005:
               self.logger.info('price of unit %s moved from %.8f to %.8f, will try to reset orders', unit, prevprice, serverprice)
               prevprice = serverprice
-            self.reset(deviation > 0.02)
+            self.reset(deviation > 0.005)
         else:
           self.logger.error('unable to retrieve server price: %s', serverprice['message'])
-      time.sleep(max(30 - time.time() + curtime, 0))
     self.shutdown()

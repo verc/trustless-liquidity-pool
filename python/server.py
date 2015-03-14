@@ -14,6 +14,20 @@ from thread import start_new_thread
 from exchanges import *
 from utils import *
 
+# pool configuration
+_port = 2019
+_interest = { 'poloniex' : { 'btc' : { 'rate' : 0.002, 'target' : 50.0, 'fee' : 0.002 } },
+              'ccedk' : { 'btc' : { 'rate' : 0.002, 'target' : 50.0, 'fee' : 0.002 } },
+              'bitcoincoid' : { 'btc' : { 'rate' : 0.002, 'target' : 50.0, 'fee' : 0.0 } },
+              'bter' : { 'btc' : { 'rate' : 5, 'target' : 10.0, 'fee' : 0.002 } }
+            }
+_nuconfig = '%s/.nu/nu.conf'%os.getenv("HOME") # path to nu.conf
+_tolerance = 0.0075 # price tolerance
+_sampling = 12 # number of requests validated per minute
+_autopayout = True # try to send payouts automatically
+_minpayout = 0.1 # minimum balance to trigger payout
+_grantaddress = "" # custodian grant address
+
 try: os.makedirs('logs')
 except: pass
 
@@ -34,22 +48,63 @@ ch.setFormatter(formatter)
 logger.addHandler(fh)
 logger.addHandler(ch)
 
-_port = 2019
-_interest = { 'poloniex' : { 'btc' : { 'rate' : 0.002, 'target' : 100.0, 'fee' : 0.002 } },
-              'ccedk' : { 'btc' : { 'rate' : 0.002, 'target' : 100.0, 'fee' : 0.002 } },
-              'bitcoincoid' : { 'btc' : { 'rate' : 0.002, 'target' : 100.0, 'fee' : 0.0 } },
-              'bter' : { 'btc' : { 'rate' : 0.002, 'target' : 100.0, 'fee' : 0.0 } }
-            }
-_nuconfig = '%s/.nu/nu.conf'%os.getenv("HOME") # path to nu.conf
 _wrappers = { 'poloniex' : Poloniex(), 'ccedk' : CCEDK(), 'bitcoincoid' : BitcoinCoId(), 'bter' : BTER() }
-_tolerance = 0.08
-_sampling = 12
-_minpayout = 0.1
 _liquidity = []
 
 keys = {}
 pricefeed = PriceFeed(30, logger)
 lock = threading.Lock()
+
+class NuRPC():
+  def __init__(self, config, address, logger = None):
+    self.logger = logger if logger else logging.getLogger('null')
+    self.address = address
+    self.rpc = None
+    try:
+      import jsonrpc
+    except ImportError:
+      self.logger.warning('NuRPC: jsonrpc library could not be imported')
+    else:
+      # rpc connection
+      self.JSONRPCException = jsonrpc.JSONRPCException
+      opts = dict(tuple(line.strip().replace(' ','').split('=')) for line in open(config).readlines())
+      if not 'rpcuser' in opts.keys() or not 'rpcpassword' in opts.keys():
+        self.logger.error("NuRPC: RPC parameters could not be read")
+      else:
+        try:
+          self.rpc = jsonrpc.ServiceProxy("http://%s:%s@127.0.0.1:%s"%(
+            opts['rpcuser'],opts['rpcpassword'], 14002))
+          self.txfee = self.rpc.getinfo()['paytxfee']
+        except:
+          self.logger.error("NuRPC: RPC connection could not be established")
+          self.rpc = None
+
+  def pay(self, txout):
+    try:
+      self.rpc.sendmany("", txout)
+      self.logger.info("successfully sent payout: %s", txout)
+      return True
+    except AttributeError:
+      self.logger.error('NuRPC: client not initialized')
+    except self.JSONRPCException as e:
+      self.logger.error('NuRPC: unable to send payout: %s', e.error['message'])
+    except:
+      self.logger.error("NuRPC: unable to send payout (exception caught): %s", sys.exc_info()[1])
+    return False
+
+  def liquidity(self, bid, ask):
+    try:
+      self.rpc.liquidityinfo('B', bid, ask, self.address)
+      print response
+      self.logger.info("successfully sent liquidity: buy: %.8f sell: %.8f", bid, ask)
+      return True
+    except AttributeError:
+      self.logger.error('NuRPC: client not initialized')
+    except self.JSONRPCException as e:
+      self.logger.error('NuRPC: unable to send liquidity: %s', e.error['message'])
+    except:
+      self.logger.error("NuRPC: unable to send liquidity (exception caught): %s", sys.exc_info()[1])
+    return False
 
 class User(threading.Thread):
   def __init__(self, key, address, unit, exchange, pricefeed, sampling, tolerance, logger = None):
@@ -218,37 +273,51 @@ def credit():
             if order[0] != previd:
               previd = order[0]
               payout = calculate_interest(balance, order[1], _interest[name][unit]) / (_sampling * 60 * 24)
+              lock.acquire()
               keys[user][unit].balance += payout
+              lock.release()
               logger.info("credit [%d/%d] %.8f nbt to %s for %.8f %s liquidity on %s for %s at balance %.8f", sample + 1, _sampling, payout, user, order[1], side, name, unit, balance)
               balance += order[1]
             else:
               logger.warning("duplicate order id detected for user %s on exchange %s: %d", user, name, previd)
 
-def pay():
+def pay(nud):
   txout = {}
   for user in keys:
     for unit in keys[user]:
       if not keys[user][unit].address in txout:
         txout[keys[user][unit].address] = 0.0
       txout[keys[user][unit].address] += keys[user][unit].balance
-  txout = {k : v for k,v in txout.items() if v > _minpayout}
+  txout = {k : v - nud.txfee for k,v in txout.items() if v > _minpayout}
   if txout:
-    # rpc connection
-    opts = dict(tuple(line.strip().replace(' ','').split('=')) for line in open(_nuconfig).readlines())
-    assert 'rpcuser' in opts.keys() and 'rpcpassword' in opts.keys(), "RPC parameters could not be read"
-    rpc = jsonrpc.ServiceProxy("http://%s:%s@127.0.0.1:%s"%(
-    opts['rpcuser'],opts['rpcpassword'],opts.pop('rpcport', 14002)))
-    if _passphrase: # unlock wallet if required
-      try: rpc.walletpassphrase(_passphrase, 30, False)
-      except:pass
-    # send the transactions
-    try: rpc.sendmany("", txout)
-    except: print "failed to send transactions:", txout
-    else:
+    payed = False
+    if _autopayout:
+      payed = nud.pay(txout)
+    try:
+      filename = 'logs/%d.credit' % time.time()
+      out = open(filename, 'w')
+      out.write(json.dumps(txout))
+      out.close()
+      if not payed:
+        logger.info("successfully stored payout to %s: %s", filename, txout)
       for user in keys:
         for unit in keys[user]:
-          if keys[user][unit].address in txout.keys():
+          if keys[user][unit].address in txout:
             keys[user][unit].balance = 0.0
+    except: logger.error("failed to store payout to %s: %s", filename, txout)
+  else:
+    logger.warning("not processing payouts because no valid balances were detected.")
+
+def submit(nud):
+  curliquidity = [0,0]
+  for user in keys:
+    for unit in keys[user]:
+      for s in xrange(_sampling):
+        curliquidity[0] += sum([ order[1] for order in keys[user][unit].liquidity['bid'][-s] ])
+        curliquidity[1] += sum([ order[1] for order in keys[user][unit].liquidity['ask'][-s] ])
+  curliquidity = [ curliquidity[0] / float(_sampling), curliquidity[1] / float(_sampling) ]
+  _liquidity.append(curliquidity)
+  nud.liquidity(curliquidity[0], curliquidity[1])
 
 class RequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
   def do_POST(self):
@@ -306,7 +375,8 @@ class RequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
 
   def log_message(self, format, *args): pass
 
-
+nud = NuRPC(_nuconfig, _grantaddress, logger)
+if not nud.rpc: logger.critical('Connection to Nu daemon could not be established, liquidity will NOT be sent!')
 httpd = BaseHTTPServer.HTTPServer(("", _port), RequestHandler)
 sa = httpd.socket.getsockname()
 logger.debug("Serving on %s port %d", sa[0], sa[1])
@@ -314,26 +384,33 @@ start_new_thread(httpd.serve_forever, ())
 
 lastcredit = time.time()
 lastpayout = time.time()
+lastsubmit = time.time()
 
 while True:
   try:
     curtime = time.time()
-    curliquidity = [0,0]
+
+    # wait for validation round to end:
     for user in keys:
       for unit in keys[user]:
         keys[user][unit].finish()
-        curliquidity[0] += sum([ order[1] for order in keys[user][unit].liquidity['bid'][-1] ])
-        curliquidity[1] += sum([ order[1] for order in keys[user][unit].liquidity['ask'][-1] ])
-    _liquidity.append(curliquidity)
 
+    # send liquidity
+    if curtime - lastsubmit >= 60:
+      lastsubmit = curtime
+      submit(nud)
+
+    # credit requests
     if curtime - lastcredit >= 60:
       lastcredit = curtime
       credit()
 
-    if curtime - lastpayout >= 86400:
+    # make payout
+    if curtime - lastpayout >= 300: #86400:
       lastpayout = curtime
-      pay()
-    
+      pay(nud)
+
+    # start new validation round
     for user in keys:
       for unit in keys[user]:
         keys[user][unit].validate()

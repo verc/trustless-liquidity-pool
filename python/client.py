@@ -59,13 +59,17 @@ class RequestThread(ConnectionThread):
     self.secret = secret
     self.exchange = exchange
     self.unit = unit
+    self.initsampling = sampling
     self.sampling = sampling
     self.address = address
     self.errorflag = False
     self.trials = 0
 
   def register(self):
-    return self.conn.post('register', {'address' : self.address, 'key' : self.key, 'name' : repr(self.exchange)})
+    response = self.conn.post('register', {'address' : self.address, 'key' : self.key, 'name' : repr(self.exchange)})
+    if response['code'] == 0: # reset sampling in case of server restart
+      self.sampling = self.initsampling
+    return response
 
   def run(self):
     ret = self.register()
@@ -78,7 +82,7 @@ class RequestThread(ConnectionThread):
       ret = self.conn.post('liquidity', params, 1)
       if ret['code'] != 0:
         self.trials += 1
-        self.errorflag = self.trials >= self.sampling * 10 # notify that something is wrong after 10 minutes of failures
+        self.errorflag = self.trials >= self.sampling * 5 # notify that something is wrong after 5 minutes of failures
         self.logger.error("submit: %s" % ret['message'])
         if ret['code'] == 11: # user unknown, just register again
           self.register()
@@ -121,13 +125,16 @@ for user in userdata:
       logger.error("unknown order handler: %s", bot)
       users[key][unit]['order'] = None
     if users[key][unit]['order']:
-      users[key][unit]['order'].start()
+      if users[key][unit]['order']:
+        users[key][unit]['order'].start()
 
 logger.debug('starting liquidity propagation with sampling %d' % sampling)
 starttime = time.time()
+curtime = time.time()
 
 while True: # print some info every minute until program terminates
   try:
+    time.sleep(max(60 - time.time() + curtime, 0))
     curtime = time.time()
     for user in users:
       for unit in users[user]:
@@ -161,8 +168,6 @@ while True: # print some info every minute until program terminates
               else: # just wait a little bit
                 logger.warning('too many missing requests, sleeping a short while to synchronize')
                 time.sleep(0.7)
-
-    time.sleep(max(60 - time.time() + curtime, 0))
   except KeyboardInterrupt: break
   except Exception as e:
     logger.error('exception caught: %s', sys.exc_info()[1])
