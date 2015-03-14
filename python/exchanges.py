@@ -92,6 +92,7 @@ class CCEDK(Exchange):
     super(CCEDK, self).__init__('www.ccedk.com')
     self.pair_id = {}
     self.currency_id = {}
+    failed = False
     while not self.pair_id or not self.currency_id:
       try:
         response = None
@@ -109,9 +110,10 @@ class CCEDK(Exchange):
       except:
         if response:
           self.adjust(",".join(response['errors'].values()))
-          print >> sys.stderr, "could not retrieve ccedk ids, will adjust shift to", self._shift, "reason:", ",".join(response['errors'].values())
+          if failed: print >> sys.stderr, "could not retrieve ccedk ids, will adjust shift to", self._shift, "reason:", ",".join(response['errors'].values())
         else:
           print >> sys.stderr, "could not retrieve ccedk ids, server is unreachable"
+        failed = True
         time.sleep(1)
 
   def __repr__(self): return "ccedk"

@@ -168,11 +168,11 @@ class PyBot(ConnectionThread):
     self.logger.info("starting PyBot for unit %s on exchange %s", self.unit, repr(self.exchange))
     self.update_interest()
     self.reset() # initialize walls
-    serverprice = self.conn.get('price')[self.unit]
+    serverprice = self.conn.get('price/' + self.unit)['price']
     prevprice = serverprice
     while self.active:
       curtime = time.time()
-      serverprice = self.conn.get('price')[self.unit]
+      serverprice = self.conn.get('price/' + self.unit)['price']
       self.update_interest()
       userprice = PyBot.pricefeed.price(self.unit)
       if 1.0 - min(serverprice, userprice) / max(serverprice, userprice) > 0.02: # validate server price

@@ -69,18 +69,10 @@ class User(threading.Thread):
     self.lock = threading.Lock()
     self.trigger = threading.Lock()
     self.trigger.acquire()
-    self.missing = 0
-    self.rejects = 0
-    self.total = 0
+    self.response = ['m'] * sampling
     self.logger = logger if logger else logging.getLogger('null')
     self.request = None
     self.daemon = True
-
-  def reset(self):
-    self.lock.acquire()
-    self.missing = 0
-    self.rejects = 0
-    self.lock.release()
 
   def set(self, request, sign):
     self.lock.acquire()
@@ -93,6 +85,7 @@ class User(threading.Thread):
       self.trigger.acquire()
       self.lock.acquire()
       if self.active:
+        del self.response[0]
         if self.request:
           try:
             orders = self.exchange.validate_request(self.key, self.unit, *self.request)
@@ -109,15 +102,20 @@ class User(threading.Thread):
               else:
                 self.logger.warning("order of deviates too much from current price for user %s at exchange %s on unit %s (%.02f < %.02f)" % (user, repr(self.exchange), self.unit, self.tolerance, deviation))
             for side in [ 'bid', 'ask' ]:
-              self.liquidity[side] = self.liquidity[side][1:] + [valid[side]]
+              del self.liquidity[side][0]
+              self.liquidity[side].append(valid[side])
+            self.response.append('a')
           else:
-            self.rejects += 1
+            self.response.append('r')
             self.last_error = "unable to validate request: " + orders['error']
             self.logger.warning("unable to validate request for user %s at exchange %s on unit %s: %s" % (self.key, repr(self.exchange), self.unit, orders['error']))
+            for side in [ 'bid', 'ask' ]:
+              del self.liquidity[side][0]
+              self.liquidity[side].append([])
         else:
-          self.missing += 1
+          self.response.append('m')
           self.last_error = "no request received"
-          logger.debug("no request received for user %s at exchange %s on unit %s" % (self.key, repr(self.exchange), self.unit))
+          #logger.debug("no request received for user %s at exchange %s on unit %s" % (self.key, repr(self.exchange), self.unit))
           for side in [ 'bid', 'ask' ]:
             self.liquidity[side] = self.liquidity[side][1:] + [[]]
         self.request = None
@@ -184,12 +182,14 @@ def userstats(user):
     if keys[user][unit].active:
       bid = [[]] + [ x for x in keys[user][unit].liquidity['bid'] if x ]
       ask = [[]] + [ x for x in keys[user][unit].liquidity['ask'] if x ]
+      missing = keys[user][unit].response.count('m')
+      rejects = keys[user][unit].response.count('r')
       res['balance'] += keys[user][unit].balance
-      res['missing'] += keys[user][unit].missing
-      res['rejects'] += keys[user][unit].rejects
-      res['units'][unit] = { 'bid' : bid[-1], 'ask' : ask[-1], 
-                             'rejects' : keys[user][unit].rejects,
-                             'missing' : keys[user][unit].missing,
+      res['missing'] += missing
+      res['rejects'] += rejects
+      res['units'][unit] = { 'bid' : bid[-1], 'ask' : ask[-1],
+                             'rejects' : rejects,
+                             'missing' : missing,
                              'last_error' :  keys[user][unit].last_error }
   if len(res['units']) > 0:
     res['efficiency'] = 1.0 - (res['rejects'] + res['missing']) / float(_sampling * len(res['units']))
@@ -220,12 +220,10 @@ def credit():
               previd = order[0]
               payout = calculate_interest(balance, order[1], _interest[name][unit]) / (_sampling * 60 * 24)
               keys[user][unit].balance += payout
+              logger.info("credit [%d/%d] %.8f nbt to %s for %.8f %s liquidity on %s for %s at balance %.8f", sample, _sampling, payout, user, order[1], side, name, unit, balance)
               balance += order[1]
-              logger.info("credit %.8f nbt to %s for providing %.8f %s liquidity on %s for %s", payout, user, order[1], side, name, unit)
             else:
               logger.warning("duplicate order id detected for user %s on exchange %s: %d", user, name, previd)
-        for user in users:
-          keys[user][unit].reset()
 
 def pay():
   txout = {}
@@ -329,11 +327,11 @@ while True:
         curliquidity[1] += sum([ order[1] for order in keys[user][unit].liquidity['ask'][-1] ])
     _liquidity.append(curliquidity)
 
-    if curtime - lastcredit > 60:
+    if curtime - lastcredit >= 60:
       lastcredit = curtime
       credit()
 
-    if curtime - lastpayout > 86400:
+    if curtime - lastpayout >= 86400:
       lastpayout = curtime
       pay()
     

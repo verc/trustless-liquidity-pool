@@ -78,11 +78,11 @@ class RequestThread(ConnectionThread):
       time.sleep(max(60 / self.sampling - time.time() + curtime, 0))
 
 # retrieve initial data
-conn = Connection(_server)
+conn = Connection(_server, logger)
 basestatus = conn.get('status')
 exchanges = conn.get('exchanges')
 exchanges['time'] = time.time()
-sampling = min(45, basestatus['sampling'] + 1)
+sampling = min(45, basestatus['sampling'] + 2)
 
 # parse user data
 users = {}
@@ -97,7 +97,7 @@ for user in userdata:
   users[key] = {}
   for unit in user[1].split(','):
     unit = unit.lower()
-    users[key][unit] = { 'request' : RequestThread(conn, key, secret, exchange, unit, user[0], sampling + 2, logger) }
+    users[key][unit] = { 'request' : RequestThread(conn, key, secret, exchange, unit, user[0], sampling, logger) }
     users[key][unit]['request'].start()
     bot = 'pybot'
     if len(user) == 6: bot = user[5]
@@ -121,19 +121,19 @@ while True: # print some info every minute until program terminates
     curtime = time.time()
     for user in users:
       response = conn.get(user)
-      logger.info('%s: balance: %.2f efficiency: %.2f%% rejects: %d missing: %d units: %s - %s', repr(users[user].values()[0]['request'].exchange),
+      logger.info('%s - balance: %.2f efficiency: %.2f%% rejects: %d missing: %d units: %s - %s', repr(users[user].values()[0]['request'].exchange),
         response['balance'], response['efficiency'] * 100, response['rejects'], response['missing'], response['units'], user )
       
       if response['efficiency'] < 0.8 and curtime - starttime > 90:
         for unit in response['units']:
-          if response['units'][unit]['rejects'] / float(users[user][unit]['request'].sampling) >= 0.2: # look for valid error and adjust nonce shift
+          if response['units'][unit]['rejects'] / float(basestatus['sampling']) >= 0.2: # look for valid error and adjust nonce shift
             if response['units'][unit]['last_error'] != "":
               logger.warning('too many rejected requests on exchange %s, adjusting nonce to %d', repr(users[user][unit]['request'].exchange), users[user][unit]['request'].exchange._shift)
               users[user][unit]['request'].exchange.acquire_lock()
               users[user][unit]['request'].exchange.adjust(response['units'][unit]['last_error'])
               users[user][unit]['request'].exchange.release_lock()
               break
-          if response['units'][unit]['missing'] / float(users[user][unit]['request'].sampling) >= 0.2: # look for valid error and adjust nonce shift
+          if response['units'][unit]['missing'] / float(basestatus['sampling']) >= 0.2: # look for valid error and adjust nonce shift
             if users[user][unit]['request'].sampling < 45:  # just send more requests
               users[user][unit]['request'].sampling = users[user][unit]['request'].sampling + 1
               logger.warning('too many missing requests, increasing sampling to %d', users[user][unit]['request'].sampling)
