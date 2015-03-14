@@ -16,16 +16,17 @@ from utils import *
 
 # pool configuration
 _port = 2019
-_interest = { 'poloniex' : { 'btc' : { 'rate' : 0.002, 'target' : 50.0, 'fee' : 0.002 } },
-              'ccedk' : { 'btc' : { 'rate' : 0.002, 'target' : 50.0, 'fee' : 0.002 } },
-              'bitcoincoid' : { 'btc' : { 'rate' : 0.002, 'target' : 50.0, 'fee' : 0.0 } },
-              'bter' : { 'btc' : { 'rate' : 5, 'target' : 10.0, 'fee' : 0.002 } }
+# daily interest rates
+_interest = { 'poloniex' : { 'btc' : { 'rate' : 0.00165, 'target' : 50.0, 'fee' : 0.002 } },
+              'ccedk' : { 'btc' : { 'rate' : 0.00165, 'target' : 50.0, 'fee' : 0.002 } },
+              'bitcoincoid' : { 'btc' : { 'rate' : 0.00165, 'target' : 50.0, 'fee' : 0.0 } },
+              'bter' : { 'btc' : { 'rate' : 0.00165, 'target' : 50.0, 'fee' : 0.002 } }
             }
 _nuconfig = '%s/.nu/nu.conf'%os.getenv("HOME") # path to nu.conf
 _tolerance = 0.0075 # price tolerance
 _sampling = 12 # number of requests validated per minute
 _autopayout = True # try to send payouts automatically
-_minpayout = 0.1 # minimum balance to trigger payout
+_minpayout = 0.011 # minimum balance to trigger payout
 _grantaddress = "" # custodian grant address
 
 try: os.makedirs('logs')
@@ -406,7 +407,7 @@ while True:
       credit()
 
     # make payout
-    if curtime - lastpayout >= 300: #86400:
+    if curtime - lastpayout >= 43200:
       lastpayout = curtime
       pay(nud)
 
