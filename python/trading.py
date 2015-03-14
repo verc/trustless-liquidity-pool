@@ -18,6 +18,7 @@ class NuBot(ConnectionThread):
     super(NuBot, self).__init__(conn, logger)
     self.process = None
     self.unit = unit
+    self.running = False
     self.exchange = exchange
     self.options = {
       'exchangename' : repr(exchange),
@@ -47,18 +48,24 @@ class NuBot(ConnectionThread):
       self.options['secondary-peg-options']['spread'] = 0.0
 
   def run(self):
-    self.logger.info("starting NuBot for unit %s on exchange %s", self.unit, repr(self.exchange))
     out = tempfile.NamedTemporaryFile(delete = False)
     out.write(json.dumps({ 'options' : self.options }))
     out.close()
-    with open(os.devnull, 'w') as fp:
-      self.process = subprocess.Popen("java -jar NuBot.jar %s" % out.name,
-        stdout=fp, stderr=fp, shell=True, preexec_fn=os.setsid, cwd = 'nubot')
+    while self.active:
+      if self.pause:
+        self.shutdown()
+      elif not self.process:
+        with open(os.devnull, 'w') as fp:
+          self.logger.info("starting NuBot for unit %s on exchange %s", self.unit, repr(self.exchange))
+          self.process = subprocess.Popen("java -jar NuBot.jar %s" % out.name,
+            stdout=fp, stderr=fp, shell=True, preexec_fn=os.setsid, cwd = 'nubot')
+      time.sleep(10)
 
   def shutdown(self):
     if self.process:
       self.logger.info("stopping NuBot for unit %s on exchange %s", self.unit, repr(self.exchange))
       os.killpg(self.process.pid, signal.SIGTERM)
+      self.process = None
 
 
 class PyBot(ConnectionThread):
@@ -104,7 +111,7 @@ class PyBot(ConnectionThread):
   def update_interest(self):
     curtime = time.time()
     if curtime - PyBot.interest[0] > 120:
-      PyBot.interest[1] = self.conn.get('exchanges')
+      PyBot.interest[1] = self.conn.get('exchanges', trials = 1)
       PyBot.interest[0] = curtime
 
   def place(self, side):
@@ -172,17 +179,25 @@ class PyBot(ConnectionThread):
     prevprice = serverprice
     while self.active:
       curtime = time.time()
-      serverprice = self.conn.get('price/' + self.unit)['price']
-      self.update_interest()
-      userprice = PyBot.pricefeed.price(self.unit)
-      if 1.0 - min(serverprice, userprice) / max(serverprice, userprice) > 0.02: # validate server price
-        self.logger.error('server price %.8f for unit %s deviates too much from price %.8f received from ticker, will delete all orders for this unit', serverprice, self.unit, userprice)
+      serverprice = self.conn.get('price/' + self.unit, trials = 3)
+      if self.pause:
         self.shutdown()
       else:
-        deviation = 1.0 - min(prevprice, serverprice) / max(prevprice, serverprice)
-        if deviation > 0.02:
-          self.logger.info('price of unit %s moved from %.8f to %.8f, will try to reset orders', unit, prevprice, serverprice)
-          prevprice = serverprice
-        self.reset(deviation > 0.02)
+        serverprice = self.conn.get('price/' + self.unit, trials = 3)
+        if not 'error' in serverprice:
+          serverprice = serverprice['price']
+          self.update_interest()
+          userprice = PyBot.pricefeed.price(self.unit)
+          if 1.0 - min(serverprice, userprice) / max(serverprice, userprice) > 0.02: # validate server price
+            self.logger.error('server price %.8f for unit %s deviates too much from price %.8f received from ticker, will delete all orders for this unit', serverprice, self.unit, userprice)
+            self.shutdown()
+          else:
+            deviation = 1.0 - min(prevprice, serverprice) / max(prevprice, serverprice)
+            if deviation > 0.02:
+              self.logger.info('price of unit %s moved from %.8f to %.8f, will try to reset orders', unit, prevprice, serverprice)
+              prevprice = serverprice
+            self.reset(deviation > 0.02)
+        else:
+          self.logger.error('unable to retrieve server price: %s', serverprice['message'])
       time.sleep(max(30 - time.time() + curtime, 0))
     self.shutdown()

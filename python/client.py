@@ -61,20 +61,30 @@ class RequestThread(ConnectionThread):
     self.unit = unit
     self.sampling = sampling
     self.address = address
+    self.errorflag = False
+    self.trials = 0
+
+  def register(self):
+    return self.conn.post('register', {'address' : self.address, 'key' : self.key, 'name' : repr(self.exchange)})
 
   def run(self):
-    ret = self.conn.post('register', {'address' : self.address, 'key' : self.key, 'name' : repr(self.exchange)})
+    ret = self.register()
     if ret['code'] != 0: self.logger.error("register: %s" % ret['message'])
     while self.active:
       curtime = time.time()
       data, sign = self.exchange.create_request(self.unit, self.key, self.secret)
       params = { 'unit' : self.unit, 'user' : self.key, 'sign' : sign }
       params.update(data)
-      ret = self.conn.post('liquidity', params)
+      ret = self.conn.post('liquidity', params, 1)
       if ret['code'] != 0:
+        self.trials += 1
+        self.errorflag = self.trials >= self.sampling * 1 # notify that something is wrong after 10 minutes of failures
         self.logger.error("submit: %s" % ret['message'])
         if ret['code'] == 11: # user unknown, just register again
-          self.conn.post('register', {'address' : self.address, 'key' : self.key, 'name' : repr(self.exchange)})
+          self.register()
+      else:
+        self.trials = 0
+        self.errorflag = False
       time.sleep(max(60 / self.sampling - time.time() + curtime, 0))
 
 # retrieve initial data
@@ -120,26 +130,37 @@ while True: # print some info every minute until program terminates
   try:
     curtime = time.time()
     for user in users:
-      response = conn.get(user)
-      logger.info('%s - balance: %.8f efficiency: %.2f%% rejects: %d missing: %d units: %s - %s', repr(users[user].values()[0]['request'].exchange),
-        response['balance'], response['efficiency'] * 100, response['rejects'], response['missing'], response['units'], user )
-      
-      if response['efficiency'] < 0.8 and curtime - starttime > 90:
-        for unit in response['units']:
-          if response['units'][unit]['rejects'] / float(basestatus['sampling']) >= 0.2: # look for valid error and adjust nonce shift
-            if response['units'][unit]['last_error'] != "":
-              logger.warning('too many rejected requests on exchange %s, adjusting nonce to %d', repr(users[user][unit]['request'].exchange), users[user][unit]['request'].exchange._shift)
-              users[user][unit]['request'].exchange.acquire_lock()
-              users[user][unit]['request'].exchange.adjust(response['units'][unit]['last_error'])
-              users[user][unit]['request'].exchange.release_lock()
-              break
-          if response['units'][unit]['missing'] / float(basestatus['sampling']) >= 0.2: # look for valid error and adjust nonce shift
-            if users[user][unit]['request'].sampling < 45:  # just send more requests
-              users[user][unit]['request'].sampling = users[user][unit]['request'].sampling + 1
-              logger.warning('too many missing requests, increasing sampling to %d', users[user][unit]['request'].sampling)
-            else: # just wait a little bit
-              logger.warning('too many missing requests, sleeping a short while to synchronize')
-              time.sleep(0.7)
+      for unit in users[user]:
+        # if request sender doesn't work correctly, shut down trading for now
+        if not users[user][unit]['order'].pause and users[user][unit]['request'].errorflag:
+          logger.warning('shutting down trading bot for user %s because of bad server communication', user)
+          users[user][unit]['order'].shutdown()
+        users[user][unit]['order'].pause = users[user][unit]['request'].errorflag
+      # post some statistics
+      response = conn.get(user, trials = 1)
+      if 'error' in response:
+        logger.error('unable to receive statistics for user %s: %s', user, response['message'])
+        if response['error'] == 'socket error': # this could mean the server just went down
+          users[user].values()[0]['request'].register()
+      else:
+        logger.info('%s - balance: %.8f efficiency: %.2f%% rejects: %d missing: %d units: %s - %s', repr(users[user].values()[0]['request'].exchange),
+          response['balance'], response['efficiency'] * 100, response['rejects'], response['missing'], response['units'], user )
+        if response['efficiency'] < 0.8 and curtime - starttime > 90:
+          for unit in response['units']:
+            if response['units'][unit]['rejects'] / float(basestatus['sampling']) >= 0.2: # look for valid error and adjust nonce shift
+              if response['units'][unit]['last_error'] != "":
+                logger.warning('too many rejected requests on exchange %s, adjusting nonce to %d', repr(users[user][unit]['request'].exchange), users[user][unit]['request'].exchange._shift)
+                users[user][unit]['request'].exchange.acquire_lock()
+                users[user][unit]['request'].exchange.adjust(response['units'][unit]['last_error'])
+                users[user][unit]['request'].exchange.release_lock()
+                break
+            if response['units'][unit]['missing'] / float(basestatus['sampling']) >= 0.2: # look for valid error and adjust nonce shift
+              if users[user][unit]['request'].sampling < 45:  # just send more requests
+                users[user][unit]['request'].sampling = users[user][unit]['request'].sampling + 1
+                logger.warning('too many missing requests, increasing sampling to %d', users[user][unit]['request'].sampling)
+              else: # just wait a little bit
+                logger.warning('too many missing requests, sleeping a short while to synchronize')
+                time.sleep(0.7)
 
     time.sleep(max(60 - time.time() + curtime, 0))
   except KeyboardInterrupt: break

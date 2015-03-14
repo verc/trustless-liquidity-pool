@@ -18,7 +18,7 @@ class Connection():
     if not logger:
       self.logger = logging.getLogger('null')
 
-  def json_request(self, request, method, params, headers):
+  def json_request(self, request, method, params, headers, trials = None):
     connection = httplib.HTTPConnection(self.server, timeout=60)
     try:
       connection.request(request, method, urllib.urlencode(params), headers = headers)
@@ -26,24 +26,28 @@ class Connection():
       content = response.read()
       return json.loads(content)
     except httplib.BadStatusLine:
-      self.logger.error("%s: server could not be reached, retrying in 15 seconds ...", method)
+      msg = 'server could not be reached'
     except ValueError:
-      self.logger.error("%s: server response invalid, retrying in 15 seconds ... %s", method, content)
+      msg = 'server response invalid'
     except socket.error:
-      self.logger.error("%s: socket error, retrying in 15 seconds ...", method)
+      msg = 'socket error'
     except:
-      self.logger.error("%s: unknown connection error, retrying in 15 seconds ...", method)
+      msg = 'unknown connection error'
+    self.logger.error("%s: %s, retrying in 15 seconds ...", method, msg)
+    if trials:
+      if trials <= 1: return { 'message' : msg, 'code' : -1, 'error' : True }
+      trials = trials - 1
     time.sleep(15)
-    return self.json_request(request, method, params, headers)
+    return self.json_request(request, method, params, headers, trials)
 
-  def get(self, method, params = None):
+  def get(self, method, params = None, trials = None):
     if not params: params = {}
-    return self.json_request('GET', '/' + method, params, {})
+    return self.json_request('GET', '/' + method, params, {}, trials)
 
-  def post(self, method, params = None):
+  def post(self, method, params = None, trials = None):
     if not params: params = {}
     headers = { "Content-type": "application/x-www-form-urlencoded" }
-    return self.json_request('POST', method, params, headers)
+    return self.json_request('POST', method, params, headers, trials)
 
 
 class ConnectionThread(threading.Thread):
@@ -51,6 +55,7 @@ class ConnectionThread(threading.Thread):
     threading.Thread.__init__(self)
     self.daemon = True
     self.active = True
+    self.pause = False
     self.logger = logger
     self.logger = logger if logger else logging.getLogger('null')
     self.conn = conn
