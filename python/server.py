@@ -63,10 +63,9 @@ class NuRPC():
     try:
       import jsonrpc
     except ImportError:
-      self.logger.warning('NuRPC: jsonrpc library could not be imported')
+      self.logger.warning('NuRPC: jsonrpclib library could not be imported')
     else:
       # rpc connection
-      self.JSONRPCException = jsonrpc.JSONRPCException
       opts = dict(tuple(line.strip().replace(' ','').split('=')) for line in open(config).readlines())
       if not 'rpcuser' in opts.keys() or not 'rpcpassword' in opts.keys():
         self.logger.error("NuRPC: RPC parameters could not be read")
@@ -86,10 +85,12 @@ class NuRPC():
       return True
     except AttributeError:
       self.logger.error('NuRPC: client not initialized')
-    except self.JSONRPCException as e:
-      self.logger.error('NuRPC: unable to send payout: %s', e.error['message'])
     except:
-      self.logger.error("NuRPC: unable to send payout (exception caught): %s", sys.exc_info()[1])
+      msg = sys.exc_info()[1]
+      try:
+        self.logger.error('NuRPC: unable to send payout: %s', e.error['message'])
+      except:
+        self.logger.error("NuRPC: unable to send payout (exception caught): %s", msg)
     return False
 
   def liquidity(self, bid, ask):
@@ -100,10 +101,12 @@ class NuRPC():
       return True
     except AttributeError:
       self.logger.error('NuRPC: client not initialized')
-    except self.JSONRPCException as e:
-      self.logger.error('NuRPC: unable to send liquidity: %s', e.error['message'])
     except:
-      self.logger.error("NuRPC: unable to send liquidity (exception caught): %s", sys.exc_info()[1])
+      msg = sys.exc_info()[1]
+      try:
+        self.logger.error('NuRPC: unable to send liquidity: %s', e.error['message'])
+      except:
+        self.logger.error("NuRPC: unable to send liquidity (exception caught): %s", msg)
     return False
 
 class User(threading.Thread):
