@@ -151,7 +151,7 @@ class User(threading.Thread):
             price = self.pricefeed.price(self.unit)
             for order in orders:
               deviation = 1.0 - min(order['price'], price) / max(order['price'], price)
-              if deviation < self.tolerance:
+              if deviation <= self.tolerance:
                 valid[order['type']].append((order['id'], order['amount']))
               else:
                 self.logger.warning("order of deviates too much from current price for user %s at exchange %s on unit %s (%.02f < %.02f)" % (user, repr(self.exchange), self.unit, self.tolerance, deviation))
