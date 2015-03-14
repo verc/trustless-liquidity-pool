@@ -78,7 +78,7 @@ class RequestThread(ConnectionThread):
       ret = self.conn.post('liquidity', params, 1)
       if ret['code'] != 0:
         self.trials += 1
-        self.errorflag = self.trials >= self.sampling * 1 # notify that something is wrong after 10 minutes of failures
+        self.errorflag = self.trials >= self.sampling * 10 # notify that something is wrong after 10 minutes of failures
         self.logger.error("submit: %s" % ret['message'])
         if ret['code'] == 11: # user unknown, just register again
           self.register()
