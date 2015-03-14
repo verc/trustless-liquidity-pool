@@ -121,7 +121,7 @@ while True: # print some info every minute until program terminates
     curtime = time.time()
     for user in users:
       response = conn.get(user)
-      logger.info('%s - balance: %.2f efficiency: %.2f%% rejects: %d missing: %d units: %s - %s', repr(users[user].values()[0]['request'].exchange),
+      logger.info('%s - balance: %.8f efficiency: %.2f%% rejects: %d missing: %d units: %s - %s', repr(users[user].values()[0]['request'].exchange),
         response['balance'], response['efficiency'] * 100, response['rejects'], response['missing'], response['units'], user )
       
       if response['efficiency'] < 0.8 and curtime - starttime > 90:
