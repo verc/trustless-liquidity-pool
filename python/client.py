@@ -98,7 +98,7 @@ for user in userdata:
   for unit in user[1].split(','):
     unit = unit.lower()
     users[key][unit] = { 'request' : RequestThread(conn, key, secret, exchange, unit, user[0], sampling + 2, logger) }
-    #users[key][unit]['request'].start()
+    users[key][unit]['request'].start()
     bot = 'pybot'
     if len(user) == 6: bot = user[5]
     if bot == 'none':
