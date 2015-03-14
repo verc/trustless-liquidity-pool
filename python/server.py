@@ -75,7 +75,7 @@ class NuRPC():
             opts['rpcuser'],opts['rpcpassword'], 14002))
           self.txfee = self.rpc.getinfo()['paytxfee']
         except:
-          self.logger.error("NuRPC: RPC connection could not be established")
+          self.logger.error("NuRPC: RPC connection could not be established: %s", sys.exc_info()[1])
           self.rpc = None
 
   def pay(self, txout):
