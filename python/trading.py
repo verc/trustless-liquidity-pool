@@ -194,10 +194,10 @@ class PyBot(ConnectionThread):
             self.shutdown()
           else:
             deviation = 1.0 - min(prevprice, self.serverprice) / max(prevprice, self.serverprice)
-            if deviation > 0.0075:
+            if deviation > 0.005:
               self.logger.info('price of unit %s moved from %.8f to %.8f, will try to reset orders', self.unit, prevprice, self.serverprice)
               prevprice = self.serverprice
-            self.reset(deviation > 0.0075)
+            self.reset(deviation > 0.005)
         else:
           self.logger.error('unable to retrieve server price: %s', response['message'])
     self.shutdown()
