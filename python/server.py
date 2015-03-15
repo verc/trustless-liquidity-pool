@@ -320,8 +320,8 @@ def submit(nud):
   for user in keys:
     for unit in keys[user]:
       for s in xrange(_sampling):
-        curliquidity[0] += sum([ order[1] for order in keys[user][unit].liquidity['bid'][-s] ])
-        curliquidity[1] += sum([ order[1] for order in keys[user][unit].liquidity['ask'][-s] ])
+        curliquidity[0] += sum([ order[1] for order in keys[user][unit].liquidity['bid'][-(s+1)] ])
+        curliquidity[1] += sum([ order[1] for order in keys[user][unit].liquidity['ask'][-(s+1)] ])
   lock.release()
   curliquidity = [ curliquidity[0] / float(_sampling), curliquidity[1] / float(_sampling) ]
   _liquidity.append(curliquidity)
