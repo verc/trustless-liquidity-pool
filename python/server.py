@@ -221,9 +221,7 @@ def liquidity(params):
     unit = params.pop('unit')[0]
     if user in keys:
       if unit in keys[user]:
-        lock.acquire()
         keys[user][unit].set(params, sign)
-        lock.release()
       else:
         ret = response(12, "unit for user %s not found: %s" % (user, unit))
     else:
@@ -395,9 +393,11 @@ while True:
     curtime = time.time()
 
     # wait for validation round to end:
+    lock.acquire()
     for user in keys:
       for unit in keys[user]:
         keys[user][unit].finish()
+    lock.release()
 
     # send liquidity
     if curtime - lastsubmit >= 60:
@@ -415,9 +415,11 @@ while True:
       pay(nud)
 
     # start new validation round
+    lock.acquire()
     for user in keys:
       for unit in keys[user]:
         keys[user][unit].validate()
+    lock.release()
 
     time.sleep(max(float(60 / _sampling) - time.time() + curtime, 0))
   except Exception as e:
