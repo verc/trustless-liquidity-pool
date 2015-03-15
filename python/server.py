@@ -316,11 +316,13 @@ def pay(nud):
 
 def submit(nud):
   curliquidity = [0,0]
+  lock.acquire()
   for user in keys:
     for unit in keys[user]:
       for s in xrange(_sampling):
         curliquidity[0] += sum([ order[1] for order in keys[user][unit].liquidity['bid'][-s] ])
         curliquidity[1] += sum([ order[1] for order in keys[user][unit].liquidity['ask'][-s] ])
+  lock.release()
   curliquidity = [ curliquidity[0] / float(_sampling), curliquidity[1] / float(_sampling) ]
   _liquidity.append(curliquidity)
   nud.liquidity(curliquidity[0], curliquidity[1])
