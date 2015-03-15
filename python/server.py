@@ -7,6 +7,7 @@ import logging
 import urllib
 import sys, os
 import time
+import thread
 import threading
 import sys
 from math import log, exp
@@ -17,11 +18,10 @@ from utils import *
 # pool configuration
 _port = 2019
 # daily interest rates
-_interest = { 'poloniex' : { 'btc' : { 'rate' : 0.00165, 'target' : 50.0, 'fee' : 0.002 } },
-              'ccedk' : { 'btc' : { 'rate' : 0.00165, 'target' : 50.0, 'fee' : 0.002 } },
-              'bitcoincoid' : { 'btc' : { 'rate' : 0.00165, 'target' : 50.0, 'fee' : 0.0 } },
-              'bter' : { 'btc' : { 'rate' : 0.00165, 'target' : 50.0, 'fee' : 0.002 } }
-            }
+_interest = { 'poloniex' : { 'btc' : { 'rate' : 0.0165, 'target' : 50.0, 'fee' : 0.002 } },
+              'ccedk' : { 'btc' : { 'rate' : 0.0165, 'target' : 50.0, 'fee' : 0.002 } },
+              'bitcoincoid' : { 'btc' : { 'rate' : 0.0165, 'target' : 50.0, 'fee' : 0.0 } },
+              'bter' : { 'btc' : { 'rate' : 0.0165, 'target' : 50.0, 'fee' : 0.002 } } }
 _nuconfig = '%s/.nu/nu.conf'%os.getenv("HOME") # path to nu.conf
 _tolerance = 0.0075 # price tolerance
 _sampling = 24 # number of requests validated per minute
@@ -155,7 +155,7 @@ class User(threading.Thread):
               if deviation <= self.tolerance:
                 valid[order['type']].append((order['id'], order['amount']))
               else:
-                self.logger.warning("order of deviates too much from current price for user %s at exchange %s on unit %s (%.04f < %.04f)" % (user, repr(self.exchange), self.unit, self.tolerance, deviation))
+                self.logger.warning("order of deviates too much from current price for user %s at exchange %s on unit %s (%.04f < %.04f)" % (self.key, repr(self.exchange), self.unit, self.tolerance, deviation))
             for side in [ 'bid', 'ask' ]:
               del self.liquidity[side][0]
               self.liquidity[side].append(valid[side])
@@ -177,7 +177,8 @@ class User(threading.Thread):
       self.lock.release()
 
   def validate(self):
-    self.trigger.release()
+    try: self.trigger.release()
+    except thread.error: pass # user did not finish last request in time
 
   def finish(self):
     self.lock.acquire()
@@ -274,9 +275,7 @@ def credit():
             if order[0] != previd:
               previd = order[0]
               payout = calculate_interest(balance, order[1], _interest[name][unit]) / (_sampling * 60 * 24)
-              lock.acquire()
               keys[user][unit].balance += payout
-              lock.release()
               logger.info("credit [%d/%d] %.8f nbt to %s for %.8f %s liquidity on %s for %s at balance %.8f", sample + 1, _sampling, payout, user, order[1], side, name, unit, balance)
               balance += order[1]
             else:
@@ -407,7 +406,7 @@ while True:
       credit()
 
     # make payout
-    if curtime - lastpayout >= 43200:
+    if curtime - lastpayout >= 600: #43200:
       lastpayout = curtime
       pay(nud)
 
