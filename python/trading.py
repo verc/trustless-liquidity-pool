@@ -115,7 +115,7 @@ class PyBot(ConnectionThread):
       PyBot.interest[0] = curtime
 
   def place(self, side):
-    price = PyBot.pricefeed.price(self.unit)
+    price = self.serverprice
     if side == 'ask':
       exunit = 'nbt'
       price *= (1.0 + self.spread)
@@ -174,9 +174,9 @@ class PyBot(ConnectionThread):
   def run(self):
     self.logger.info("starting PyBot for unit %s on exchange %s", self.unit, repr(self.exchange))
     self.update_interest()
+    self.serverprice = self.conn.get('price/' + self.unit)['price']
     self.reset() # initialize walls
-    serverprice = self.conn.get('price/' + self.unit)['price']
-    prevprice = serverprice
+    prevprice = self.serverprice
     curtime = time.time()
     while self.active:
       time.sleep(max(30 - time.time() + curtime, 0))
@@ -184,20 +184,20 @@ class PyBot(ConnectionThread):
       if self.pause:
         self.shutdown()
       else:
-        serverprice = self.conn.get('price/' + self.unit, trials = 3)
-        if not 'error' in serverprice:
-          serverprice = serverprice['price']
+        response = self.conn.get('price/' + self.unit, trials = 3)
+        if not 'error' in response:
+          self.serverprice = response['price']
           self.update_interest()
           userprice = PyBot.pricefeed.price(self.unit)
-          if 1.0 - min(serverprice, userprice) / max(serverprice, userprice) > 0.005: # validate server price
-            self.logger.error('server price %.8f for unit %s deviates too much from price %.8f received from ticker, will delete all orders for this unit', serverprice, self.unit, userprice)
+          if 1.0 - min(self.serverprice, userprice) / max(self.serverprice, userprice) > 0.005: # validate server price
+            self.logger.error('server price %.8f for unit %s deviates too much from price %.8f received from ticker, will delete all orders for this unit', self.serverprice, self.unit, userprice)
             self.shutdown()
           else:
-            deviation = 1.0 - min(prevprice, serverprice) / max(prevprice, serverprice)
+            deviation = 1.0 - min(prevprice, self.serverprice) / max(prevprice, self.serverprice)
             if deviation > 0.0075:
-              self.logger.info('price of unit %s moved from %.8f to %.8f, will try to reset orders', self.unit, prevprice, serverprice)
-              prevprice = serverprice
+              self.logger.info('price of unit %s moved from %.8f to %.8f, will try to reset orders', self.unit, prevprice, self.serverprice)
+              prevprice = self.serverprice
             self.reset(deviation > 0.0075)
         else:
-          self.logger.error('unable to retrieve server price: %s', serverprice['message'])
+          self.logger.error('unable to retrieve server price: %s', response['message'])
     self.shutdown()
