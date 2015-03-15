@@ -16,7 +16,7 @@ from exchanges import *
 from utils import *
 
 # pool configuration
-_port = 2019
+_port = 2020
 # daily interest rates
 _interest = { 'poloniex' : { 'btc' : { 'rate' : 0.0025, 'target' : 200.0, 'fee' : 0.002 } },
               'ccedk' : { 'btc' : { 'rate' : 0.0025, 'target' : 200.0, 'fee' : 0.002 } },
@@ -26,7 +26,7 @@ _nuconfig = '%s/.nu/nu.conf'%os.getenv("HOME") # path to nu.conf
 _tolerance = 0.0085 # price tolerance
 _sampling = 24 # number of requests validated per minute
 _autopayout = True # try to send payouts automatically
-_minpayout = 0.05 # minimum balance to trigger payout
+_minpayout = 0.03 # minimum balance to trigger payout
 _grantaddress = "" # custodian grant address
 
 try: os.makedirs('logs')
@@ -285,11 +285,13 @@ def credit():
 
 def pay(nud):
   txout = {}
+  lock.acquire()
   for user in keys:
     for unit in keys[user]:
       if not keys[user][unit].address in txout:
         txout[keys[user][unit].address] = 0.0
       txout[keys[user][unit].address] += keys[user][unit].balance
+  lock.release()
   txout = {k : v - nud.txfee for k,v in txout.items() if v - nud.txfee > _minpayout}
   if txout:
     payed = False
@@ -302,10 +304,12 @@ def pay(nud):
       out.close()
       if not payed:
         logger.info("successfully stored payout to %s: %s", filename, txout)
+      lock.acquire()
       for user in keys:
         for unit in keys[user]:
           if keys[user][unit].address in txout:
             keys[user][unit].balance = 0.0
+      lock.release()
     except: logger.error("failed to store payout to %s: %s", filename, txout)
   else:
     logger.warning("not processing payouts because no valid balances were detected.")
@@ -401,18 +405,18 @@ while True:
 
     # send liquidity
     if curtime - lastsubmit >= 60:
-      lastsubmit = curtime
       submit(nud)
+      lastsubmit = curtime
 
     # credit requests
     if curtime - lastcredit >= 60:
-      lastcredit = curtime
       credit()
+      lastcredit = curtime
 
     # make payout
     if curtime - lastpayout >= 3600: #43200:
-      lastpayout = curtime
       pay(nud)
+      lastpayout = curtime
 
     # start new validation round
     lock.acquire()
