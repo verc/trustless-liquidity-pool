@@ -195,7 +195,7 @@ class PyBot(ConnectionThread):
           else:
             deviation = 1.0 - min(prevprice, serverprice) / max(prevprice, serverprice)
             if deviation > 0.005:
-              self.logger.info('price of unit %s moved from %.8f to %.8f, will try to reset orders', unit, prevprice, serverprice)
+              self.logger.info('price of unit %s moved from %.8f to %.8f, will try to reset orders', self.unit, prevprice, serverprice)
               prevprice = serverprice
             self.reset(deviation > 0.005)
         else:

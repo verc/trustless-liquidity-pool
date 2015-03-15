@@ -155,7 +155,7 @@ class User(threading.Thread):
               if deviation <= self.tolerance:
                 valid[order['type']].append((order['id'], order['amount']))
               else:
-                self.logger.warning("order of deviates too much from current price for user %s at exchange %s on unit %s (%.02f < %.02f)" % (user, repr(self.exchange), self.unit, self.tolerance, deviation))
+                self.logger.warning("order of deviates too much from current price for user %s at exchange %s on unit %s (%.04f < %.04f)" % (user, repr(self.exchange), self.unit, self.tolerance, deviation))
             for side in [ 'bid', 'ask' ]:
               del self.liquidity[side][0]
               self.liquidity[side].append(valid[side])
