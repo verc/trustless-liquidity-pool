@@ -156,11 +156,15 @@ while True: # print some info every minute until program terminates
           for unit in response['units']:
             if response['units'][unit]['rejects'] / float(basestatus['sampling']) >= 0.2: # look for valid error and adjust nonce shift
               if response['units'][unit]['last_error'] != "":
-                logger.warning('too many rejected requests on exchange %s, adjusting nonce to %d', repr(users[user][unit]['request'].exchange), users[user][unit]['request'].exchange._shift)
-                users[user][unit]['request'].exchange.acquire_lock()
-                users[user][unit]['request'].exchange.adjust(response['units'][unit]['last_error'])
-                users[user][unit]['request'].exchange.release_lock()
-                break
+                if 'deviates too much from price' in response['units'][unit]['last_error']:
+                  PyBot.pricefeed.price(unit, True) # Force a price update
+                  logger.warning('price missmatch on exchange %s, forcing price update', repr(users[user][unit]['request'].exchange))
+                else:
+                  logger.warning('too many rejected requests on exchange %s, adjusting nonce to %d', repr(users[user][unit]['request'].exchange), users[user][unit]['request'].exchange._shift)
+                  users[user][unit]['request'].exchange.acquire_lock()
+                  users[user][unit]['request'].exchange.adjust(response['units'][unit]['last_error'])
+                  users[user][unit]['request'].exchange.release_lock()
+                  break
             if response['units'][unit]['missing'] / float(basestatus['sampling']) >= 0.2: # look for valid error and adjust nonce shift
               if users[user][unit]['request'].sampling < 45:  # just send more requests
                 users[user][unit]['request'].sampling = users[user][unit]['request'].sampling + 1

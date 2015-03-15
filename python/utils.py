@@ -73,10 +73,11 @@ class PriceFeed():
     self.feed = { 'btc' : [0, threading.Lock(), 0.0] }
     self.logger = logger if logger else logging.getLogger('null')
 
-  def price(self, unit):
+  def price(self, unit, force = False):
     if not unit in self.feed: return None
     self.feed[unit][1].acquire()
     curtime = time.time()
+    if force: self.feed[unit][0] = 0
     if curtime - self.feed[unit][0] > self.update_interval:
       self.feed[unit][2] = None
       if unit == 'btc': 

@@ -18,12 +18,12 @@ from utils import *
 # pool configuration
 _port = 2019
 # daily interest rates
-_interest = { 'poloniex' : { 'btc' : { 'rate' : 0.0165, 'target' : 50.0, 'fee' : 0.002 } },
-              'ccedk' : { 'btc' : { 'rate' : 0.0165, 'target' : 50.0, 'fee' : 0.002 } },
-              'bitcoincoid' : { 'btc' : { 'rate' : 0.0165, 'target' : 50.0, 'fee' : 0.0 } },
-              'bter' : { 'btc' : { 'rate' : 0.0165, 'target' : 50.0, 'fee' : 0.002 } } }
+_interest = { 'poloniex' : { 'btc' : { 'rate' : 0.165, 'target' : 50.0, 'fee' : 0.002 } },
+              'ccedk' : { 'btc' : { 'rate' : 0.165, 'target' : 50.0, 'fee' : 0.002 } },
+              'bitcoincoid' : { 'btc' : { 'rate' : 0.165, 'target' : 50.0, 'fee' : 0.0 } },
+              'bter' : { 'btc' : { 'rate' : 0.165, 'target' : 50.0, 'fee' : 0.002 } } }
 _nuconfig = '%s/.nu/nu.conf'%os.getenv("HOME") # path to nu.conf
-_tolerance = 0.0075 # price tolerance
+_tolerance = 0.0085 # price tolerance
 _sampling = 24 # number of requests validated per minute
 _autopayout = True # try to send payouts automatically
 _minpayout = 0.011 # minimum balance to trigger payout
@@ -155,11 +155,15 @@ class User(threading.Thread):
               if deviation <= self.tolerance:
                 valid[order['type']].append((order['id'], order['amount']))
               else:
-                self.logger.warning("order of deviates too much from current price for user %s at exchange %s on unit %s (%.04f < %.04f)" % (self.key, repr(self.exchange), self.unit, self.tolerance, deviation))
+                self.last_error = 'unable to validate request: order of deviates too much from current price'
             for side in [ 'bid', 'ask' ]:
               del self.liquidity[side][0]
               self.liquidity[side].append(valid[side])
-            self.response.append('a')
+            if self.last_error != "" and len(valid['bid'] + valid['ask']) == 0:
+              self.response.append('r')
+              self.logger.warning("unable to validate request for user %s at exchange %s on unit %s: orders of deviate too much from current price" % (self.key, repr(self.exchange), self.unit))
+            else:
+              self.response.append('a')
           else:
             self.response.append('r')
             self.last_error = "unable to validate request: " + orders['error']
@@ -288,7 +292,7 @@ def pay(nud):
       if not keys[user][unit].address in txout:
         txout[keys[user][unit].address] = 0.0
       txout[keys[user][unit].address] += keys[user][unit].balance
-  txout = {k : v - nud.txfee for k,v in txout.items() if v > _minpayout}
+  txout = {k : v - nud.txfee for k,v in txout.items() if v - nud.txfee > _minpayout}
   if txout:
     payed = False
     if _autopayout:
