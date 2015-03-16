@@ -357,8 +357,6 @@ class RequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
       self.wfile.write("\n")
       if method == 'status':
         self.wfile.write(json.dumps(poolstats()))
-      elif method == 'price':
-        self.wfile.write(json.dumps(pricefeed))
       elif method == 'exchanges':
         self.wfile.write(json.dumps(_interest))
       self.end_headers()
@@ -394,6 +392,11 @@ httpd = ThreadingServer(("", _port), RequestHandler)
 sa = httpd.socket.getsockname()
 logger.debug("Serving on %s port %d", sa[0], sa[1])
 start_new_thread(httpd.serve_forever, ())
+
+def serve(server):
+  try:
+    while 1:
+      server.handle_request()
 
 lastcredit = time.time()
 lastpayout = time.time()
