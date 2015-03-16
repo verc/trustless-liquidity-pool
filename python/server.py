@@ -1,6 +1,7 @@
 #! /usr/bin/env python
 
 import SimpleHTTPServer
+import SocketServer
 import BaseHTTPServer
 import cgi
 import logging
@@ -14,6 +15,10 @@ from math import log, exp
 from thread import start_new_thread
 from exchanges import *
 from utils import *
+
+class ThreadingServer(SocketServer.ThreadingMixIn, BaseHTTPServer.HTTPServer):
+    pass
+
 
 # pool configuration
 _port = 2020
@@ -352,8 +357,6 @@ class RequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
       self.wfile.write("\n")
       if method == 'status':
         self.wfile.write(json.dumps(poolstats()))
-      elif method == 'price':
-        self.wfile.write(json.dumps(pricefeed))
       elif method == 'exchanges':
         self.wfile.write(json.dumps(_interest))
       self.end_headers()
@@ -385,10 +388,15 @@ class RequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
 
 nud = NuRPC(_nuconfig, _grantaddress, logger)
 if not nud.rpc: logger.critical('Connection to Nu daemon could not be established, liquidity will NOT be sent!')
-httpd = BaseHTTPServer.HTTPServer(("", _port), RequestHandler)
+httpd = ThreadingServer(("", _port), RequestHandler)
 sa = httpd.socket.getsockname()
 logger.debug("Serving on %s port %d", sa[0], sa[1])
 start_new_thread(httpd.serve_forever, ())
+
+def serve(server):
+  try:
+    while 1:
+      server.handle_request()
 
 lastcredit = time.time()
 lastpayout = time.time()

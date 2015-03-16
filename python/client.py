@@ -171,8 +171,7 @@ while True: # print some info every minute until program terminates
                 logger.warning('too many missing requests, increasing sampling to %d', users[user][unit]['request'].sampling)
               else: # just wait a little bit
                 logger.warning('too many missing requests, sleeping a short while to synchronize')
-                time.sleep(0.7)
-                curtime -= 0.7
+                curtime += 0.7
   except KeyboardInterrupt: break
   except Exception as e:
     logger.error('exception caught: %s', sys.exc_info()[1])
