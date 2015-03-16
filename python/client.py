@@ -156,7 +156,7 @@ while True: # print some info every minute until program terminates
           for unit in response['units']:
             if response['units'][unit]['rejects'] / float(basestatus['sampling']) >= 0.2: # look for valid error and adjust nonce shift
               if response['units'][unit]['last_error'] != "":
-                if 'deviates too much from price' in response['units'][unit]['last_error']:
+                if 'deviates too much from current price' in response['units'][unit]['last_error']:
                   PyBot.pricefeed.price(unit, True) # Force a price update
                   logger.warning('price missmatch on exchange %s, forcing price update', repr(users[user][unit]['request'].exchange))
                 else:
