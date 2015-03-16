@@ -393,11 +393,6 @@ sa = httpd.socket.getsockname()
 logger.debug("Serving on %s port %d", sa[0], sa[1])
 start_new_thread(httpd.serve_forever, ())
 
-def serve(server):
-  try:
-    while 1:
-      server.handle_request()
-
 lastcredit = time.time()
 lastpayout = time.time()
 lastsubmit = time.time()
