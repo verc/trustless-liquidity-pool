@@ -6,6 +6,7 @@ import urllib
 import urllib2
 import hashlib
 import httplib
+import threading
 import datetime
 
 class Exchange(object):
