@@ -24,7 +24,7 @@ _interest = { 'poloniex' : { 'btc' : { 'rate' : 0.0025, 'target' : 200.0, 'fee' 
               'bter' : { 'btc' : { 'rate' : 0.0025, 'target' : 200.0, 'fee' : 0.002 } } }
 _nuconfig = '%s/.nu/nu.conf'%os.getenv("HOME") # path to nu.conf
 _tolerance = 0.0085 # price tolerance
-_sampling = 24 # number of requests validated per minute
+_sampling = 20 # number of requests validated per minute
 _autopayout = True # try to send payouts automatically
 _minpayout = 0.03 # minimum balance to trigger payout
 _grantaddress = "" # custodian grant address
