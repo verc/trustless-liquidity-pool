@@ -30,9 +30,9 @@ class Poloniex(Exchange):
     if "Nonce must be greater than" in error: # (TODO: regex)
       if ':' in error: error = error.split(':')[1].strip()
       error = error.replace('.', '').split()
-      self._shift += 25 + (int(error[5]) - int(error[8])) / 1000
+      self._shift += 100 + (int(error[5]) - int(error[8])) / 1000
     else:
-      self._shift = self._shift + 25
+      self._shift = self._shift + 100
 
   def post(self, method, params, key, secret):
     request = { 'nonce' : int(time.time() + self._shift) * 1000, 'command' : method }
