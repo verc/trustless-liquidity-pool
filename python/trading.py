@@ -58,13 +58,14 @@ class NuBot(ConnectionThread):
         with open(os.devnull, 'w') as fp:
           self.logger.info("starting NuBot for unit %s on exchange %s", self.unit, repr(self.exchange))
           self.process = subprocess.Popen("java -jar NuBot.jar %s" % out.name,
-            stdout=fp, stderr=fp, shell=True, preexec_fn=os.setsid, cwd = 'nubot')
+            stdout=fp, stderr=fp, shell=True, cwd = 'nubot')
       time.sleep(10)
 
   def shutdown(self):
     if self.process:
       self.logger.info("stopping NuBot for unit %s on exchange %s", self.unit, repr(self.exchange))
-      os.killpg(self.process.pid, signal.SIGTERM)
+      self.process.terminate()
+      #os.killpg(self.process.pid, signal.SIGTERM)
       self.process = None
 
 
