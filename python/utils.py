@@ -19,7 +19,8 @@ class Connection():
       self.logger = logging.getLogger('null')
 
   def json_request(self, request, method, params, headers, trials = None):
-    connection = httplib.HTTPConnection(self.server, timeout=60)
+    curtime = time.time()
+    connection = httplib.HTTPConnection(self.server, timeout=5)
     try:
       connection.request(request, method, urllib.urlencode(params), headers = headers)
       response = connection.getresponse()
@@ -33,11 +34,11 @@ class Connection():
       msg = 'socket error (%s)' % str(v[0])
     except:
       msg = 'unknown connection error'
-    self.logger.error("%s: %s, retrying in 15 seconds ...", method, msg)
+    self.logger.error("%s: %s, retrying in 5 seconds ...", method, msg)
     if trials:
       if trials <= 1: return { 'message' : msg, 'code' : -1, 'error' : True }
       trials = trials - 1
-    time.sleep(15)
+    time.sleep(max(5 - time.time() + curtime), 0)
     return self.json_request(request, method, params, headers, trials)
 
   def get(self, method, params = None, trials = None):
