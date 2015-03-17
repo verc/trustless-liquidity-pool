@@ -38,7 +38,7 @@ class Connection():
     if trials:
       if trials <= 1: return { 'message' : msg, 'code' : -1, 'error' : True }
       trials = trials - 1
-    time.sleep(max(5 - time.time() + curtime), 0)
+    time.sleep(max(5.0 - time.time() + curtime, 0))
     return self.json_request(request, method, params, headers, trials)
 
   def get(self, method, params = None, trials = None):

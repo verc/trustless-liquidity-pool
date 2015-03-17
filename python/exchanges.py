@@ -46,7 +46,7 @@ class Poloniex(Exchange):
     return json.loads(urllib2.urlopen(urllib2.Request('https://poloniex.com/tradingApi', data, headers)).read())
 
   def cancel_orders(self, unit, key, secret):
-    response = self.post('returnOpenOrders', {'currencyPair' : "%s_NBT"%unit.upper()}, key, secret)
+    response = self.post('returnOpenOrders', { 'currencyPair' : "%s_NBT"%unit.upper() }, key, secret)
     if 'error' in response: return response
     for order in response:
       ret = self.post('cancelOrder', { 'currencyPair' : "%s_NBT"%unit.upper(), 'orderNumber' : order['orderNumber'] }, key, secret)
@@ -70,7 +70,7 @@ class Poloniex(Exchange):
 
   def create_request(self, unit, key = None, secret = None):
     if not secret: return None, None
-    request = { 'command' : 'returnOpenOrders', 'nonce' : int(time.time() + self._shift) * 1000,  'currencyPair' : "%s_NBT"%unit.upper()}
+    request = { 'command' : 'returnOpenOrders', 'nonce' : int(time.time() + self._shift) * 1000,  'currencyPair' : "%s_NBT"%unit.upper() }
     if self._nonce >= request['nonce']:
       request['nonce'] = self._nonce + self._shift * 1000
     self._nonce = request['nonce']

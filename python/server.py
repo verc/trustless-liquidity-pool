@@ -131,12 +131,13 @@ class User(threading.Thread):
     self.trigger.acquire()
     self.response = ['m'] * sampling
     self.logger = logger if logger else logging.getLogger('null')
-    self.request = None
+    self.requests = []
     self.daemon = True
 
   def set(self, request, sign):
     self.lock.acquire()
-    self.request = ({ p : v[0] for p,v in request.items() }, sign)
+    if len(self.requests) < 10: # don't accept more requests to avoid simple spamming
+      self.requests.append(({ p : v[0] for p,v in request.items() }, sign))
     self.active = True
     self.lock.release()
 
@@ -146,43 +147,45 @@ class User(threading.Thread):
       self.lock.acquire()
       if self.active:
         del self.response[0]
-        if self.request:
-          try:
-            orders = self.exchange.validate_request(self.key, self.unit, *self.request)
-          except:
-            orders = { 'error' : 'exception caught: %s' % sys.exc_info()[1]}
-          if not 'error' in orders:
-            self.last_error = ""
-            valid = { 'bid': [], 'ask' : [] }
-            price = self.pricefeed.price(self.unit)
-            for order in orders:
-              deviation = 1.0 - min(order['price'], price) / max(order['price'], price)
-              if deviation <= self.tolerance:
-                valid[order['type']].append((order['id'], order['amount']))
+        if self.requests:
+          for rid, request in enumerate(self.requests):
+            try:
+              orders = self.exchange.validate_request(self.key, self.unit, *request)
+            except:
+              orders = { 'error' : 'exception caught: %s' % sys.exc_info()[1]}
+            if not 'error' in orders:
+              self.last_error = ""
+              valid = { 'bid': [], 'ask' : [] }
+              price = self.pricefeed.price(self.unit)
+              for order in orders:
+                deviation = 1.0 - min(order['price'], price) / max(order['price'], price)
+                if deviation <= self.tolerance:
+                  valid[order['type']].append((order['id'], order['amount']))
+                else:
+                  self.last_error = 'unable to validate request: order of deviates too much from current price'
+              for side in [ 'bid', 'ask' ]:
+                del self.liquidity[side][0]
+                self.liquidity[side].append(valid[side])
+              if self.last_error != "" and len(valid['bid'] + valid['ask']) == 0:
+                self.response.append('r')
+                self.logger.warning("unable to validate request %d/%d for user %s at exchange %s on unit %s: orders of deviate too much from current price" % (rid + 1, len(self.requests), self. self.key, repr(self.exchange), self.unit))
               else:
-                self.last_error = 'unable to validate request: order of deviates too much from current price'
-            for side in [ 'bid', 'ask' ]:
-              del self.liquidity[side][0]
-              self.liquidity[side].append(valid[side])
-            if self.last_error != "" and len(valid['bid'] + valid['ask']) == 0:
-              self.response.append('r')
-              self.logger.warning("unable to validate request for user %s at exchange %s on unit %s: orders of deviate too much from current price" % (self.key, repr(self.exchange), self.unit))
+                self.response.append('a')
+                break
             else:
-              self.response.append('a')
-          else:
-            self.response.append('r')
-            self.last_error = "unable to validate request: " + orders['error']
-            self.logger.warning("unable to validate request for user %s at exchange %s on unit %s: %s" % (self.key, repr(self.exchange), self.unit, orders['error']))
-            for side in [ 'bid', 'ask' ]:
-              del self.liquidity[side][0]
-              self.liquidity[side].append([])
+              self.response.append('r')
+              self.last_error = "unable to validate request: " + orders['error']
+              self.logger.warning("unable to validate request %d/%d  for user %s at exchange %s on unit %s: %s" % (rid + 1, len(self.requests), self.key, repr(self.exchange), self.unit, orders['error']))
+              for side in [ 'bid', 'ask' ]:
+                del self.liquidity[side][0]
+                self.liquidity[side].append([])
         else:
           self.response.append('m')
           self.last_error = "no request received"
           #logger.debug("no request received for user %s at exchange %s on unit %s" % (self.key, repr(self.exchange), self.unit))
           for side in [ 'bid', 'ask' ]:
             self.liquidity[side] = self.liquidity[side][1:] + [[]]
-        self.request = None
+        self.requests = []
       self.lock.release()
 
   def validate(self):

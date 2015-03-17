@@ -25,7 +25,7 @@ if not os.path.isdir('logs'):
 
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
-sh = logging.handlers.SocketHandler('', 9463)
+sh = logging.handlers.SocketHandler('', logging.handlers.DEFAULT_TCP_LOGGING_PORT)
 sh.setLevel(logging.DEBUG)
 fh = logging.FileHandler('logs/%d.log' % time.time())
 fh.setLevel(logging.DEBUG)
@@ -96,7 +96,7 @@ conn = Connection(_server, logger)
 basestatus = conn.get('status')
 exchanges = conn.get('exchanges')
 exchanges['time'] = time.time()
-sampling = min(45, basestatus['sampling'] + 2)
+sampling = max(1, min(45, int(basestatus['sampling'] * 1.5)))
 
 # parse user data
 users = {}
