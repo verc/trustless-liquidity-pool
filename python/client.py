@@ -43,7 +43,7 @@ userfile = 'users.dat'
 if len(sys.argv) == 3:
   userfile = sys.argv[2]
 try:
-  userdata = [ line.strip().split() for line in open(userfile).readlines() if len(line.strip().split()) > 5 ] # address units exchange key secret [trader]
+  userdata = [ line.strip().split() for line in open(userfile).readlines() if len(line.strip().split()) >= 5 ] # address units exchange key secret [trader]
 except:
   logger.error("%s could not be read", userfile)
   sys.exit(1)
