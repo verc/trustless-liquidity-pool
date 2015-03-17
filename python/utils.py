@@ -30,7 +30,7 @@ class Connection():
     except ValueError:
       msg = 'server response invalid'
     except socket.error, v:
-      msg = 'socket error (%d)' % v[0]
+      msg = 'socket error (%s)' % str(v[0])
     except:
       msg = 'unknown connection error'
     self.logger.error("%s: %s, retrying in 15 seconds ...", method, msg)
