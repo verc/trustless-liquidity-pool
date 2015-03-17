@@ -71,6 +71,8 @@ class Poloniex(Exchange):
   def create_request(self, unit, key = None, secret = None):
     if not secret: return None, None
     request = { 'command' : 'returnOpenOrders', 'nonce' : int(time.time() + self._shift) * 1000,  'currencyPair' : "%s_NBT"%unit.upper()}
+    if self._nonce >= request['nonce']:
+      request['nonce'] = self._nonce + self._shift * 1000
     data = urllib.urlencode(request)
     sign = hmac.new(secret, data, hashlib.sha512).hexdigest()
     return request, sign
