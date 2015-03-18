@@ -256,7 +256,7 @@ class BitcoinCoId(Exchange):
 
   def create_request(self, unit, key = None, secret = None):
     if not secret: return None, None
-    request = { self.nonce(), 'pair' : 'nbt_' + unit.lower(), 'method' : 'openOrders' }
+    request = { 'nonce' : self.nonce(), 'pair' : 'nbt_' + unit.lower(), 'method' : 'openOrders' }
     data = urllib.urlencode(request)
     sign = hmac.new(secret, data, hashlib.sha512).hexdigest()
     return request, sign
