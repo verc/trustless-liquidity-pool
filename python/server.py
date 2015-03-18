@@ -168,7 +168,7 @@ class User(threading.Thread):
                 self.liquidity[side].append(valid[side])
               if self.last_error != "" and len(valid['bid'] + valid['ask']) == 0:
                 self.response.append('r')
-                self.logger.warning("unable to validate request %d/%d for user %s at exchange %s on unit %s: orders of deviate too much from current price" % (rid + 1, len(self.requests), self. self.key, repr(self.exchange), self.unit))
+                self.logger.warning("unable to validate request %d/%d for user %s at exchange %s on unit %s: orders of deviate too much from current price" % (rid + 1, len(self.requests), self.key, repr(self.exchange), self.unit))
               else:
                 self.response.append('a')
                 break
