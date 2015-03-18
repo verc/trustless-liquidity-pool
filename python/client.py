@@ -96,7 +96,7 @@ conn = Connection(_server, logger)
 basestatus = conn.get('status')
 exchanges = conn.get('exchanges')
 exchanges['time'] = time.time()
-sampling = max(1, min(45, int(basestatus['sampling'] * 1.5)))
+sampling = max(1, min(60, int(basestatus['sampling'] * 1.5)))
 
 # parse user data
 users = {}
@@ -152,24 +152,35 @@ while True: # print some info every minute until program terminates
       else:
         logger.info('%s - balance: %.8f efficiency: %.2f%% rejects: %d missing: %d units: %s - %s', repr(users[user].values()[0]['request'].exchange),
           response['balance'], response['efficiency'] * 100, response['rejects'], response['missing'], response['units'], user )
-        if response['efficiency'] < 0.8 and curtime - starttime > 90:
-          for unit in response['units']:
-            if response['units'][unit]['rejects'] / float(basestatus['sampling']) >= 0.2: # look for valid error and adjust nonce shift
-              if response['units'][unit]['last_error'] != "":
-                if 'deviates too much from current price' in response['units'][unit]['last_error']:
-                  PyBot.pricefeed.price(unit, True) # Force a price update
-                  logger.warning('price missmatch on exchange %s, forcing price update', repr(users[user][unit]['request'].exchange))
-                else:
-                  logger.warning('too many rejected requests on exchange %s, adjusting nonce to %d', repr(users[user][unit]['request'].exchange), users[user][unit]['request'].exchange._shift)
-                  users[user][unit]['request'].exchange.adjust(response['units'][unit]['last_error'])
-                  break
-            if response['units'][unit]['missing'] / float(basestatus['sampling']) >= 0.2: # look for valid error and adjust nonce shift
-              if users[user][unit]['request'].sampling < 45:  # just send more requests
-                users[user][unit]['request'].sampling = users[user][unit]['request'].sampling + 1
-                logger.warning('too many missing requests, increasing sampling to %d', users[user][unit]['request'].sampling)
-              else: # just wait a little bit
-                logger.warning('too many missing requests, sleeping a short while to synchronize')
-                curtime += 0.7
+        if curtime - starttime > 90:
+          if response['efficiency'] < 0.8:
+            for unit in response['units']:
+              if response['units'][unit]['rejects'] / float(basestatus['sampling']) >= 0.1: # look for valid error and adjust nonce shift
+                if response['units'][unit]['last_error'] != "":
+                  if 'deviates too much from current price' in response['units'][unit]['last_error']:
+                    PyBot.pricefeed.price(unit, True) # Force a price update
+                    logger.warning('price missmatch for unit %s on exchange %s, forcing price update', unit, repr(users[user][unit]['request'].exchange))
+                  else:
+                    users[user][unit]['request'].exchange.adjust(response['units'][unit]['last_error'])
+                    logger.warning('too many rejected requests for unit %s on exchange %s, adjusting nonce to %d',
+                      unit, repr(users[user][unit]['request'].exchange), users[user][unit]['request'].exchange._shift)
+                    break
+              if response['units'][unit]['missing'] / float(basestatus['sampling']) >= 0.1: # look for missing error and adjust sampling
+                if users[user][unit]['request'].sampling < 60:  # just send more requests
+                  users[user][unit]['request'].sampling = users[user][unit]['request'].sampling + 1
+                  logger.warning('too many missing requests for unit %s on exchange %s, increasing sampling to %d',
+                    unit, repr(users[user][unit]['request'].exchange), users[user][unit]['request'].sampling)
+                else: # just wait a little bit
+                  logger.warning('too many missing requests, sleeping a short while to synchronize')
+                  curtime += 0.7
+          elif response['efficiency'] >= 0.9 and response['efficiency'] < 1.0:
+            for unit in response['units']:
+              if (response['units'][unit]['rejects'] + response['units'][unit]['missing']) / float(basestatus['sampling']) >= 0.05:
+                if users[user][unit]['request'].sampling < 45:  # send some more requests
+                  users[user][unit]['request'].sampling = users[user][unit]['request'].sampling + 1
+                  logger.warning('trying to optimize efficiency by increasing sampling of unit %s on exchange %s to %d',
+                    unit, repr(users[user][unit]['request'].exchange), users[user][unit]['request'].sampling)
+
   except KeyboardInterrupt: break
   except Exception as e:
     logger.error('exception caught: %s', sys.exc_info()[1])
