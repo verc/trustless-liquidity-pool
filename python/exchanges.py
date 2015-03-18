@@ -10,19 +10,24 @@ import threading
 import datetime
 
 class Exchange(object):
-  def __init__(self, domain):
-    self._domain = domain
+  def __init__(self):
     self._shift = 1
+    self._nonce = 0
 
   def adjust(self, error):
     if not 'exception caught:' in error:
       self._shift = ((self._shift + 7) % 200) - 100 # -92 15 -78 29 -64 43 -50 57 ...
 
+  def nonce(self, factor = 1000.0):
+    nonce = int((time.time() + self._shift) * float(factor))
+    if self._nonce >= nonce:
+      nonce = self._nonce + int(factor)
+    self._nonce = nonce
+    return nonce
+
 class Poloniex(Exchange):
   def __init__(self):
-    super(Poloniex, self).__init__('poloniex.com/tradingApi')
-    self._shift = 1
-    self._nonce = 0
+    super(Poloniex, self).__init__()
 
   def __repr__(self): return "poloniex"
 
@@ -30,15 +35,12 @@ class Poloniex(Exchange):
     if "Nonce must be greater than" in error: # (TODO: regex)
       if ':' in error: error = error.split(':')[1].strip()
       error = error.replace('.', '').split()
-      self._shift += 100 + (int(error[5]) - int(error[8])) / 1000
+      self._shift += 100.0 + (int(error[5]) - int(error[8])) / 1000.0
     else:
-      self._shift = self._shift + 100
+      self._shift = self._shift + 100.0
 
   def post(self, method, params, key, secret):
-    request = { 'nonce' : int(time.time() + self._shift) * 1000, 'command' : method }
-    if self._nonce >= request['nonce']:
-      request['nonce'] = self._nonce + self._shift * 1000
-    self._nonce = request['nonce']
+    request = { 'nonce' : self.nonce(), 'command' : method }
     request.update(params)
     data = urllib.urlencode(request)
     sign = hmac.new(secret, data, hashlib.sha512).hexdigest()
@@ -70,10 +72,7 @@ class Poloniex(Exchange):
 
   def create_request(self, unit, key = None, secret = None):
     if not secret: return None, None
-    request = { 'command' : 'returnOpenOrders', 'nonce' : int(time.time() + self._shift) * 1000,  'currencyPair' : "%s_NBT"%unit.upper() }
-    if self._nonce >= request['nonce']:
-      request['nonce'] = self._nonce + self._shift * 1000
-    self._nonce = request['nonce']
+    request = { 'command' : 'returnOpenOrders', 'nonce' : self.nonce(),  'currencyPair' : "%s_NBT"%unit.upper() }
     data = urllib.urlencode(request)
     sign = hmac.new(secret, data, hashlib.sha512).hexdigest()
     return request, sign
@@ -93,7 +92,7 @@ class Poloniex(Exchange):
 
 class CCEDK(Exchange):
   def __init__(self):
-    super(CCEDK, self).__init__('www.ccedk.com')
+    super(CCEDK, self).__init__()
     self.pair_id = {}
     self.currency_id = {}
     failed = False
@@ -102,13 +101,13 @@ class CCEDK(Exchange):
         response = None
         if not self.pair_id:
           response = json.loads(urllib2.urlopen(urllib2.Request(
-            'https://www.ccedk.com/api/v1/stats/marketdepthfull?' + urllib.urlencode({ 'nonce' : int(time.time() + self._shift) }))).read())
+            'https://www.ccedk.com/api/v1/stats/marketdepthfull?' + urllib.urlencode({ 'nonce' : self.nonce(1) }))).read())
           for unit in response['response']['entities']:
             if unit['pair_name'][:4] == 'NBT/':
               self.pair_id[unit['pair_name'][4:]] = unit['pair_id']
         if not self.currency_id:
           response = json.loads(urllib2.urlopen(urllib2.Request(
-            'https://www.ccedk.com/api/v1/currency/list?' + urllib.urlencode({ 'nonce' : int(time.time() + self._shift) }))).read())
+            'https://www.ccedk.com/api/v1/currency/list?' + urllib.urlencode({ 'nonce' : self.nonce(1) }))).read())
           for unit in response['response']['entities']:
             self.currency_id[unit['iso'].lower()] = unit['currency_id']
       except:
@@ -140,7 +139,7 @@ class CCEDK(Exchange):
         super(CCEDK, self).adjust(error)
 
   def post(self, method, params, key, secret):
-    request = { 'nonce' : int(time.time()  + self._shift) } # TODO: check for unique nonce
+    request = { 'nonce' : self.nonce(1) } # TODO: check for unique nonce
     request.update(params)
     data = urllib.urlencode(request)
     sign = hmac.new(secret, data, hashlib.sha512).hexdigest()
@@ -181,7 +180,7 @@ class CCEDK(Exchange):
 
   def create_request(self, unit, key = None, secret = None):
     if not secret: return None, None
-    request = { 'nonce' : int(time.time()  + self._shift) }
+    request = { 'nonce' : self.nonce(1) }
     data = urllib.urlencode(request)
     sign = hmac.new(secret, data, hashlib.sha512).hexdigest()
     return request, sign
@@ -204,28 +203,21 @@ class CCEDK(Exchange):
 
 class BitcoinCoId(Exchange):
   def __init__(self):
-    super(BitcoinCoId, self).__init__('vip.bitcoin.co.id/tapi')
-    self._nonce = 0
-    self._shift = self.server_delta()
+    super(BitcoinCoId, self).__init__()
+    try:
+      response = json.loads(urllib2.urlopen(urllib2.Request('https://vip.bitcoin.co.id/api/summaries')).read())
+      self._shift = float(response['tickers']['btc_idr']['server_time']) - time.time()
+    except:
+      pass
 
   def __repr__(self): return "bitcoincoid"
 
-  def server_delta(self):
-    try:
-      response = json.loads(urllib2.urlopen(urllib2.Request('https://vip.bitcoin.co.id/api/summaries')).read())
-      return float(response['tickers']['btc_idr']['server_time']) - time.time()
-    except:
-      return 0.0
-
   def adjust(self, error):
     if "Invalid nonce" in error: #(TODO: regex)
-      self._shift += 25
+      self._shift += 50
 
   def post(self, method, params, key, secret):
-    request = { 'nonce' : int(time.time() + self._shift) * 1000, 'method' : method }
-    if self._nonce >= request['nonce']:
-      request['nonce'] = self._nonce + 1000
-    self._nonce = request['nonce']
+    request = { 'nonce' : self.nonce(), 'method' : method }
     request.update(params)
     data = urllib.urlencode(request)
     sign = hmac.new(secret, data, hashlib.sha512).hexdigest()
@@ -264,7 +256,7 @@ class BitcoinCoId(Exchange):
 
   def create_request(self, unit, key = None, secret = None):
     if not secret: return None, None
-    request = { 'nonce' : int(time.time()  + self._shift) * 1000, 'pair' : 'nbt_' + unit.lower(), 'method' : 'openOrders' }
+    request = { self.nonce(), 'pair' : 'nbt_' + unit.lower(), 'method' : 'openOrders' }
     data = urllib.urlencode(request)
     sign = hmac.new(secret, data, hashlib.sha512).hexdigest()
     return request, sign
@@ -286,8 +278,7 @@ class BitcoinCoId(Exchange):
 
 class BTER(Exchange):
   def __init__(self):
-    super(BTER, self).__init__('data.bter.com')
-    #self._nonce = 0
+    super(BTER, self).__init__()
 
   def __repr__(self): return "bter"
 
@@ -296,17 +287,12 @@ class BTER(Exchange):
 
   def https_request(self, method, params, headers = None):
     if not headers: headers = {}
-    connection = httplib.HTTPSConnection(self._domain, timeout=60)
+    connection = httplib.HTTPSConnection('data.bter.com', timeout=60)
     connection.request('POST', '/api/1/private/' + method, params, headers)
     response = connection.getresponse().read()
     return json.loads(response)
 
   def post(self, method, params, key, secret):
-    #request = { 'nonce' : int(time.time() + self._shift) }
-    #if self._nonce >= request['nonce']:
-    #  request['nonce'] = self._nonce + 1
-    #self._nonce = request['nonce']
-    #request.update(params)
     data = urllib.urlencode(params)
     sign = hmac.new(secret, data, hashlib.sha512).hexdigest()
     headers = { 'Sign' : sign, 'Key' : key, "Content-type": "application/x-www-form-urlencoded" }
@@ -347,7 +333,7 @@ class BTER(Exchange):
 
   def create_request(self, unit, key = None, secret = None):
     if not secret: return None, None
-    request = {} #'nonce' : int(time.time() + self._shift) }
+    request = {} # no nonce required
     data = urllib.urlencode(request)
     sign = hmac.new(secret, data, hashlib.sha512).hexdigest()
     return request, sign
@@ -355,7 +341,6 @@ class BTER(Exchange):
   def validate_request(self, key, unit, data, sign):
     headers = { 'Sign' : sign, 'Key' : key, "Content-type": "application/x-www-form-urlencoded" }
     response = self.https_request('orderlist', urllib.urlencode(data), headers)
-    #response = json.loads(urllib2.urlopen(urllib2.Request('https://bter.com/api/1/private/orderlist', urllib.urlencode(data), headers)).read())
     if not response['result']:
       response['error'] = response['msg']
       return response
