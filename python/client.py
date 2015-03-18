@@ -123,7 +123,7 @@ for user in userdata:
     elif bot == 'nubot': 
       users[key][unit]['order'] = NuBot(conn, key, secret, exchange, unit, logger)
     elif bot == 'pybot': 
-      users[key][unit]['order'] = PyBot(conn, key, secret, exchange, unit, logger)
+      users[key][unit]['order'] = PyBot(conn, users[key][unit]['request'], key, secret, exchange, unit, logger)
     else:
       logger.error("unknown order handler: %s", bot)
       users[key][unit]['order'] = None

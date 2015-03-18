@@ -73,7 +73,7 @@ class NuRPC():
     else:
       # rpc connection
       self.JSONRPCException = jsonrpc.JSONRPCException
-      opts = dict(tuple(line.strip().replace(' ','').split('=')) for line in open(config).readlines())
+      opts = dict(tuple(line.strip().replace(' ','').split('=')) for line in open(config).readlines() if len(line.split('=')) == 2)
       if not 'rpcuser' in opts.keys() or not 'rpcpassword' in opts.keys():
         self.logger.error("NuRPC: RPC parameters could not be read")
       else:

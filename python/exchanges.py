@@ -140,7 +140,7 @@ class CCEDK(Exchange):
         super(CCEDK, self).adjust(error)
 
   def post(self, method, params, key, secret):
-    request = { 'nonce' : int(time.time()  + self._shift) }
+    request = { 'nonce' : int(time.time()  + self._shift) } # TODO: check for unique nonce
     request.update(params)
     data = urllib.urlencode(request)
     sign = hmac.new(secret, data, hashlib.sha512).hexdigest()

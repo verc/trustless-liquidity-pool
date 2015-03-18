@@ -70,8 +70,9 @@ class NuBot(ConnectionThread):
 
 
 class PyBot(ConnectionThread):
-  def __init__(self, conn, key, secret, exchange, unit, logger = None):
+  def __init__(self, conn, requester, key, secret, exchange, unit, logger = None):
     super(PyBot, self).__init__(conn, logger)
+    self.requester = requester
     self.key = key
     self.secret = secret
     self.exchange = exchange
@@ -169,6 +170,7 @@ class PyBot(ConnectionThread):
         else:
           self.exchange.adjust(response['error'])
           self.logger.info('adjusting nonce of exchange %s to %d', repr(self.exchange), self.exchange._shift)
+    self.requester.submit()
     self.release_lock()
     return response
 
