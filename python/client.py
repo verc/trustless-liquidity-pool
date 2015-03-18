@@ -71,32 +71,35 @@ class RequestThread(ConnectionThread):
       self.sampling = self.initsampling
     return response
 
+  def submit(self):
+    data, sign = self.exchange.create_request(self.unit, self.key, self.secret)
+    params = { 'unit' : self.unit, 'user' : self.key, 'sign' : sign }
+    params.update(data)
+    ret = self.conn.post('liquidity', params, 1)
+    if ret['code'] != 0:
+      self.trials += 1
+      self.errorflag = self.trials >= self.sampling * 5 # notify that something is wrong after 5 minutes of failures
+      self.logger.error("submit: %s" % ret['message'])
+      if ret['code'] == 11: # user unknown, just register again
+        self.register()
+    else:
+      self.trials = 0
+      self.errorflag = False
+
   def run(self):
     ret = self.register()
     if ret['code'] != 0: self.logger.error("register: %s" % ret['message'])
     while self.active:
       curtime = time.time()
-      data, sign = self.exchange.create_request(self.unit, self.key, self.secret)
-      params = { 'unit' : self.unit, 'user' : self.key, 'sign' : sign }
-      params.update(data)
-      ret = self.conn.post('liquidity', params, 1)
-      if ret['code'] != 0:
-        self.trials += 1
-        self.errorflag = self.trials >= self.sampling * 5 # notify that something is wrong after 5 minutes of failures
-        self.logger.error("submit: %s" % ret['message'])
-        if ret['code'] == 11: # user unknown, just register again
-          self.register()
-      else:
-        self.trials = 0
-        self.errorflag = False
-      time.sleep(max(60 / self.sampling - time.time() + curtime, 0))
+      self.submit()
+      time.sleep(max(60.0 / self.sampling - time.time() + curtime, 0))
 
 # retrieve initial data
 conn = Connection(_server, logger)
 basestatus = conn.get('status')
 exchanges = conn.get('exchanges')
 exchanges['time'] = time.time()
-sampling = max(1, min(60, int(basestatus['sampling'] * 1.5)))
+sampling = max(1, min(120, int(basestatus['sampling'] * 1.5)))
 
 # parse user data
 users = {}
@@ -166,7 +169,7 @@ while True: # print some info every minute until program terminates
                       unit, repr(users[user][unit]['request'].exchange), users[user][unit]['request'].exchange._shift)
                     break
               if response['units'][unit]['missing'] / float(basestatus['sampling']) >= 0.1: # look for missing error and adjust sampling
-                if users[user][unit]['request'].sampling < 60:  # just send more requests
+                if users[user][unit]['request'].sampling < 120:  # just send more requests
                   users[user][unit]['request'].sampling = users[user][unit]['request'].sampling + 1
                   logger.warning('too many missing requests for unit %s on exchange %s, increasing sampling to %d',
                     unit, repr(users[user][unit]['request'].exchange), users[user][unit]['request'].sampling)
@@ -176,7 +179,7 @@ while True: # print some info every minute until program terminates
           elif response['efficiency'] >= 0.9 and response['efficiency'] < 1.0:
             for unit in response['units']:
               if (response['units'][unit]['rejects'] + response['units'][unit]['missing']) / float(basestatus['sampling']) >= 0.05:
-                if users[user][unit]['request'].sampling < 45:  # send some more requests
+                if users[user][unit]['request'].sampling < 100:  # send some more requests
                   users[user][unit]['request'].sampling = users[user][unit]['request'].sampling + 1
                   logger.warning('trying to optimize efficiency by increasing sampling of unit %s on exchange %s to %d',
                     unit, repr(users[user][unit]['request'].exchange), users[user][unit]['request'].sampling)
