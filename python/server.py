@@ -205,21 +205,25 @@ def register(params):
   if set(params.keys()) == set(['address', 'key', 'name']):
     user = params['key'][0]
     name = params['name'][0]
-    if name in _wrappers:
-      if not user in keys:
-        lock.acquire()
-        keys[user] = {}
-        for unit in _interest[name]:
-          keys[user][unit] = User(user, params['address'][0], unit, _wrappers[name], pricefeed, _sampling, _tolerance, logger)
-          keys[user][unit].start()
-        lock.release()
-        logger.info("new user %s on %s: %s" % (user, name, params['address'][0]))
-      elif keys[user].values()[0].address != params['address'][0]:
-        ret = response(9, "user already exists with different address: %s" % user)
+    address = params['address'][0]
+    if address[0] == 'B': # this is certainly not a proper check
+      if name in _wrappers:
+        if not user in keys:
+          lock.acquire()
+          keys[user] = {}
+          for unit in _interest[name]:
+            keys[user][unit] = User(user, params['address'][0], unit, _wrappers[name], pricefeed, _sampling, _tolerance, logger)
+            keys[user][unit].start()
+          lock.release()
+          logger.info("new user %s on %s: %s" % (user, name, params['address'][0]))
+        elif keys[user].values()[0].address != params['address'][0]:
+          ret = response(9, "user already exists with different address: %s" % user)
+      else:
+        ret = response(8, "unknown exchange requested: %s" % name)
     else:
-      ret = response(8, "unknown exchange requested: %s" % name)
+      ret = response(7, "invalid payout address: %s" % address)
   else:
-    ret = response(7, "invalid registration data received: %s" % str(params))
+    ret = response(6, "invalid registration data received: %s" % str(params))
   return ret
 
 def liquidity(params):
