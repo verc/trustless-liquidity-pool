@@ -147,6 +147,7 @@ class User(threading.Thread):
       self.lock.acquire()
       if self.active:
         del self.response[0]
+        res = 'm'
         if self.requests:
           for rid, request in enumerate(self.requests):
             try:
@@ -167,24 +168,24 @@ class User(threading.Thread):
                 del self.liquidity[side][0]
                 self.liquidity[side].append(valid[side])
               if self.last_error != "" and len(valid['bid'] + valid['ask']) == 0:
-                self.response.append('r')
+                res = 'r'
                 self.logger.warning("unable to validate request %d/%d for user %s at exchange %s on unit %s: orders of deviate too much from current price" % (rid + 1, len(self.requests), self.key, repr(self.exchange), self.unit))
               else:
-                self.response.append('a')
+                res = 'a'
                 break
             else:
-              self.response.append('r')
+              res = 'r'
               self.last_error = "unable to validate request: " + orders['error']
               self.logger.warning("unable to validate request %d/%d  for user %s at exchange %s on unit %s: %s" % (rid + 1, len(self.requests), self.key, repr(self.exchange), self.unit, orders['error']))
               for side in [ 'bid', 'ask' ]:
                 del self.liquidity[side][0]
                 self.liquidity[side].append([])
         else:
-          self.response.append('m')
           self.last_error = "no request received"
           #logger.debug("no request received for user %s at exchange %s on unit %s" % (self.key, repr(self.exchange), self.unit))
           for side in [ 'bid', 'ask' ]:
             self.liquidity[side] = self.liquidity[side][1:] + [[]]
+        self.response.append(res)
         self.requests = []
       self.lock.release()
 
