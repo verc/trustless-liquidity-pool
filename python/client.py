@@ -78,13 +78,12 @@ class RequestThread(ConnectionThread):
     ret = self.conn.post('liquidity', params, 1)
     if ret['code'] != 0:
       self.trials += 1
-      self.errorflag = self.trials >= self.sampling * 5 # notify that something is wrong after 5 minutes of failures
       self.logger.error("submit: %s" % ret['message'])
       if ret['code'] == 11: # user unknown, just register again
         self.register()
     else:
       self.trials = 0
-      self.errorflag = False
+    self.errorflag = self.trials >= self.sampling * 2 # notify that something is wrong after 2 minutes of failures
 
   def run(self):
     ret = self.register()
@@ -106,24 +105,32 @@ users = {}
 for user in userdata:
   key = user[3]
   secret = user[4]
-  if not user[2].lower() in _wrappers:
+  name = user[2].lower()
+  if not name in _wrappers:
     logger.error("unknown exchange: %s", user[2])
+    sys.exit(2)
+  if not name in exchanges:
+    logger.error("exchange not supported by pool: %s", name)
     sys.exit(2)
   units = [ unit.lower() for unit in user[1].split(',') ]
   exchange = _wrappers[user[2].lower()]
   users[key] = {}
   for unit in user[1].split(','):
     unit = unit.lower()
+    if not unit in exchanges[name]:
+      logger.error("unit %s on exchange %s not supported by pool: %s", unit, name)
+      sys.exit(2)
     users[key][unit] = { 'request' : RequestThread(conn, key, secret, exchange, unit, user[0], sampling, logger) }
     users[key][unit]['request'].start()
-    bot = 'pybot'
-    if len(user) == 6: bot = user[5]
+    bot = 'pybot' if len(user) < 6 else user[5]
+    cost = exchanges[name][unit]['rate'] if len(user) < 7 else user[6]
+
     if bot == 'none':
       users[key][unit]['order'] = None
-    elif bot == 'nubot': 
-      users[key][unit]['order'] = NuBot(conn, key, secret, exchange, unit, logger)
-    elif bot == 'pybot': 
-      users[key][unit]['order'] = PyBot(conn, users[key][unit]['request'], key, secret, exchange, unit, logger)
+    elif bot == 'nubot':
+      users[key][unit]['order'] = NuBot(conn, users[key][unit]['request'], key, secret, exchange, unit, logger)
+    elif bot == 'pybot':
+      users[key][unit]['order'] = PyBot(conn, users[key][unit]['request'], key, secret, exchange, unit, cost, logger)
     else:
       logger.error("unknown order handler: %s", bot)
       users[key][unit]['order'] = None
@@ -139,19 +146,11 @@ while True: # print some info every minute until program terminates
   try:
     time.sleep(max(60 - time.time() + curtime, 0))
     curtime = time.time()
-    for user in users:
-      for unit in users[user]:
-        # if request sender doesn't work correctly, shut down trading for now
-        if not users[user][unit]['order'].pause and users[user][unit]['request'].errorflag:
-          logger.warning('shutting down trading bot for user %s because of bad server communication', user)
-          users[user][unit]['order'].shutdown()
-        users[user][unit]['order'].pause = users[user][unit]['request'].errorflag
-      # post some statistics
+    for user in users: # post some statistics
       response = conn.get(user, trials = 1)
       if 'error' in response:
         logger.error('unable to receive statistics for user %s: %s', user, response['message'])
-        if response['error'] == 'socket error': # this could mean the server just went down
-          users[user].values()[0]['request'].register()
+        users[user].values()[0]['request'].register() # reassure to be registered if 
       else:
         logger.info('%s - balance: %.8f efficiency: %.2f%% rejects: %d missing: %d units: %s - %s', repr(users[user].values()[0]['request'].exchange),
           response['balance'], response['efficiency'] * 100, response['rejects'], response['missing'], response['units'], user )

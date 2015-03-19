@@ -134,10 +134,10 @@ class User(threading.Thread):
     self.requests = []
     self.daemon = True
 
-  def set(self, request, sign):
+  def set(self, request, sign, cost):
     self.lock.acquire()
     if len(self.requests) < 10: # don't accept more requests to avoid simple spamming
-      self.requests.append(({ p : v[0] for p,v in request.items() }, sign))
+      self.requests.append(({ p : v[0] for p,v in request.items() }, sign, cost))
     self.active = True
     self.lock.release()
 
@@ -151,7 +151,7 @@ class User(threading.Thread):
         if self.requests:
           for rid, request in enumerate(self.requests):
             try:
-              orders = self.exchange.validate_request(self.key, self.unit, *request)
+              orders = self.exchange.validate_request(self.key, self.unit, request[0], request[1])
             except:
               orders = { 'error' : 'exception caught: %s' % sys.exc_info()[1]}
             if not 'error' in orders:
@@ -161,7 +161,7 @@ class User(threading.Thread):
               for order in orders:
                 deviation = 1.0 - min(order['price'], price) / max(order['price'], price)
                 if deviation <= self.tolerance:
-                  valid[order['type']].append((order['id'], order['amount']))
+                  valid[order['type']].append((order['id'], order['amount'], request[2]))
                 else:
                   self.last_error = 'unable to validate request: order of deviates too much from current price'
               for side in [ 'bid', 'ask' ]:
@@ -234,7 +234,8 @@ def liquidity(params):
     unit = params.pop('unit')[0]
     if user in keys:
       if unit in keys[user]:
-        keys[user][unit].set(params, sign)
+        cost = _interest[repr(keys[user][unit].exchange)][unit]['rate'] if not 'cost' in params else float(params.pop('cost')[0])
+        keys[user][unit].set(params, sign, cost)
       else:
         ret = response(12, "unit for user %s not found: %s" % (user, unit))
     else:
@@ -283,7 +284,7 @@ def credit():
           orders = []
           for user in users:
             orders += [ (user, order) for order in keys[user][unit].liquidity[side][sample] ]
-          orders.sort(key = lambda x: x[1][0])
+          orders.sort(key = lambda x: (x[1][2], x[1][0]))
           balance = 0.0
           previd = -1
           for user, order in orders:

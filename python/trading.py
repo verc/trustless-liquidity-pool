@@ -14,8 +14,9 @@ from utils import *
 
 
 class NuBot(ConnectionThread):
-  def __init__(self, conn, key, secret, exchange, unit, logger = None):
+  def __init__(self, conn, requester, key, secret, exchange, unit, logger = None):
     super(NuBot, self).__init__(conn, logger)
+    self.requester = requester
     self.process = None
     self.unit = unit
     self.running = False
@@ -52,7 +53,7 @@ class NuBot(ConnectionThread):
     out.write(json.dumps({ 'options' : self.options }))
     out.close()
     while self.active:
-      if self.pause:
+      if self.requester.errorflag:
         self.shutdown()
       elif not self.process:
         with open(os.devnull, 'w') as fp:
@@ -70,8 +71,9 @@ class NuBot(ConnectionThread):
 
 
 class PyBot(ConnectionThread):
-  def __init__(self, conn, requester, key, secret, exchange, unit, logger = None):
+  def __init__(self, conn, requester, key, secret, exchange, unit, cost, logger = None):
     super(PyBot, self).__init__(conn, logger)
+    self.cost = cost
     self.requester = requester
     self.key = key
     self.secret = secret
@@ -112,9 +114,10 @@ class PyBot(ConnectionThread):
 
   def update_interest(self):
     curtime = time.time()
-    if curtime - PyBot.interest[0] > 120:
+    if curtime - PyBot.interest[0] > 30:
       PyBot.interest[1] = self.conn.get('exchanges', trials = 1)
       PyBot.interest[0] = curtime
+    self.interest = PyBot.interest[1][repr(self.exchange)][self.unit]
 
   def place(self, side):
     price = self.serverprice
@@ -134,7 +137,6 @@ class PyBot(ConnectionThread):
       self.exchange.adjust(response['error'])
     elif response['balance'] > 0.0001:
       balance = response['balance'] if exunit == 'nbt' else response['balance'] / price
-      self.update_interest()
       try:
         response = self.exchange.place_order(self.unit, side, self.key, self.secret, balance, price)
       except KeyboardInterrupt: raise
@@ -184,7 +186,7 @@ class PyBot(ConnectionThread):
     while self.active:
       time.sleep(max(30 - time.time() + curtime, 0))
       curtime = time.time()
-      if self.pause:
+      if self.requester.errorflag:
         self.shutdown()
       else:
         response = self.conn.get('price/' + self.unit, trials = 3)
