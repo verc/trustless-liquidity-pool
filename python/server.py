@@ -15,24 +15,14 @@ from math import log, exp
 from thread import start_new_thread
 from exchanges import *
 from utils import *
+import config
 
-class ThreadingServer(SocketServer.ThreadingMixIn, BaseHTTPServer.HTTPServer):
-    pass
-
-
-# pool configuration
-_port = 2020
-# daily interest rates
-_interest = { 'poloniex' : { 'btc' : { 'rate' : 0.0025, 'target' : 200.0, 'fee' : 0.002 } },
-              'ccedk' : { 'btc' : { 'rate' : 0.0025, 'target' : 200.0, 'fee' : 0.002 } },
-              'bitcoincoid' : { 'btc' : { 'rate' : 0.0025, 'target' : 200.0, 'fee' : 0.0 } },
-              'bter' : { 'btc' : { 'rate' : 0.0025, 'target' : 200.0, 'fee' : 0.002 } } }
-_nuconfig = '%s/.nu/nu.conf'%os.getenv("HOME") # path to nu.conf
-_tolerance = 0.0085 # price tolerance
-_sampling = 20 # number of requests validated per minute
-_autopayout = True # try to send payouts automatically
-_minpayout = 0.03 # minimum balance to trigger payout
-_grantaddress = "" # custodian grant address
+_wrappers = { 'poloniex' : Poloniex, 'ccedk' : CCEDK, 'bitcoincoid' : BitcoinCoId, 'bter' : BTER }
+for e in config._interest:
+  _wrappers[e] = _wrappers[e]()
+  for u in config._interest[e]:
+    for s in ['bid', 'ask']:
+      config._interest[e][u][s]['orders'] = []
 
 try: os.makedirs('logs')
 except: pass
@@ -53,8 +43,6 @@ fh.setFormatter(formatter)
 ch.setFormatter(formatter)
 logger.addHandler(fh)
 logger.addHandler(ch)
-
-_wrappers = { 'poloniex' : Poloniex(), 'ccedk' : CCEDK(), 'bitcoincoid' : BitcoinCoId(), 'bter' : BTER() }
 _liquidity = []
 
 keys = {}
@@ -134,10 +122,10 @@ class User(threading.Thread):
     self.requests = []
     self.daemon = True
 
-  def set(self, request, sign, cost):
+  def set(self, request, sign, bid, ask):
     self.lock.acquire()
     if len(self.requests) < 10: # don't accept more requests to avoid simple spamming
-      self.requests.append(({ p : v[0] for p,v in request.items() }, sign, cost))
+      self.requests.append(({ p : v[0] for p,v in request.items() }, sign, bid, ask))
     self.active = True
     self.lock.release()
 
@@ -161,7 +149,7 @@ class User(threading.Thread):
               for order in orders:
                 deviation = 1.0 - min(order['price'], price) / max(order['price'], price)
                 if deviation <= self.tolerance:
-                  valid[order['type']].append((order['id'], order['amount'], request[2]))
+                  valid[order['type']].append((order['id'], order['amount'], request[2], request[3]))
                 else:
                   self.last_error = 'unable to validate request: order of deviates too much from current price'
               for side in [ 'bid', 'ask' ]:
@@ -184,7 +172,8 @@ class User(threading.Thread):
           self.last_error = "no request received"
           #logger.debug("no request received for user %s at exchange %s on unit %s" % (self.key, repr(self.exchange), self.unit))
           for side in [ 'bid', 'ask' ]:
-            self.liquidity[side] = self.liquidity[side][1:] + [[]]
+            del self.liquidity[side][0]
+            self.liquidity[side].append([])
         self.response.append(res)
         self.requests = []
       self.lock.release()
@@ -211,12 +200,12 @@ def register(params):
         if not user in keys:
           lock.acquire()
           keys[user] = {}
-          for unit in _interest[name]:
-            keys[user][unit] = User(user, params['address'][0], unit, _wrappers[name], pricefeed, _sampling, _tolerance, logger)
+          for unit in config._interest[name]:
+            keys[user][unit] = User(user, address, unit, _wrappers[name], pricefeed, config._sampling, config._tolerance, logger)
             keys[user][unit].start()
           lock.release()
-          logger.info("new user %s on %s: %s" % (user, name, params['address'][0]))
-        elif keys[user].values()[0].address != params['address'][0]:
+          logger.info("new user %s on %s: %s" % (user, name, address))
+        elif keys[user].values()[0].address != address:
           ret = response(9, "user already exists with different address: %s" % user)
       else:
         ret = response(8, "unknown exchange requested: %s" % name)
@@ -228,24 +217,28 @@ def register(params):
 
 def liquidity(params):
   ret = response()
-  if set(params.keys() + ['user', 'sign', 'unit']) == set(params.keys()):
+  if set(params.keys() + ['user', 'sign', 'unit', 'ask', 'bid']) == set(params.keys()):
     user = params.pop('user')[0]
     sign = params.pop('sign')[0]
     unit = params.pop('unit')[0]
-    if user in keys:
-      if unit in keys[user]:
-        cost = _interest[repr(keys[user][unit].exchange)][unit]['rate'] if not 'cost' in params else float(params.pop('cost')[0])
-        keys[user][unit].set(params, sign, cost)
+    try:
+      bid = float(params.pop('bid')[0])
+      ask = float(params.pop('ask')[0])
+      if user in keys:
+        if unit in keys[user]:
+          keys[user][unit].set(params, sign, bid, ask)
+        else:
+          ret = response(12, "unit for user %s not found: %s" % (user, unit))
       else:
-        ret = response(12, "unit for user %s not found: %s" % (user, unit))
-    else:
-        ret = response(11, "user not found: %s" % user)
+          ret = response(11, "user not found: %s" % user)
+    except ValueError:
+      ret = response(10, "invalid liquidity data received: %s" % str(params))      
   else:
     ret = response(10, "invalid liquidity data received: %s" % str(params))
   return ret
 
 def poolstats():
-  return { 'liquidity' : ([ (0,0) ] + _liquidity)[-1], 'sampling' : _sampling, 'users' : len(keys.keys()) }
+  return { 'liquidity' : ([ (0,0) ] + _liquidity)[-1], 'sampling' : config._sampling, 'users' : len(keys.keys()) }
 
 def userstats(user):
   res = { 'balance' : 0.0, 'efficiency' : 0.0, 'rejects': 0, 'missing' : 0 }
@@ -259,16 +252,17 @@ def userstats(user):
       res['balance'] += keys[user][unit].balance
       res['missing'] += missing
       res['rejects'] += rejects
-      res['units'][unit] = { 'bid' : bid[-1], 'ask' : ask[-1],
+      res['units'][unit] = { 'bid' : bid[-1],
+                             'ask' : ask[-1],
                              'rejects' : rejects,
                              'missing' : missing,
                              'last_error' :  keys[user][unit].last_error }
   if len(res['units']) > 0:
-    res['efficiency'] = 1.0 - (res['rejects'] + res['missing']) / float(_sampling * len(res['units']))
+    res['efficiency'] = 1.0 - (res['rejects'] + res['missing']) / float(config._sampling * len(res['units']))
   return res
 
-def calculate_interest(balance, amount, interest):
-  return max(min(amount, interest['target'] - balance) * interest['rate'], 0.0)
+def calculate_interest(balance, amount, target, rate):
+  return max(min(amount, target - balance) * rate, 0.0)
   #try: # this is not possible with python floating arithmetic
   #  return interest['rate'] * (amount - (log(exp(interest['target']) + exp(balance + amount)) - log(exp(interest['target']) + exp(balance))))
   #except OverflowError:
@@ -276,26 +270,37 @@ def calculate_interest(balance, amount, interest):
   #  return 0.00001
 
 def credit():
-  for name in _interest:
-    for unit in _interest[name]:
+  for name in config._interest:
+    for unit in config._interest[name]:
       users = [ k for k in keys if unit in keys[k] and repr(keys[k][unit].exchange) == name ]
       for side in [ 'bid', 'ask' ]:
-        for sample in xrange(_sampling):
+        sidx = 2 if side == 'bid' else 3
+        for sample in xrange(config._sampling):
           orders = []
           for user in users:
             orders += [ (user, order) for order in keys[user][unit].liquidity[side][sample] ]
           orders.sort(key = lambda x: (x[1][2], x[1][0]))
           balance = 0.0
+          maxinterest = config._interest[name][unit][side]['rate']
           previd = -1
           for user, order in orders:
             if order[0] != previd:
-              previd = order[0]
-              payout = calculate_interest(balance, order[1], _interest[name][unit]) / (_sampling * 60 * 24)
-              keys[user][unit].balance += payout
-              logger.info("credit [%d/%d] %.8f nbt to %s for %.8f %s liquidity on %s for %s at balance %.8f", sample + 1, _sampling, payout, user, order[1], side, name, unit, balance)
-              balance += order[1]
+              if order[sidx] <= config._interest[name][unit][side]['rate']:
+                previd = order[0]
+                if balance + order[1] >= config._interest[name][unit][side]['target']:
+                  maxinterest = order[sidx]
+                payout = calculate_interest(balance, order[1], config._interest[name][unit][side]['target'], order[sidx]) / (config._sampling * 60 * 24)
+                #order[2] = payout / order[1] # effective interest rate
+                keys[user][unit].balance += payout
+                logger.info("credit [%d/%d] %.8f nbt to %s for %.8f %s liquidity on %s for %s at balance %.8f with rate %.2f",
+                  sample + 1, config._sampling, payout, user, order[1], side, name, unit, balance, order[sidx] * 100)
+                balance += order[1]
+              else:
+                logger.warning("unable to credit request for user %s on exchange %s: requested interest rate is too high", user, name)
+                keys[user][unit].last_error = 'unable to credit request: requested interest rate is too high'
             else:
               logger.warning("duplicate order id detected for user %s on exchange %s: %d", user, name, previd)
+          config._interest[name][unit][side]['orders'] = [ { 'id': order[0], 'amount' : order[1], 'cost' : order[sidx] } for _,order in orders ]
 
 def pay(nud):
   txout = {}
@@ -306,10 +311,10 @@ def pay(nud):
         txout[keys[user][unit].address] = 0.0
       txout[keys[user][unit].address] += keys[user][unit].balance
   lock.release()
-  txout = {k : v - nud.txfee for k,v in txout.items() if v - nud.txfee > _minpayout}
+  txout = {k : v - nud.txfee for k,v in txout.items() if v - nud.txfee > config._minpayout}
   if txout:
     payed = False
-    if _autopayout:
+    if config._autopayout:
       payed = nud.pay(txout)
     try:
       filename = 'logs/%d.credit' % time.time()
@@ -333,11 +338,11 @@ def submit(nud):
   lock.acquire()
   for user in keys:
     for unit in keys[user]:
-      for s in xrange(_sampling):
+      for s in xrange(config._sampling):
         curliquidity[0] += sum([ order[1] for order in keys[user][unit].liquidity['bid'][-(s+1)] ])
         curliquidity[1] += sum([ order[1] for order in keys[user][unit].liquidity['ask'][-(s+1)] ])
   lock.release()
-  curliquidity = [ curliquidity[0] / float(_sampling), curliquidity[1] / float(_sampling) ]
+  curliquidity = [ curliquidity[0] / float(config._sampling), curliquidity[1] / float(config._sampling) ]
   _liquidity.append(curliquidity)
   nud.liquidity(curliquidity[0], curliquidity[1])
 
@@ -367,7 +372,7 @@ class RequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
       if method == 'status':
         self.wfile.write(json.dumps(poolstats()))
       elif method == 'exchanges':
-        self.wfile.write(json.dumps(_interest))
+        self.wfile.write(json.dumps(config._interest))
       self.end_headers()
     elif method in keys:
       self.send_response(200)
@@ -377,14 +382,23 @@ class RequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
       self.end_headers()
     elif '/' in method:
       root = method.split('/')[0]
-      method = method.split('/')[1]
+      method = method.split('/')[1:]
       if root == 'price':
-        price = { 'price' : pricefeed.price(method) }
+        price = { 'price' : pricefeed.price(method[0]) }
         if price['price']:
           self.send_response(200)
           self.send_header('Content-Type', 'application/json')
           self.wfile.write("\n")
           self.wfile.write(json.dumps(price))
+          self.end_headers()
+        else:
+          self.send_response(404)
+      elif root == 'info':
+        if len(method) == 2 and method[0] in config._interest and method[1] in config._interest[method[0]]:
+          self.send_response(200)
+          self.send_header('Content-Type', 'application/json')
+          self.wfile.write("\n")
+          self.wfile.write(json.dumps(config._interest[method[0]][method[1]]))
           self.end_headers()
         else:
           self.send_response(404)
@@ -395,11 +409,25 @@ class RequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
 
   def log_message(self, format, *args): pass
 
-nud = NuRPC(_nuconfig, _grantaddress, logger)
+class ThreadingServer(SocketServer.ThreadingMixIn, BaseHTTPServer.HTTPServer):
+  def get_request(self):
+    self.socket.settimeout(self.timeout)
+    result = None
+    while result is None:
+      try:
+        result = self.socket.accept()
+      except socket.timeout:
+        pass
+    # Reset timeout on the new socket
+    result[0].settimeout(None)
+    return result
+
+nud = NuRPC(config._nuconfig, config._grantaddress, logger)
 if not nud.rpc: logger.critical('Connection to Nu daemon could not be established, liquidity will NOT be sent!')
-httpd = ThreadingServer(("", _port), RequestHandler)
+httpd = ThreadingServer(("", config._port), RequestHandler)
 sa = httpd.socket.getsockname()
 logger.debug("Serving on %s port %d", sa[0], sa[1])
+httpd.timeout = 5
 start_new_thread(httpd.serve_forever, ())
 
 lastcredit = time.time()
@@ -439,9 +467,8 @@ while True:
         keys[user][unit].validate()
     lock.release()
 
-    time.sleep(max(float(60 / _sampling) - time.time() + curtime, 0))
+    time.sleep(max(float(60 / config._sampling) - time.time() + curtime, 0))
   except Exception as e:
     logger.error('exception caught: %s', sys.exc_info()[1])
-    break
-
-httpd.socket.close()
+    httpd.socket.close()
+    raise

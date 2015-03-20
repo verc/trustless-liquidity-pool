@@ -18,37 +18,40 @@ class Connection():
     if not logger:
       self.logger = logging.getLogger('null')
 
-  def json_request(self, request, method, params, headers, trials = None):
-    curtime = time.time()
-    connection = httplib.HTTPConnection(self.server, timeout=5)
-    try:
-      connection.request(request, method, urllib.urlencode(params), headers = headers)
-      response = connection.getresponse()
-      content = response.read()
-      return json.loads(content)
-    except httplib.BadStatusLine:
-      msg = 'server could not be reached'
-    except ValueError:
-      msg = 'server response invalid'
-    except socket.error, v:
-      msg = 'socket error (%s)' % str(v[0])
-    except:
-      msg = 'unknown connection error'
-    self.logger.error("%s: %s, retrying in 5 seconds ...", method, msg)
-    if trials:
-      if trials <= 1: return { 'message' : msg, 'code' : -1, 'error' : True }
-      trials = trials - 1
-    time.sleep(max(5.0 - time.time() + curtime, 0))
-    return self.json_request(request, method, params, headers, trials)
+  def json_request(self, request, method, params, headers, trials = None, timeout = 5):
+    while True:
+      curtime = time.time()
+      connection = httplib.HTTPConnection(self.server, timeout = timeout)
+      time.sleep(3)
+      try:
+        connection.request(request, method, urllib.urlencode(params), headers = headers)
+        response = connection.getresponse()
+        content = response.read()
+        return json.loads(content)
+      except httplib.BadStatusLine:
+        msg = 'server could not be reached'
+      except ValueError:
+        msg = 'server response invalid'
+      except socket.error, v:
+        msg = 'socket error (%s)' % str(v[0])
+      except:
+        msg = 'unknown connection error'
+      if trials:
+        if trials <= 1:
+          self.logger.error("%s: %s", method, msg)
+          return { 'message' : msg, 'code' : -1, 'error' : True }
+        trials = trials - 1
+      self.logger.error("%s: %s, retrying in 5 seconds ...", method, msg)
+      time.sleep(max(5.0 - time.time() + curtime, 0))
 
-  def get(self, method, params = None, trials = None):
+  def get(self, method, params = None, trials = None, timeout = 5):
     if not params: params = {}
-    return self.json_request('GET', '/' + method, params, {}, trials)
+    return self.json_request('GET', '/' + method, params, {}, trials, timeout)
 
-  def post(self, method, params = None, trials = None):
+  def post(self, method, params = None, trials = None, timeout = 5):
     if not params: params = {}
     headers = { "Content-type": "application/x-www-form-urlencoded" }
-    return self.json_request('POST', method, params, headers, trials)
+    return self.json_request('POST', method, params, headers, trials, timeout)
 
 
 class ConnectionThread(threading.Thread):

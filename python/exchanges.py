@@ -10,7 +10,8 @@ import threading
 import datetime
 
 class Exchange(object):
-  def __init__(self):
+  def __init__(self, fee):
+    self.fee = fee
     self._shift = 1
     self._nonce = 0
 
@@ -27,7 +28,7 @@ class Exchange(object):
 
 class Poloniex(Exchange):
   def __init__(self):
-    super(Poloniex, self).__init__()
+    super(Poloniex, self).__init__(0.002)
 
   def __repr__(self): return "poloniex"
 
@@ -47,14 +48,15 @@ class Poloniex(Exchange):
     headers = { 'Sign' : sign, 'Key' : key }
     return json.loads(urllib2.urlopen(urllib2.Request('https://poloniex.com/tradingApi', data, headers)).read())
 
-  def cancel_orders(self, unit, key, secret):
+  def cancel_orders(self, unit, side, key, secret):
     response = self.post('returnOpenOrders', { 'currencyPair' : "%s_NBT"%unit.upper() }, key, secret)
     if 'error' in response: return response
     for order in response:
-      ret = self.post('cancelOrder', { 'currencyPair' : "%s_NBT"%unit.upper(), 'orderNumber' : order['orderNumber'] }, key, secret)
-      if 'error' in ret:
-        if isinstance(response,list): response = { 'error': "" }
-        response['error'] += "," + ret['error']
+      if side == 'all' or (side == 'bid' and order['type'] == 'buy') or (side == 'ask' and order['type'] == 'sell'):
+        ret = self.post('cancelOrder', { 'currencyPair' : "%s_NBT"%unit.upper(), 'orderNumber' : order['orderNumber'] }, key, secret)
+        if 'error' in ret:
+          if isinstance(response,list): response = { 'error': "" }
+          response['error'] += "," + ret['error']
     return response
 
   def place_order(self, unit, side, key, secret, amount, price):
@@ -92,7 +94,7 @@ class Poloniex(Exchange):
 
 class CCEDK(Exchange):
   def __init__(self):
-    super(CCEDK, self).__init__()
+    super(CCEDK, self).__init__(0.002)
     self.pair_id = {}
     self.currency_id = {}
     failed = False
@@ -149,16 +151,17 @@ class CCEDK(Exchange):
       response['error'] = ",".join(response['errors'].values())
     return response
 
-  def cancel_orders(self, unit, key, secret):
+  def cancel_orders(self, unit, side, key, secret):
     response = self.post('order/list', {}, key, secret)
     if not response['response'] or not response['response']['entities']:
       return response
     for order in response['response']['entities']:
-      if order['pair_id'] == self.pair_id[unit.upper()]:
-        ret = self.post('order/cancel', { 'order_id' : order['order_id'] }, key, secret)
-        if not ret['response']:
-          if not 'error' in response: response['error'] = ""
-          response['error'] += ",".join(ret['errors'].values())
+      if side == 'all' or (side == 'bid' and order['type'] == 'buy') or (side == 'ask' and order['type'] == 'sell'):
+        if order['pair_id'] == self.pair_id[unit.upper()]:
+          ret = self.post('order/cancel', { 'order_id' : order['order_id'] }, key, secret)
+          if not ret['response']:
+            if not 'error' in response: response['error'] = ""
+            response['error'] += ",".join(ret['errors'].values())
     return response
 
   def place_order(self, unit, side, key, secret, amount, price):
@@ -203,7 +206,7 @@ class CCEDK(Exchange):
 
 class BitcoinCoId(Exchange):
   def __init__(self):
-    super(BitcoinCoId, self).__init__()
+    super(BitcoinCoId, self).__init__(0.0)
     try:
       response = json.loads(urllib2.urlopen(urllib2.Request('https://vip.bitcoin.co.id/api/summaries')).read())
       self._shift = float(response['tickers']['btc_idr']['server_time']) - time.time()
@@ -225,15 +228,16 @@ class BitcoinCoId(Exchange):
     response = json.loads(urllib2.urlopen(urllib2.Request('https://vip.bitcoin.co.id/tapi', data, headers)).read())
     return response
 
-  def cancel_orders(self, unit, key, secret):
+  def cancel_orders(self, unit, side, key, secret):
     response = self.post('openOrders', {'pair' : 'nbt_' + unit.lower()}, key, secret)
     if response['success'] == 0 or not response['return']['orders']: return response
     for order in response['return']['orders']:
-      params = { 'pair' : 'nbt_' + unit.lower(), 'order_id' : order['order_id'], 'type' :  order['type'] }
-      ret = self.post('cancelOrder', params, key, secret)
-      if 'error' in ret:
-        if not 'error' in response: response['error'] = ""
-        response['error'] += "," + ret['error']
+      if side == 'all' or (side == 'bid' and order['type'] == 'buy') or (side == 'ask' and order['type'] == 'sell'):
+        params = { 'pair' : 'nbt_' + unit.lower(), 'order_id' : order['order_id'], 'type' :  order['type'] }
+        ret = self.post('cancelOrder', params, key, secret)
+        if 'error' in ret:
+          if not 'error' in response: response['error'] = ""
+          response['error'] += "," + ret['error']
     return response
 
   def place_order(self, unit, side, key, secret, amount, price):
@@ -278,7 +282,7 @@ class BitcoinCoId(Exchange):
 
 class BTER(Exchange):
   def __init__(self):
-    super(BTER, self).__init__()
+    super(BTER, self).__init__(0.002)
 
   def __repr__(self): return "bter"
 
@@ -298,18 +302,19 @@ class BTER(Exchange):
     headers = { 'Sign' : sign, 'Key' : key, "Content-type": "application/x-www-form-urlencoded" }
     return self.https_request(method, data, headers)
 
-  def cancel_orders(self, unit, key, secret):
+  def cancel_orders(self, unit, side, key, secret):
     response = self.post('orderlist', {}, key, secret)
     if not response['result']:
       response['error'] = response['msg']
       return response
     if not response['orders']: response['orders'] = []
     for order in response['orders']:
-      params = { 'order_id' : order['id'] }
-      ret = self.post('cancelorder', params, key, secret)
-      if not ret['result']:
-        if not 'error' in response: response['error'] = ""
-        response['error'] += "," + ret['msg']
+      if side == 'all' or (side == 'ask' and order['buy_type'] == unit) or (side == 'bid' and order['sell_type'] == unit):
+        params = { 'order_id' : order['id'] }
+        ret = self.post('cancelorder', params, key, secret)
+        if not ret['result']:
+          if not 'error' in response: response['error'] = ""
+          response['error'] += "," + ret['msg']
     return response
 
   def place_order(self, unit, side, key, secret, amount, price):
@@ -349,6 +354,6 @@ class BTER(Exchange):
     return [ {
       'id' : int(order['id']),
       'price' : float(order['rate']),
-      'type' : 'ask' if order['buy_type'] == unit else 'bid',
+      'type' : 'ask' if order['buy_type'].lower() == unit.lower() else 'bid',
       'amount' : float(order['amount']),
       } for order in response['orders'] if order['pair'] == 'nbt_' + unit.lower() ]

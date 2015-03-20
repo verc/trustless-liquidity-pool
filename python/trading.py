@@ -71,39 +71,46 @@ class NuBot(ConnectionThread):
 
 
 class PyBot(ConnectionThread):
-  def __init__(self, conn, requester, key, secret, exchange, unit, cost, logger = None):
+  def __init__(self, conn, requester, key, secret, exchange, unit, logger = None):
     super(PyBot, self).__init__(conn, logger)
-    self.cost = cost
     self.requester = requester
     self.key = key
     self.secret = secret
     self.exchange = exchange
     self.unit = unit
-    self.spread = 0.002
+    self.ids = { 'bid' : [], 'ask' : [] }
+    self.limit = { 'bid' : 0.0, 'ask' : 0.0 }
     if not hasattr(PyBot, 'lock'):
       PyBot.lock = {}
     if not repr(exchange) in PyBot.lock:
       PyBot.lock[repr(exchange)] = threading.Lock()
     if not hasattr(PyBot, 'pricefeed'):
       PyBot.pricefeed = PriceFeed(30, logger)
-    if not hasattr(PyBot, 'interest'):
-      PyBot.interest = [0, {}]
+
+  def cancel_orders(self, side = 'all', reset = True):
+    try:
+      response = self.exchange.cancel_orders(self.unit, side, self.key, self.secret)
+    except:
+      response = {'error' : 'exception caught: %s' % sys.exc_info()[1]}
+    if 'error' in response:
+      self.logger.error('unable to cancel %s orders for unit %s on exchange %s (trial %d): %s', side, self.unit, repr(self.exchange), trials + 1, response['error'])
+      self.exchange.adjust(response['error'])
+      self.logger.info('adjusting nonce of exchange %s to %d', repr(self.exchange), self.exchange._shift)
+    else:
+      self.logger.info('successfully deleted %s orders for unit %s on exchange %s', side, self.unit, repr(self.exchange))
+      if reset:
+        if side == 'all' or side == 'bid':
+          self.limit['bid'] = self.requester.interest()['bid']['target'] * 1.25
+        if side == 'all' or side == 'ask':
+          self.limit['ask'] = self.requester.interest()['ask']['target'] * 1.25
+    return response
 
   def shutdown(self):
     self.logger.info("stopping PyBot for unit %s on exchange %s", self.unit, repr(self.exchange))
     trials = 0
     while trials < 10:
-      try:
-        response = self.exchange.cancel_orders(self.unit, self.key, self.secret)
-      except:
-        response = {'error' : 'exception caught: %s' % sys.exc_info()[1]}
-      if 'error' in response:
-        self.logger.error('unable to cancel orders for unit %s on exchange %s (trial %d): %s', self.unit, repr(self.exchange), trials + 1, response['error'])
-        self.exchange.adjust(response['error'])
-        self.logger.info('adjusting nonce of exchange %s to %d', repr(self.exchange), self.exchange._shift)
-      else:
-        self.logger.info('successfully deleted all orders for unit %s on exchange %s', self.unit, repr(self.exchange))
-        break
+      response = self.cancel_orders(reset = False)
+      if not 'error' in response: break
       trials = trials + 1
 
   def acquire_lock(self):
@@ -112,21 +119,41 @@ class PyBot(ConnectionThread):
   def release_lock(self):
     PyBot.lock[repr(self.exchange)].release()
 
-  def update_interest(self):
-    curtime = time.time()
-    if curtime - PyBot.interest[0] > 30:
-      PyBot.interest[1] = self.conn.get('exchanges', trials = 1)
-      PyBot.interest[0] = curtime
-    self.interest = PyBot.interest[1][repr(self.exchange)][self.unit]
+  def place(self, side, balance, price):
+    try:
+      response = self.exchange.place_order(self.unit, side, self.key, self.secret, balance, price)
+    except KeyboardInterrupt: raise
+    except: response = { 'error' : 'exception caught: %s' % sys.exc_info()[1] }
+    if 'error' in response:
+      self.logger.error('unable to place %s %s order of %.4f nbt at %.8f on exchange %s: %s', side, self.unit, balance, price, repr(self.exchange), response['error'])
+      self.exchange.adjust(response['error'])
+    else:
+      self.logger.info('successfully placed %s %s order of %.4f nbt at %.8f on exchange %s', side, self.unit, balance, price, repr(self.exchange))
+    return response
+
+  def effective_interest(self, orders, target, cost):
+    mod = orders[:]
+    for i in xrange(len(mod)):
+      if mod[i]['id'] in self.ids:
+        mod[i]['cost'] = cost
+    mod.sort(key = lambda x: x['cost'])
+    total = 0.0
+    mass = 0.0
+    for order in mod:
+      if order['id'] in self.ids:
+        mass += max(min(order['amount'], target - total), 0.0)
+      total += order['amount']
+    return mass * cost
 
   def place(self, side):
     price = self.serverprice
+    spread = max(self.exchange.fee, 0.002)
     if side == 'ask':
       exunit = 'nbt'
-      price *= (1.0 + self.spread)
+      price *= (1.0 + spread)
     else:
       exunit = self.unit
-      price *= (1.0 - self.spread)
+      price *= (1.0 - spread)
     price = ceil(price * 10**8) / float(10**8) # truncate floating point precision after 8th position
     try:
       response = self.exchange.get_balance(exunit, self.key, self.secret)
@@ -137,52 +164,35 @@ class PyBot(ConnectionThread):
       self.exchange.adjust(response['error'])
     elif response['balance'] > 0.0001:
       balance = response['balance'] if exunit == 'nbt' else response['balance'] / price
-      try:
-        response = self.exchange.place_order(self.unit, side, self.key, self.secret, balance, price)
-      except KeyboardInterrupt: raise
-      except: response = { 'error' : 'exception caught: %s' % sys.exc_info()[1] }
-      if 'error' in response:
-        self.logger.error('unable to place %s %s order of %.4f nbt at %.8f on exchange %s: %s', side, exunit, balance, price, repr(self.exchange), response['error'])
-        self.exchange.adjust(response['error'])
-      else:
-        self.logger.info('successfully placed %s %s order of %.4f nbt at %.8f on exchange %s', side, exunit, balance, price, repr(self.exchange))
-    return response
-
-  def reset(self, cancel = True):
-    self.acquire_lock()
-    response = { 'error' : True }
-    while 'error' in response:
-      response = {}
-      if cancel:
-        try: response = self.exchange.cancel_orders(self.unit, self.key, self.secret)
+      balance = min(self.limit[side], balance)
+      if balance > 0.0001:
+        try:
+          response = self.exchange.place_order(self.unit, side, self.key, self.secret, balance, price)
         except KeyboardInterrupt: raise
         except: response = { 'error' : 'exception caught: %s' % sys.exc_info()[1] }
         if 'error' in response:
-          self.logger.error('unable to cancel orders for unit %s on exchange %s: %s', self.unit, repr(self.exchange), response['error'])
-        else:
-          self.logger.info('successfully deleted all orders for unit %s on exchange %s', self.unit, repr(self.exchange))
-      if not 'error' in response:
-        response = self.place('bid')
-        if not 'error' in response:
-          response = self.place('ask')
-      if 'error' in response:
-        if 'exception caught:' in response['error']:
-          self.logger.info('retrying in 5 seconds ...')
-          time.sleep(5)
-        else:
+          self.logger.error('unable to place %s %s order of %.4f nbt at %.8f on exchange %s: %s',
+            side, exunit, balance, price, repr(self.exchange), response['error'])
           self.exchange.adjust(response['error'])
-          self.logger.info('adjusting nonce of exchange %s to %d', repr(self.exchange), self.exchange._shift)
-    self.requester.submit()
-    self.release_lock()
+        else:
+          self.logger.info('successfully placed %s %s order of %.4f nbt at %.8f on exchange %s',
+            side, exunit, balance, price, repr(self.exchange))
+          self.ids[side].append(response['id'])
+          self.limit[side] -= balance
+      else:
+        self.logger.error('not placing %s %s order of %.4f nbt at %.8f on exchange %s: target limit reached',
+            side, exunit, balance, price, repr(self.exchange))
     return response
 
   def run(self):
     self.logger.info("starting PyBot for unit %s on exchange %s", self.unit, repr(self.exchange))
-    self.update_interest()
     self.serverprice = self.conn.get('price/' + self.unit)['price']
-    self.reset() # initialize walls
+    self.cancel_orders()
+    self.place('bid')
+    self.place('ask')
     prevprice = self.serverprice
     curtime = time.time()
+    efftime = time.time()
     while self.active:
       time.sleep(max(30 - time.time() + curtime, 0))
       curtime = time.time()
@@ -192,7 +202,6 @@ class PyBot(ConnectionThread):
         response = self.conn.get('price/' + self.unit, trials = 3)
         if not 'error' in response:
           self.serverprice = response['price']
-          self.update_interest()
           userprice = PyBot.pricefeed.price(self.unit)
           if 1.0 - min(self.serverprice, userprice) / max(self.serverprice, userprice) > 0.005: # validate server price
             self.logger.error('server price %.8f for unit %s deviates too much from price %.8f received from ticker, will delete all orders for this unit', self.serverprice, self.unit, userprice)
@@ -202,7 +211,33 @@ class PyBot(ConnectionThread):
             if deviation > 0.00425:
               self.logger.info('price of unit %s moved from %.8f to %.8f, will try to reset orders', self.unit, prevprice, self.serverprice)
               prevprice = self.serverprice
-            self.reset(deviation > 0.00425)
+              self.cancel_orders()
+            elif curtime - efftime >= 60:
+              efftime = curtime
+              for side in [ 'bid', 'ask' ]:
+                info = self.requester.interest()[side]
+                mass = sum([order['amount'] for order in info['orders'] if order['id'] in self.ids])
+                cureff = self.effective_interest(info['orders'], info['target'], self.requester.cost[side])
+                besteff = cureff
+                bestcost = self.requester.cost[side]
+                for candidate in [ order['cost'] - 0.001 for order in info['orders'] if order['id'] not in self.ids and order['cost'] - 0.001 >= requester.maxcost[side]]:
+                  eff = self.effective_interest(info['orders'], info['target'], candidate)
+                  if eff > besteff:
+                    besteff = eff
+                    bestcost = candidate
+                if self.requester.cost != bestcost:
+                  self.logger.info('reducing %s interest rate to %.2f for unit %s on exchange %s to increase effective interest from %.4f to %.4f',
+                    side, bestcost * 100.0, self.unit, repr(self.exchange), cureff / self.requester.cost[side], besteff / bestcost)
+                  self.requester.cost = bestcost
+                if 1.25 * besteff / bestcost < self.limit[side]: # remove balance with 0% interest
+                  self.logger.info('reducing %s limit to %.4f for unit %s on exchange %s', side, 1.25 * besteff / bestcost, self.unit, repr(self.exchange))
+                  self.cancel_orders(side)
+                  self.limit[side] = 1.25 * besteff / bestcost
+                elif 1.25 * besteff / bestcost > self.limit[side]: # reset limit if almost all current funds are in use
+                  self.logger.info('reseting %s limit to %.4f for unit %s on exchange %s', side, 1.25 * besteff / bestcost, self.unit, repr(self.exchange))
+                  self.limit[side] = 1.25 * self.requester.interest()[side]['target']
+            self.place('bid')
+            self.place('ask')
         else:
           self.logger.error('unable to retrieve server price: %s', response['message'])
     self.shutdown()

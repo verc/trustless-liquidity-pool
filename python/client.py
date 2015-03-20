@@ -43,7 +43,7 @@ userfile = 'users.dat'
 if len(sys.argv) == 3:
   userfile = sys.argv[2]
 try:
-  userdata = [ line.strip().split() for line in open(userfile).readlines() if len(line.strip().split()) >= 5 ] # address units exchange key secret [trader]
+  userdata = [ line.strip().split() for line in open(userfile).readlines() if len(line.strip().split('#')[0].split()) >= 5 ] # address units exchange key secret [trader]
 except:
   logger.error("%s could not be read", userfile)
   sys.exit(1)
@@ -53,7 +53,7 @@ _wrappers = { 'poloniex' : Poloniex(), 'ccedk' : CCEDK(), 'bitcoincoid' : Bitcoi
 
 # one request signer thread for each key and unit
 class RequestThread(ConnectionThread):
-  def __init__(self, conn, key, secret, exchange, unit, address, sampling, logger = None):
+  def __init__(self, conn, key, secret, exchange, unit, address, sampling, cost, logger = None):
     super(RequestThread, self).__init__(conn, logger)
     self.key = key
     self.secret = secret
@@ -64,9 +64,24 @@ class RequestThread(ConnectionThread):
     self.address = address
     self.errorflag = False
     self.trials = 0
+    self.exchangeupdate = 0
+    self.exchangeinfo = 0
+    self.maxcost = cost.copy()
+    self.cost = cost.copy()
+
+  def interest(self):
+    curtime = time.time()
+    if curtime - self.exchangeupdate > 30:
+      response = self.conn.get('info/%s/%s' % (repr(self.exchange), self.unit), {}, 1)
+      if 'error' in response:
+        self.logger.error('unable to update interest rates for unit %s on exchange %s', self.unit, repr(self.exchange))
+      else:
+        self.exchangeinfo = response
+        self.exchangeupdate = curtime
+    return self.exchangeinfo
 
   def register(self):
-    response = self.conn.post('register', {'address' : self.address, 'key' : self.key, 'name' : repr(self.exchange)})
+    response = self.conn.post('register', { 'address' : self.address, 'key' : self.key, 'name' : repr(self.exchange) })
     if response['code'] == 0: # reset sampling in case of server restart
       self.sampling = self.initsampling
     return response
@@ -75,6 +90,7 @@ class RequestThread(ConnectionThread):
     data, sign = self.exchange.create_request(self.unit, self.key, self.secret)
     params = { 'unit' : self.unit, 'user' : self.key, 'sign' : sign }
     params.update(data)
+    params.update(self.cost)
     ret = self.conn.post('liquidity', params, 1)
     if ret['code'] != 0:
       self.trials += 1
@@ -96,9 +112,8 @@ class RequestThread(ConnectionThread):
 # retrieve initial data
 conn = Connection(_server, logger)
 basestatus = conn.get('status')
-exchanges = conn.get('exchanges')
-exchanges['time'] = time.time()
-sampling = max(1, min(120, int(basestatus['sampling'] * 1.5)))
+exchangeinfo = conn.get('exchanges')
+sampling = max(9600, min(120, int(basestatus['sampling'] * 1.5)))
 
 # parse user data
 users = {}
@@ -109,28 +124,35 @@ for user in userdata:
   if not name in _wrappers:
     logger.error("unknown exchange: %s", user[2])
     sys.exit(2)
-  if not name in exchanges:
+  if not name in exchangeinfo:
     logger.error("exchange not supported by pool: %s", name)
     sys.exit(2)
   units = [ unit.lower() for unit in user[1].split(',') ]
-  exchange = _wrappers[user[2].lower()]
+  exchange = _wrappers[name]
   users[key] = {}
   for unit in user[1].split(','):
     unit = unit.lower()
-    if not unit in exchanges[name]:
+    if not unit in exchangeinfo[name]:
       logger.error("unit %s on exchange %s not supported by pool: %s", unit, name)
       sys.exit(2)
-    users[key][unit] = { 'request' : RequestThread(conn, key, secret, exchange, unit, user[0], sampling, logger) }
-    users[key][unit]['request'].start()
     bot = 'pybot' if len(user) < 6 else user[5]
-    cost = exchanges[name][unit]['rate'] if len(user) < 7 else user[6]
+    cost = { 'bid' : exchangeinfo[name][unit]['bid']['rate'], 'ask' : exchangeinfo[name][unit]['ask']['rate'] }
+    if len(user) >= 7:
+      if float(user[6]) != 0.0:
+        cost['bid'] = float(user[6])
+      if len(user) >= 8:
+        if float(user[7]) != 0.0:
+          cost['ask'] = float(user[7])
+
+    users[key][unit] = { 'request' : RequestThread(conn, key, secret, exchange, unit, user[0], sampling, cost, logger) }
+    users[key][unit]['request'].start()
 
     if bot == 'none':
       users[key][unit]['order'] = None
     elif bot == 'nubot':
       users[key][unit]['order'] = NuBot(conn, users[key][unit]['request'], key, secret, exchange, unit, logger)
     elif bot == 'pybot':
-      users[key][unit]['order'] = PyBot(conn, users[key][unit]['request'], key, secret, exchange, unit, cost, logger)
+      users[key][unit]['order'] = PyBot(conn, users[key][unit]['request'], key, secret, exchange, unit, logger)
     else:
       logger.error("unknown order handler: %s", bot)
       users[key][unit]['order'] = None
