@@ -220,15 +220,15 @@ class PyBot(ConnectionThread):
                 cureff = self.effective_interest(info['orders'], info['target'], self.requester.cost[side])
                 besteff = cureff
                 bestcost = self.requester.cost[side]
-                for candidate in [ order['cost'] - 0.001 for order in info['orders'] if order['id'] not in self.ids and order['cost'] - 0.001 >= requester.maxcost[side]]:
+                for candidate in [ order['cost'] - 0.001 for order in info['orders'] if order['id'] not in self.ids and order['cost'] - 0.001 >= self.requester.maxcost[side]]:
                   eff = self.effective_interest(info['orders'], info['target'], candidate)
                   if eff > besteff:
                     besteff = eff
                     bestcost = candidate
                 if self.requester.cost != bestcost:
-                  self.logger.info('reducing %s interest rate to %.2f for unit %s on exchange %s to increase effective interest from %.4f to %.4f',
+                  self.logger.info('reducing %s interest rate to %.2f%% for unit %s on exchange %s to increase effective interest from %.4f%% to %.4f%%',
                     side, bestcost * 100.0, self.unit, repr(self.exchange), cureff / self.requester.cost[side], besteff / bestcost)
-                  self.requester.cost = bestcost
+                  self.requester.cost[side] = bestcost
                 if 1.25 * besteff / bestcost < self.limit[side]: # remove balance with 0% interest
                   self.logger.info('reducing %s limit to %.4f for unit %s on exchange %s', side, 1.25 * besteff / bestcost, self.unit, repr(self.exchange))
                   self.cancel_orders(side)
