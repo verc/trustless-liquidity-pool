@@ -20,11 +20,11 @@ _interest = {
     'btc' : {
       'bid': {
         'rate' : 0.0025,
-        'target' : 25.0
+        'target' : 10.0
         },
       'ask': {
         'rate' : 0.0025,
-        'target' : 25.0
+        'target' : 10.0
         }
       }
   },
@@ -32,11 +32,11 @@ _interest = {
     'btc' : {
       'bid': {
         'rate' : 0.0025,
-        'target' : 25.0
+        'target' : 10.0
         },
       'ask': {
         'rate' : 0.0025,
-        'target' : 25.0
+        'target' : 10.0
         }
       }
     },
@@ -44,11 +44,11 @@ _interest = {
     'btc' : {
       'bid': {
         'rate' : 0.0025,
-        'target' : 25.0
+        'target' : 10.0
         },
       'ask': {
         'rate' : 0.0025,
-        'target' : 25.0
+        'target' : 10.0
         }
       }
     }

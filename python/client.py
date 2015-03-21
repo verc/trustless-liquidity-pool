@@ -65,9 +65,9 @@ class RequestThread(ConnectionThread):
     self.errorflag = False
     self.trials = 0
     self.exchangeupdate = 0
-    self.exchangeinfo = 0
+    self.exchangeinfo = self.interest()
     self.maxcost = cost.copy()
-    self.cost = cost.copy()
+    self.cost = { 'bid' : self.exchangeinfo['bid']['rate'], 'ask' : self.exchangeinfo['ask']['rate'] }
 
   def interest(self):
     curtime = time.time()

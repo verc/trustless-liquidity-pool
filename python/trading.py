@@ -131,11 +131,12 @@ class PyBot(ConnectionThread):
       self.logger.info('successfully placed %s %s order of %.4f nbt at %.8f on exchange %s', side, self.unit, balance, price, repr(self.exchange))
     return response
 
-  def effective_interest(self, orders, target, cost):
+  def effective_interest(self, balance, orders, target, cost):
     mod = orders[:]
     for i in xrange(len(mod)):
       if mod[i]['id'] in self.orders:
         mod[i]['cost'] = cost
+    mod.append({'amount' : balance, 'cost' : cost, 'id' : sys.maxint})
     mod.sort(key = lambda x: x['cost'])
     total = 0.0
     mass = 0.0
@@ -143,9 +144,10 @@ class PyBot(ConnectionThread):
       if order['id'] in self.orders:
         mass += max(min(order['amount'], target - total), 0.0)
       total += order['amount']
+
     return mass * cost
 
-  def balance(self, side):
+  def balance(self, exunit, price):
     try:
       response = self.exchange.get_balance(exunit, self.key, self.secret)
       if not 'error' in response:
@@ -153,6 +155,8 @@ class PyBot(ConnectionThread):
         response['balance'] = int(response['balance'] * 10**3) / float(10**3)
     except KeyboardInterrupt: raise
     except: response = { 'error' : 'exception caught: %s' % sys.exc_info()[1] }
+    return response
+
     if 'error' in response:
       self.logger.error('unable to receive balance for unit %s on exchange %s: %s', exunit, repr(self.exchange), response['error'])
       self.exchange.adjust(response['error'])
@@ -167,13 +171,7 @@ class PyBot(ConnectionThread):
       exunit = self.unit
       price *= (1.0 - spread)
     price = ceil(price * 10**8) / float(10**8) # truncate floating point precision after 8th position
-    try:
-      response = self.exchange.get_balance(exunit, self.key, self.secret)
-      if not 'error' in response:
-        response['balance'] = response['balance'] if exunit == 'nbt' else response['balance'] / price
-        response['balance'] = int(response['balance'] * 10**3) / float(10**3)
-    except KeyboardInterrupt: raise
-    except: response = { 'error' : 'exception caught: %s' % sys.exc_info()[1] }
+    response = self.balance(exunit, price)
     if 'error' in response:
       self.logger.error('unable to receive balance for unit %s on exchange %s: %s', exunit, repr(self.exchange), response['error'])
       self.exchange.adjust(response['error'])
@@ -237,13 +235,17 @@ class PyBot(ConnectionThread):
                 if self.limit[side] < self.requester.interest()[side]['target'] - mass:
                   self.limit[side] = self.requester.interest()[side]['target'] - mass
                   self.logger.info('increasing %s limit to %.4f for unit %s on exchange %s', side, self.limit[side], self.unit, repr(self.exchange))
-                if weight > 0:
-                  # get balance and use it when calculating effective interest
-                  cureff = self.effective_interest(info['orders'], info['target'], self.requester.cost[side])
+                response = self.balance('nbt' if side == 'ask' else self.unit, prevprice)
+                if 'error' in response:
+                  self.logger.error('unable to receive balance for unit %s on exchange %s: %s', 'nbt' if side == 'ask' else self.unit, repr(self.exchange), response['error'])
+                  self.exchange.adjust(response['error'])
+                  self.logger.info('adjusting nonce of exchange %s to %d', repr(self.exchange), self.exchange._shift)
+                else:
+                  cureff = self.effective_interest(response['balance'], info['orders'], info['target'], self.requester.cost[side])
                   besteff = cureff
                   bestcost = self.requester.cost[side]
                   for candidate in [ order['cost'] - 0.001 for order in info['orders'] if order['id'] not in self.orders and order['cost'] - 0.001 >= self.requester.maxcost[side]]:
-                    eff = self.effective_interest(info['orders'], info['target'], candidate)
+                    eff = self.effective_interest(response['balance'], info['orders'], info['target'], candidate)
                     if eff > besteff:
                       besteff = eff
                       bestcost = candidate

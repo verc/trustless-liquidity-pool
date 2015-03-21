@@ -183,8 +183,11 @@ class User(threading.Thread):
     except thread.error: pass # user did not finish last request in time
 
   def finish(self):
-    self.lock.acquire()
-    self.lock.release()
+    try:
+      self.lock.acquire()
+      self.lock.release()
+    except KeyboardInterrupt:
+      raise
 
 def response(errcode = 0, message = 'success'):
   return { 'code' : errcode, 'message' : message }
@@ -390,7 +393,13 @@ class RequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
     elif '/' in method:
       root = method.split('/')[0]
       method = method.split('/')[1:]
-      if root == 'price':
+      if 'loaderio' in root: # evil hack to support load tester (TODO)
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/html')
+        self.wfile.write("\n")
+        self.wfile.write(root)
+        self.end_headers()
+      elif root == 'price':
         price = { 'price' : pricefeed.price(method[0]) }
         if price['price']:
           self.send_response(200)
