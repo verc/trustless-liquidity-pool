@@ -375,7 +375,13 @@ class RequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
       self.send_response(404)
       return
     method = self.path[1:]
-    if method in [ 'status', 'exchanges' ]:
+    if 'loaderio' in method: # evil hack to support load tester (TODO)
+      self.send_response(200)
+      self.send_header('Content-Type', 'text/html')
+      self.wfile.write("\n")
+      self.wfile.write(method)
+      self.end_headers()
+    elif method in [ 'status', 'exchanges' ]:
       self.send_response(200)
       self.send_header('Content-Type', 'application/json')
       self.wfile.write("\n")
@@ -393,13 +399,7 @@ class RequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
     elif '/' in method:
       root = method.split('/')[0]
       method = method.split('/')[1:]
-      if 'loaderio' in root: # evil hack to support load tester (TODO)
-        self.send_response(200)
-        self.send_header('Content-Type', 'text/html')
-        self.wfile.write("\n")
-        self.wfile.write(root)
-        self.end_headers()
-      elif root == 'price':
+      if root == 'price':
         price = { 'price' : pricefeed.price(method[0]) }
         if price['price']:
           self.send_response(200)
