@@ -377,9 +377,9 @@ class RequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
     method = self.path[1:]
     if 'loaderio' in method: # evil hack to support load tester (TODO)
       self.send_response(200)
-      self.send_header('Content-Type', 'text/html')
+      self.send_header('Content-Type', 'text/plain')
       self.wfile.write("\n")
-      self.wfile.write(method)
+      self.wfile.write(method.replace('/',''))
       self.end_headers()
     elif method in [ 'status', 'exchanges' ]:
       self.send_response(200)
@@ -426,17 +426,18 @@ class RequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
   def log_message(self, format, *args): pass
 
 class ThreadingServer(SocketServer.ThreadingMixIn, BaseHTTPServer.HTTPServer):
-  def get_request(self):
-    self.socket.settimeout(self.timeout)
-    result = None
-    while result is None:
-      try:
-        result = self.socket.accept()
-      except socket.timeout:
-        pass
-    # Reset timeout on the new socket
-    result[0].settimeout(None)
-    return result
+  pass
+#  def get_request(self):
+#    self.socket.settimeout(self.timeout)
+#    result = None
+#    while result is None:
+#      try:
+#        result = self.socket.accept()
+#      except socket.timeout:
+#        pass
+#    # Reset timeout on the new socket
+#    result[0].settimeout(None)
+#    return result
 
 nud = NuRPC(config._nuconfig, config._grantaddress, logger)
 if not nud.rpc:
@@ -445,7 +446,7 @@ if not nud.rpc:
 httpd = ThreadingServer(("", config._port), RequestHandler)
 sa = httpd.socket.getsockname()
 logger.debug("Serving on %s port %d", sa[0], sa[1])
-httpd.timeout = 5
+#httpd.timeout = 5
 start_new_thread(httpd.serve_forever, ())
 
 lastcredit = time.time()
