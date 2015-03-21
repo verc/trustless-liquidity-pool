@@ -124,6 +124,9 @@ class CCEDK(Exchange):
 
   def __repr__(self): return "ccedk"
 
+  def nonce(self, factor = 1.0):
+    return int(time.time() + self._shift)
+
   def adjust(self, error):
     if "incorrect range" in error: #(TODO: regex)
       if ':' in error: error = error.split(':')[1].strip()
@@ -143,14 +146,14 @@ class CCEDK(Exchange):
             self.adjustcontrol = False
             super(CCEDK, self).adjust(error)
           else:
-            self.shift = newshift
+            self._shift = newshift
         else:
           super(CCEDK, self).adjust(error)
     else:
         super(CCEDK, self).adjust(error)
 
   def post(self, method, params, key, secret):
-    request = { 'nonce' : self.nonce(1) } # TODO: check for unique nonce
+    request = { 'nonce' : self.nonce() } # TODO: check for unique nonce
     request.update(params)
     data = urllib.urlencode(request)
     sign = hmac.new(secret, data, hashlib.sha512).hexdigest()
@@ -192,7 +195,7 @@ class CCEDK(Exchange):
 
   def create_request(self, unit, key = None, secret = None):
     if not secret: return None, None
-    request = { 'nonce' : self.nonce(1) }
+    request = { 'nonce' : self.nonce() }
     data = urllib.urlencode(request)
     sign = hmac.new(secret, data, hashlib.sha512).hexdigest()
     return request, sign

@@ -145,6 +145,18 @@ class PyBot(ConnectionThread):
       total += order['amount']
     return mass * cost
 
+  def balance(self, side):
+    try:
+      response = self.exchange.get_balance(exunit, self.key, self.secret)
+      if not 'error' in response:
+        response['balance'] = response['balance'] if exunit == 'nbt' else response['balance'] / price
+        response['balance'] = int(response['balance'] * 10**3) / float(10**3)
+    except KeyboardInterrupt: raise
+    except: response = { 'error' : 'exception caught: %s' % sys.exc_info()[1] }
+    if 'error' in response:
+      self.logger.error('unable to receive balance for unit %s on exchange %s: %s', exunit, repr(self.exchange), response['error'])
+      self.exchange.adjust(response['error'])
+
   def place(self, side):
     price = self.serverprice
     spread = max(self.exchange.fee, 0.002)
@@ -165,6 +177,7 @@ class PyBot(ConnectionThread):
     if 'error' in response:
       self.logger.error('unable to receive balance for unit %s on exchange %s: %s', exunit, repr(self.exchange), response['error'])
       self.exchange.adjust(response['error'])
+      self.logger.info('adjusting nonce of exchange %s to %d', repr(self.exchange), self.exchange._shift)
     elif response['balance'] > 0.1:
       #balance = response['balance'] if exunit == 'nbt' else response['balance'] / price
       amount = min(self.limit[side], response['balance'])
@@ -223,7 +236,7 @@ class PyBot(ConnectionThread):
                 mass = sum([order['amount'] for order in info['orders']])
                 if self.limit[side] < self.requester.interest()[side]['target'] - mass:
                   self.limit[side] = self.requester.interest()[side]['target'] - mass
-                  self.logger.info('reseting %s limit to %.4f for unit %s on exchange %s', side, self.limit[side], self.unit, repr(self.exchange))
+                  self.logger.info('increasing %s limit to %.4f for unit %s on exchange %s', side, self.limit[side], self.unit, repr(self.exchange))
                 if weight > 0:
                   # get balance and use it when calculating effective interest
                   cureff = self.effective_interest(info['orders'], info['target'], self.requester.cost[side])
