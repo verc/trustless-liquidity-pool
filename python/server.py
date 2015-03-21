@@ -149,7 +149,7 @@ class User(threading.Thread):
               for order in orders:
                 deviation = 1.0 - min(order['price'], price) / max(order['price'], price)
                 if deviation <= self.tolerance:
-                  valid[order['type']].append((order['id'], order['amount'], request[2], request[3]))
+                  valid[order['type']].append((order['id'], order['amount'], request[2] if order['type'] == 'bid' else request[3]))
                 else:
                   self.last_error = 'unable to validate request: order of deviates too much from current price'
               for side in [ 'bid', 'ask' ]:
@@ -274,7 +274,6 @@ def credit():
     for unit in config._interest[name]:
       users = [ k for k in keys if unit in keys[k] and repr(keys[k][unit].exchange) == name ]
       for side in [ 'bid', 'ask' ]:
-        sidx = 2 if side == 'bid' else 3
         for sample in xrange(config._sampling):
           orders = []
           for user in users:
@@ -285,22 +284,22 @@ def credit():
           previd = -1
           for user, order in orders:
             if order[0] != previd:
-              if order[sidx] <= config._interest[name][unit][side]['rate']:
+              if order[2] <= config._interest[name][unit][side]['rate']:
                 previd = order[0]
                 if balance + order[1] >= config._interest[name][unit][side]['target']:
-                  maxinterest = order[sidx]
-                payout = calculate_interest(balance, order[1], config._interest[name][unit][side]['target'], order[sidx]) / (config._sampling * 60 * 24)
+                  maxinterest = order[2]
+                payout = calculate_interest(balance, order[1], config._interest[name][unit][side]['target'], order[2]) / (config._sampling * 60 * 24)
                 #order[2] = payout / order[1] # effective interest rate
                 keys[user][unit].balance += payout
                 logger.info("credit [%d/%d] %.8f nbt to %s for %.8f %s liquidity on %s for %s at balance %.8f with rate %.2f",
-                  sample + 1, config._sampling, payout, user, order[1], side, name, unit, balance, order[sidx] * 100)
+                  sample + 1, config._sampling, payout, user, order[1], side, name, unit, balance, order[2] * 100)
                 balance += order[1]
               else:
                 logger.warning("unable to credit request for user %s on exchange %s: requested interest rate is too high", user, name)
                 keys[user][unit].last_error = 'unable to credit request: requested interest rate is too high'
             else:
               logger.warning("duplicate order id detected for user %s on exchange %s: %d", user, name, previd)
-          config._interest[name][unit][side]['orders'] = [ { 'id': order[0], 'amount' : order[1], 'cost' : order[sidx] } for _,order in orders ]
+          config._interest[name][unit][side]['orders'] = [ { 'id': order[0], 'amount' : order[1], 'cost' : order[2] } for _,order in orders ]
 
 def pay(nud):
   txout = {}
@@ -348,6 +347,10 @@ def submit(nud):
 
 class RequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
   def do_POST(self):
+    if len(self.path) == 0:
+      self.send_response(404)
+      return
+    self.path = self.path[1:]
     if self.path in ['register', 'liquidity']:
       ctype, pdict = cgi.parse_header(self.headers.getheader('content-type'))
       if ctype == 'application/x-www-form-urlencoded':
@@ -364,6 +367,9 @@ class RequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
       self.end_headers()
 
   def do_GET(self):
+    if len(self.path) == 0:
+      self.send_response(404)
+      return
     method = self.path[1:]
     if method in [ 'status', 'exchanges' ]:
       self.send_response(200)
@@ -469,6 +475,6 @@ while True:
 
     time.sleep(max(float(60 / config._sampling) - time.time() + curtime, 0))
   except Exception as e:
-    logger.error('exception caught: %s', sys.exc_info()[1])
+    logger.error('exception caught in main loop: %s', sys.exc_info()[1])
     httpd.socket.close()
     raise

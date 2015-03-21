@@ -63,7 +63,7 @@ class Poloniex(Exchange):
     params = { 'currencyPair' : "%s_NBT"%unit.upper(), "rate" : price, "amount" : amount }
     response = self.post('buy' if side == 'bid' else 'sell', params, key, secret)
     if not 'error' in response:
-      response['id'] = response['orderNumber']
+      response['id'] = int(response['orderNumber'])
     return response
 
   def get_balance(self, unit, key, secret):
@@ -98,6 +98,7 @@ class CCEDK(Exchange):
     self.pair_id = {}
     self.currency_id = {}
     failed = False
+    self.adjustcontrol = True
     while not self.pair_id or not self.currency_id:
       try:
         response = None
@@ -132,11 +133,19 @@ class CCEDK(Exchange):
       except:
         super(CCEDK, self).adjust(error)
       else:
-        current = int(time.time()) #int(error.split()[2].split('`')[3])
-        if current < maximum:
-          self._shift = (minimum + 2 * maximum) / 3  - current
+        if self.adjustcontrol:
+          current = int(time.time()) #int(error.split()[2].split('`')[3])
+          if current < maximum:
+            newshift = (minimum + 2 * maximum) / 3  - current
+          else:
+            newshift = (2 * minimum + maximum) / 3 - current
+          if self._shift == newshift:
+            self.adjustcontrol = False
+            super(CCEDK, self).adjust(error)
+          else:
+            self.shift = newshift
         else:
-          self._shift = (minimum + maximum) / 2 - current
+          super(CCEDK, self).adjust(error)
     else:
         super(CCEDK, self).adjust(error)
 
@@ -171,7 +180,7 @@ class CCEDK(Exchange):
                "volume" : amount }
     response = self.post('order/new', params, key, secret)
     if not 'error' in response:
-      response['id'] = response['response']['entity']['order_id']
+      response['id'] = int(response['response']['entity']['order_id'])
     return response
 
   def get_balance(self, unit, key, secret):
@@ -249,7 +258,7 @@ class BitcoinCoId(Exchange):
       params[unit] = amount * price
     response = self.post('trade', params, key, secret)
     if response['success'] == 1:
-      response['id'] = response['return']['order_id']
+      response['id'] = int(response['return']['order_id'])
     return response
 
   def get_balance(self, unit, key, secret):
@@ -321,7 +330,7 @@ class BTER(Exchange):
     params = { 'pair' : 'nbt_' + unit.lower(), 'type' : 'buy' if side == 'bid' else 'sell', 'rate' : price, 'amount' : amount }
     response = self.post('placeorder', params, key, secret)
     if response['result']:
-      response['id'] = response['order_id']
+      response['id'] = int(response['order_id'])
     else:
       response['error'] = response['msg']
     return response
@@ -352,8 +361,8 @@ class BTER(Exchange):
     if not response['orders']:
       response['orders'] = []
     return [ {
-      'id' : int(order['id']),
+      'id' : int(order['oid']),
       'price' : float(order['rate']),
       'type' : 'ask' if order['buy_type'].lower() == unit.lower() else 'bid',
-      'amount' : float(order['amount']),
+      'amount' : float(order['amount']) / (1.0 if order['buy_type'].lower() == unit.lower() else float(order['rate'])),
       } for order in response['orders'] if order['pair'] == 'nbt_' + unit.lower() ]

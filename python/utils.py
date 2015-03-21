@@ -22,7 +22,6 @@ class Connection():
     while True:
       curtime = time.time()
       connection = httplib.HTTPConnection(self.server, timeout = timeout)
-      time.sleep(3)
       try:
         connection.request(request, method, urllib.urlencode(params), headers = headers)
         response = connection.getresponse()
@@ -34,6 +33,8 @@ class Connection():
         msg = 'server response invalid'
       except socket.error, v:
         msg = 'socket error (%s)' % str(v[0])
+        if str(v[0]) == 'timed out':
+          timeout = min(timeout + 5, 30)
       except:
         msg = 'unknown connection error'
       if trials:
@@ -41,7 +42,7 @@ class Connection():
           self.logger.error("%s: %s", method, msg)
           return { 'message' : msg, 'code' : -1, 'error' : True }
         trials = trials - 1
-      self.logger.error("%s: %s, retrying in 5 seconds ...", method, msg)
+      self.logger.error("%s: %s, retrying in 5 seconds with timeout %d...", method, msg, timeout)
       time.sleep(max(5.0 - time.time() + curtime, 0))
 
   def get(self, method, params = None, trials = None, timeout = 5):
@@ -51,7 +52,7 @@ class Connection():
   def post(self, method, params = None, trials = None, timeout = 5):
     if not params: params = {}
     headers = { "Content-type": "application/x-www-form-urlencoded" }
-    return self.json_request('POST', method, params, headers, trials, timeout)
+    return self.json_request('POST', '/' + method, params, headers, trials, timeout)
 
 
 class ConnectionThread(threading.Thread):
@@ -81,23 +82,24 @@ class PriceFeed():
     if not unit in self.feed: return None
     self.feed[unit][1].acquire()
     curtime = time.time()
-    if force: self.feed[unit][0] = 0
-    if curtime - self.feed[unit][0] > self.update_interval:
+    if force or curtime - self.feed[unit][0] > self.update_interval:
+      self.feed[unit][0] = curtime
       self.feed[unit][2] = None
       if unit == 'btc': 
         try: # bitfinex
-          ret = json.loads(urllib2.urlopen(urllib2.Request('https://api.bitfinex.com/v1//pubticker/btcusd')).read())
+          ret = json.loads(urllib2.urlopen(urllib2.Request('https://api.bitfinex.com/v1//pubticker/btcusd'), timeout = 1).read())
           self.feed['btc'][2] = 1.0 / float(ret['mid'])
         except:
+          self.logger.warning("unable to update BTC price from bitfinex")
           try: # coinbase
-            ret = json.loads(urllib2.urlopen(urllib2.Request('https://coinbase.com/api/v1/prices/spot_rate?currency=USD')).read())
+            ret = json.loads(urllib2.urlopen(urllib2.Request('https://coinbase.com/api/v1/prices/spot_rate?currency=USD'), timeout = 1).read())
             self.feed['btc'][2] = 1.0 / float(ret['amount'])
           except:
+            self.logger.warning("unable to update BTC price from coinbase")
             try: # bitstamp
-              ret = json.loads(urllib2.urlopen(urllib2.Request('https://www.bitstamp.net/api/ticker/')).read())
+              ret = json.loads(urllib2.urlopen(urllib2.Request('https://www.bitstamp.net/api/ticker/'), timeout = 1).read())
               self.feed['btc'][2] = 2.0 / (float(ret['ask']) + float(ret['bid']))
             except:
-              if self.logger: self.logger.error("unable to update price for BTC")
-      self.feed[unit][0] = curtime
+              self.logger.error("unable to update price for BTC")
     self.feed[unit][1].release()
     return self.feed[unit][2]

@@ -78,8 +78,8 @@ class PyBot(ConnectionThread):
     self.secret = secret
     self.exchange = exchange
     self.unit = unit
-    self.ids = { 'bid' : [], 'ask' : [] }
-    self.limit = { 'bid' : 0.0, 'ask' : 0.0 }
+    self.orders = []
+    self.limit = { 'bid' : self.requester.interest()['bid']['target'], 'ask' : self.requester.interest()['ask']['target'] }
     if not hasattr(PyBot, 'lock'):
       PyBot.lock = {}
     if not repr(exchange) in PyBot.lock:
@@ -93,16 +93,16 @@ class PyBot(ConnectionThread):
     except:
       response = {'error' : 'exception caught: %s' % sys.exc_info()[1]}
     if 'error' in response:
-      self.logger.error('unable to cancel %s orders for unit %s on exchange %s (trial %d): %s', side, self.unit, repr(self.exchange), trials + 1, response['error'])
+      self.logger.error('unable to cancel %s orders for unit %s on exchange %s: %s', side, self.unit, repr(self.exchange), response['error'])
       self.exchange.adjust(response['error'])
       self.logger.info('adjusting nonce of exchange %s to %d', repr(self.exchange), self.exchange._shift)
     else:
       self.logger.info('successfully deleted %s orders for unit %s on exchange %s', side, self.unit, repr(self.exchange))
       if reset:
         if side == 'all' or side == 'bid':
-          self.limit['bid'] = self.requester.interest()['bid']['target'] * 1.25
+          self.limit['bid'] = self.requester.interest()['bid']['target']
         if side == 'all' or side == 'ask':
-          self.limit['ask'] = self.requester.interest()['ask']['target'] * 1.25
+          self.limit['ask'] = self.requester.interest()['ask']['target']
     return response
 
   def shutdown(self):
@@ -134,13 +134,13 @@ class PyBot(ConnectionThread):
   def effective_interest(self, orders, target, cost):
     mod = orders[:]
     for i in xrange(len(mod)):
-      if mod[i]['id'] in self.ids:
+      if mod[i]['id'] in self.orders:
         mod[i]['cost'] = cost
     mod.sort(key = lambda x: x['cost'])
     total = 0.0
     mass = 0.0
     for order in mod:
-      if order['id'] in self.ids:
+      if order['id'] in self.orders:
         mass += max(min(order['amount'], target - total), 0.0)
       total += order['amount']
     return mass * cost
@@ -157,36 +157,38 @@ class PyBot(ConnectionThread):
     price = ceil(price * 10**8) / float(10**8) # truncate floating point precision after 8th position
     try:
       response = self.exchange.get_balance(exunit, self.key, self.secret)
+      response['balance'] = response['balance'] if exunit == 'nbt' else response['balance'] / price
+      response['balance'] = int(response['balance'] * 10**3) / float(10**3)
     except KeyboardInterrupt: raise
     except: response = { 'error' : 'exception caught: %s' % sys.exc_info()[1] }
     if 'error' in response:
       self.logger.error('unable to receive balance for unit %s on exchange %s: %s', exunit, repr(self.exchange), response['error'])
       self.exchange.adjust(response['error'])
-    elif response['balance'] > 0.0001:
-      balance = response['balance'] if exunit == 'nbt' else response['balance'] / price
-      balance = min(self.limit[side], balance)
-      if balance > 0.0001:
+    elif response['balance'] > 0.1:
+      #balance = response['balance'] if exunit == 'nbt' else response['balance'] / price
+      amount = min(self.limit[side], response['balance'])
+      if amount > 0.1:
         try:
-          response = self.exchange.place_order(self.unit, side, self.key, self.secret, balance, price)
+          response = self.exchange.place_order(self.unit, side, self.key, self.secret, amount, price)
         except KeyboardInterrupt: raise
         except: response = { 'error' : 'exception caught: %s' % sys.exc_info()[1] }
         if 'error' in response:
           self.logger.error('unable to place %s %s order of %.4f nbt at %.8f on exchange %s: %s',
-            side, exunit, balance, price, repr(self.exchange), response['error'])
+            side, exunit, amount, price, repr(self.exchange), response['error'])
           self.exchange.adjust(response['error'])
         else:
           self.logger.info('successfully placed %s %s order of %.4f nbt at %.8f on exchange %s',
-            side, exunit, balance, price, repr(self.exchange))
-          self.ids[side].append(response['id'])
-          self.limit[side] -= balance
-      else:
-        self.logger.error('not placing %s %s order of %.4f nbt at %.8f on exchange %s: target limit reached',
-            side, exunit, balance, price, repr(self.exchange))
+            side, exunit, amount, price, repr(self.exchange))
+          self.orders.append(response['id'])
+          self.limit[side] -= amount
+      #else:
+      #  self.logger.error('not placing %s %s order of %.4f nbt at %.8f on exchange %s: target limit reached',
+      #      side, exunit, response['balance'], price, repr(self.exchange))
     return response
 
   def run(self):
     self.logger.info("starting PyBot for unit %s on exchange %s", self.unit, repr(self.exchange))
-    self.serverprice = self.conn.get('price/' + self.unit)['price']
+    self.serverprice = self.conn.get('price/' + self.unit, timeout = 30)['price']
     self.cancel_orders()
     self.place('bid')
     self.place('ask')
@@ -199,7 +201,7 @@ class PyBot(ConnectionThread):
       if self.requester.errorflag:
         self.shutdown()
       else:
-        response = self.conn.get('price/' + self.unit, trials = 3)
+        response = self.conn.get('price/' + self.unit, trials = 3, timeout = 15)
         if not 'error' in response:
           self.serverprice = response['price']
           userprice = PyBot.pricefeed.price(self.unit)
@@ -212,30 +214,35 @@ class PyBot(ConnectionThread):
               self.logger.info('price of unit %s moved from %.8f to %.8f, will try to reset orders', self.unit, prevprice, self.serverprice)
               prevprice = self.serverprice
               self.cancel_orders()
-            elif curtime - efftime >= 60:
+            elif curtime - efftime >= 30:
               efftime = curtime
               for side in [ 'bid', 'ask' ]:
                 info = self.requester.interest()[side]
-                mass = sum([order['amount'] for order in info['orders'] if order['id'] in self.ids])
-                cureff = self.effective_interest(info['orders'], info['target'], self.requester.cost[side])
-                besteff = cureff
-                bestcost = self.requester.cost[side]
-                for candidate in [ order['cost'] - 0.001 for order in info['orders'] if order['id'] not in self.ids and order['cost'] - 0.001 >= self.requester.maxcost[side]]:
-                  eff = self.effective_interest(info['orders'], info['target'], candidate)
-                  if eff > besteff:
-                    besteff = eff
-                    bestcost = candidate
-                if self.requester.cost != bestcost:
-                  self.logger.info('reducing %s interest rate to %.2f%% for unit %s on exchange %s to increase effective interest from %.4f%% to %.4f%%',
-                    side, bestcost * 100.0, self.unit, repr(self.exchange), cureff / self.requester.cost[side], besteff / bestcost)
-                  self.requester.cost[side] = bestcost
-                if 1.25 * besteff / bestcost < self.limit[side]: # remove balance with 0% interest
-                  self.logger.info('reducing %s limit to %.4f for unit %s on exchange %s', side, 1.25 * besteff / bestcost, self.unit, repr(self.exchange))
-                  self.cancel_orders(side)
-                  self.limit[side] = 1.25 * besteff / bestcost
-                elif 1.25 * besteff / bestcost > self.limit[side]: # reset limit if almost all current funds are in use
-                  self.logger.info('reseting %s limit to %.4f for unit %s on exchange %s', side, 1.25 * besteff / bestcost, self.unit, repr(self.exchange))
-                  self.limit[side] = 1.25 * self.requester.interest()[side]['target']
+                weight = sum([order['amount'] for order in info['orders'] if order['id'] in self.orders])
+                mass = sum([order['amount'] for order in info['orders']])
+                if self.limit[side] < self.requester.interest()[side]['target'] - mass:
+                  self.limit[side] = self.requester.interest()[side]['target'] - mass
+                  self.logger.info('reseting %s limit to %.4f for unit %s on exchange %s', side, self.limit[side], self.unit, repr(self.exchange))
+                if weight > 0:
+                  # get balance and use it when calculating effective interest
+                  cureff = self.effective_interest(info['orders'], info['target'], self.requester.cost[side])
+                  besteff = cureff
+                  bestcost = self.requester.cost[side]
+                  for candidate in [ order['cost'] - 0.001 for order in info['orders'] if order['id'] not in self.orders and order['cost'] - 0.001 >= self.requester.maxcost[side]]:
+                    eff = self.effective_interest(info['orders'], info['target'], candidate)
+                    if eff > besteff:
+                      besteff = eff
+                      bestcost = candidate
+                  #print "<<<<<<<<<<<<<<<", side, "cureff:", cureff, "curcost:", self.requester.cost, 'besteff:', besteff, 'bestcost:', bestcost, 'limit:', self.limit[side], 'weight:', besteff / bestcost
+                  effmass = besteff / bestcost
+                  if self.requester.cost[side] != bestcost:
+                    self.logger.info('reducing %s interest rate to %.2f%% for unit %s on exchange %s to increase effective interest from %.4f%% to %.4f%%',
+                      side, bestcost * 100.0, self.unit, repr(self.exchange), cureff / self.requester.cost[side], effmass)
+                    self.requester.cost[side] = bestcost
+                  elif effmass < weight: # remove balance with 0% interest
+                    self.logger.info('reducing %s limit to %.4f for unit %s on exchange %s', side, effmass, self.unit, repr(self.exchange))
+                    self.cancel_orders(side)
+                    self.limit[side] = effmass
             self.place('bid')
             self.place('ask')
         else:

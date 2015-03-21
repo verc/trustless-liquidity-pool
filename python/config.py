@@ -3,28 +3,28 @@ import os
 # pool configuration
 _port = 2021
 # daily interest rates
-_interest = { 
-  'poloniex' : { 
+_interest = {
+  'poloniex' : {
     'btc' : {
       'bid': {
         'rate' : 0.0025,
-        'target' : 200.0
+        'target' : 10.0
         },
       'ask': {
         'rate' : 0.0025,
-        'target' : 200.0
+        'target' : 10.0
         }
       }
   },
-  'ccedk' : { 
+  'ccedk' : {
     'btc' : {
       'bid': {
         'rate' : 0.0025,
-        'target' : 200.0
+        'target' : 25.0
         },
       'ask': {
         'rate' : 0.0025,
-        'target' : 200.0
+        'target' : 25.0
         }
       }
   },
@@ -32,26 +32,26 @@ _interest = {
     'btc' : {
       'bid': {
         'rate' : 0.0025,
-        'target' : 200.0
+        'target' : 25.0
         },
       'ask': {
         'rate' : 0.0025,
-        'target' : 200.0
+        'target' : 25.0
         }
       }
     },
-  'bter' : { 
+  'bter' : {
     'btc' : {
       'bid': {
         'rate' : 0.0025,
-        'target' : 200.0
+        'target' : 25.0
         },
       'ask': {
         'rate' : 0.0025,
-        'target' : 200.0
+        'target' : 25.0
         }
       }
-  }
+    }
 }
 
 _nuconfig = '%s/.nu/nu.conf'%os.getenv("HOME") # path to nu.conf

@@ -91,15 +91,16 @@ class RequestThread(ConnectionThread):
     params = { 'unit' : self.unit, 'user' : self.key, 'sign' : sign }
     params.update(data)
     params.update(self.cost)
-    ret = self.conn.post('liquidity', params, 1)
+    curtime = time.time()
+    ret = self.conn.post('liquidity', params, trials = 1, timeout = 10)
     if ret['code'] != 0:
-      self.trials += 1
+      self.trials += time.time() - curtime + 60.0 / self.sampling
       self.logger.error("submit: %s" % ret['message'])
       if ret['code'] == 11: # user unknown, just register again
         self.register()
     else:
       self.trials = 0
-    self.errorflag = self.trials >= self.sampling * 2 # notify that something is wrong after 2 minutes of failures
+    self.errorflag = self.trials >= 120 # notify that something is wrong after 2 minutes of failures
 
   def run(self):
     ret = self.register()
@@ -113,7 +114,7 @@ class RequestThread(ConnectionThread):
 conn = Connection(_server, logger)
 basestatus = conn.get('status')
 exchangeinfo = conn.get('exchanges')
-sampling = max(9600, min(120, int(basestatus['sampling'] * 1.5)))
+sampling = min(240, basestatus['sampling'] * 2)
 
 # parse user data
 users = {}
@@ -139,10 +140,10 @@ for user in userdata:
     cost = { 'bid' : exchangeinfo[name][unit]['bid']['rate'], 'ask' : exchangeinfo[name][unit]['ask']['rate'] }
     if len(user) >= 7:
       if float(user[6]) != 0.0:
-        cost['bid'] = float(user[6])
-      if len(user) >= 8:
-        if float(user[7]) != 0.0:
-          cost['ask'] = float(user[7])
+        cost['bid'] = float(user[6]) / 100.0
+        cost['ask'] = float(user[6]) / 100.0
+      if len(user) >= 8 and float(user[7]) != 0.0:
+        cost['ask'] = float(user[7]) / 100.0
 
     users[key][unit] = { 'request' : RequestThread(conn, key, secret, exchange, unit, user[0], sampling, cost, logger) }
     users[key][unit]['request'].start()
@@ -182,7 +183,7 @@ while True: # print some info every minute until program terminates
               if response['units'][unit]['rejects'] / float(basestatus['sampling']) >= 0.1: # look for valid error and adjust nonce shift
                 if response['units'][unit]['last_error'] != "":
                   if 'deviates too much from current price' in response['units'][unit]['last_error']:
-                    PyBot.pricefeed.price(unit, True) # Force a price update
+                    PyBot.pricefeed.price(unit, True) # force a price update
                     logger.warning('price missmatch for unit %s on exchange %s, forcing price update', unit, repr(users[user][unit]['request'].exchange))
                   else:
                     users[user][unit]['request'].exchange.adjust(response['units'][unit]['last_error'])
@@ -190,7 +191,7 @@ while True: # print some info every minute until program terminates
                       unit, repr(users[user][unit]['request'].exchange), users[user][unit]['request'].exchange._shift)
                     break
               if response['units'][unit]['missing'] / float(basestatus['sampling']) >= 0.1: # look for missing error and adjust sampling
-                if users[user][unit]['request'].sampling < 120:  # just send more requests
+                if users[user][unit]['request'].sampling < 120: # just send more requests
                   users[user][unit]['request'].sampling = users[user][unit]['request'].sampling + 1
                   logger.warning('too many missing requests for unit %s on exchange %s, increasing sampling to %d',
                     unit, repr(users[user][unit]['request'].exchange), users[user][unit]['request'].sampling)
@@ -207,7 +208,7 @@ while True: # print some info every minute until program terminates
 
   except KeyboardInterrupt: break
   except Exception as e:
-    logger.error('exception caught: %s', sys.exc_info()[1])
+    logger.error('exception caught in main loop: %s', sys.exc_info()[1])
 
 for user in users:
   for unit in users[user]:
