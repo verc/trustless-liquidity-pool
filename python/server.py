@@ -310,7 +310,8 @@ def pay(nud):
         txout[keys[user][unit].address] = 0.0
       txout[keys[user][unit].address] += keys[user][unit].balance
   lock.release()
-  txout = {k : v - nud.txfee for k,v in txout.items() if v - nud.txfee > config._minpayout}
+  txfee = 0.01 if not nud.rpc else nud.txfee
+  txout = {k : v - nud.txfee for k,v in txout.items() if v - txfee > config._minpayout}
   if txout:
     payed = False
     if config._autopayout:
@@ -429,7 +430,9 @@ class ThreadingServer(SocketServer.ThreadingMixIn, BaseHTTPServer.HTTPServer):
     return result
 
 nud = NuRPC(config._nuconfig, config._grantaddress, logger)
-if not nud.rpc: logger.critical('Connection to Nu daemon could not be established, liquidity will NOT be sent!')
+if not nud.rpc:
+  logger.critical('Connection to Nu daemon could not be established, liquidity will NOT be sent!')
+  config._autopayout = False
 httpd = ThreadingServer(("", config._port), RequestHandler)
 sa = httpd.socket.getsockname()
 logger.debug("Serving on %s port %d", sa[0], sa[1])

@@ -157,8 +157,9 @@ class PyBot(ConnectionThread):
     price = ceil(price * 10**8) / float(10**8) # truncate floating point precision after 8th position
     try:
       response = self.exchange.get_balance(exunit, self.key, self.secret)
-      response['balance'] = response['balance'] if exunit == 'nbt' else response['balance'] / price
-      response['balance'] = int(response['balance'] * 10**3) / float(10**3)
+      if not 'error' in response:
+        response['balance'] = response['balance'] if exunit == 'nbt' else response['balance'] / price
+        response['balance'] = int(response['balance'] * 10**3) / float(10**3)
     except KeyboardInterrupt: raise
     except: response = { 'error' : 'exception caught: %s' % sys.exc_info()[1] }
     if 'error' in response:
