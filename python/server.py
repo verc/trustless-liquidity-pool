@@ -123,11 +123,11 @@ class User(threading.Thread):
     self.daemon = True
 
   def set(self, request, sign, bid, ask):
-    self.lock.acquire()
     if len(self.requests) < 10: # don't accept more requests to avoid simple spamming
+      self.lock.acquire()
       self.requests.append(({ p : v[0] for p,v in request.items() }, sign, bid, ask))
+      self.lock.release()
     self.active = True
-    self.lock.release()
 
   def run(self):
     while True:

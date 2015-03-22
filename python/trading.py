@@ -257,7 +257,7 @@ class PyBot(ConnectionThread):
                   elif self.limit[side] != effmass and effmass < min(response['balance'], info['target']): # remove balance with 0% interest
                     self.logger.info('reducing %s limit to %.2f nbt for unit %s on exchange %s', side, effmass, self.unit, repr(self.exchange))
                     self.cancel_orders(side)
-                    self.limit[side] = effmass
+                  self.limit[side] = effmass
             self.place('bid')
             self.place('ask')
         else:
