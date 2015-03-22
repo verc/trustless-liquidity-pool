@@ -141,10 +141,9 @@ class PyBot(ConnectionThread):
     total = 0.0
     mass = 0.0
     for order in mod:
-      if order['id'] in self.orders:
+      if order['id'] in self.orders or order['id'] == sys.maxint:
         mass += max(min(order['amount'], target - total), 0.0)
       total += order['amount']
-
     return mass * cost
 
   def balance(self, exunit, price):
@@ -156,10 +155,6 @@ class PyBot(ConnectionThread):
     except KeyboardInterrupt: raise
     except: response = { 'error' : 'exception caught: %s' % sys.exc_info()[1] }
     return response
-
-    if 'error' in response:
-      self.logger.error('unable to receive balance for unit %s on exchange %s: %s', exunit, repr(self.exchange), response['error'])
-      self.exchange.adjust(response['error'])
 
   def place(self, side):
     price = self.serverprice
@@ -234,7 +229,7 @@ class PyBot(ConnectionThread):
                 mass = sum([order['amount'] for order in info['orders']])
                 if self.limit[side] < self.requester.interest()[side]['target'] - mass:
                   self.limit[side] = self.requester.interest()[side]['target'] - mass
-                  self.logger.info('increasing %s limit to %.4f for unit %s on exchange %s', side, self.limit[side], self.unit, repr(self.exchange))
+                  self.logger.info('increasing %s limit to %.2f nbt for unit %s on exchange %s', side, self.limit[side], self.unit, repr(self.exchange))
                 response = self.balance('nbt' if side == 'ask' else self.unit, prevprice)
                 if 'error' in response:
                   self.logger.error('unable to receive balance for unit %s on exchange %s: %s', 'nbt' if side == 'ask' else self.unit, repr(self.exchange), response['error'])
@@ -244,19 +239,23 @@ class PyBot(ConnectionThread):
                   cureff = self.effective_interest(response['balance'], info['orders'], info['target'], self.requester.cost[side])
                   besteff = cureff
                   bestcost = self.requester.cost[side]
-                  for candidate in [ order['cost'] - 0.001 for order in info['orders'] if order['id'] not in self.orders and order['cost'] - 0.001 >= self.requester.maxcost[side]]:
+                  candidates = [ order['cost'] - 0.0001 for order in info['orders'] if order['id'] not in self.orders and order['cost'] - 0.0001 >= self.requester.maxcost[side] and order['cost'] <= info['rate']]
+                  if self.requester.cost[side] + 0.0001 <= info['rate']:
+                    candidates += [ self.requester.cost[side] + 0.0001 ]
+                  for candidate in candidates:
                     eff = self.effective_interest(response['balance'], info['orders'], info['target'], candidate)
                     if eff > besteff:
                       besteff = eff
                       bestcost = candidate
+                  #print candidates, besteff, bestcost, cureff, response['balance']
                   #print "<<<<<<<<<<<<<<<", side, "cureff:", cureff, "curcost:", self.requester.cost, 'besteff:', besteff, 'bestcost:', bestcost, 'limit:', self.limit[side], 'weight:', besteff / bestcost
                   effmass = besteff / bestcost
                   if self.requester.cost[side] != bestcost:
-                    self.logger.info('reducing %s interest rate to %.2f%% for unit %s on exchange %s to increase effective interest from %.4f%% to %.4f%%',
-                      side, bestcost * 100.0, self.unit, repr(self.exchange), cureff / self.requester.cost[side], effmass)
+                    self.logger.info('setting %s interest rate from %.2f%% to %.2f%% for unit %s on exchange %s to increase expected payout from %.2f to %.2f',
+                      side, self.requester.cost[side] * 100.0, bestcost * 100.0, self.unit, repr(self.exchange), cureff, besteff)
                     self.requester.cost[side] = bestcost
-                  elif effmass < weight: # remove balance with 0% interest
-                    self.logger.info('reducing %s limit to %.4f for unit %s on exchange %s', side, effmass, self.unit, repr(self.exchange))
+                  elif self.limit[side] != effmass and effmass < min(response['balance'], info['target']): # remove balance with 0% interest
+                    self.logger.info('reducing %s limit to %.2f nbt for unit %s on exchange %s', side, effmass, self.unit, repr(self.exchange))
                     self.cancel_orders(side)
                     self.limit[side] = effmass
             self.place('bid')
