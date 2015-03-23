@@ -255,6 +255,6 @@ class PyBot(ConnectionThread):
             self.place('ask')
         else:
           self.logger.error('unable to retrieve server price: %s', response['message'])
-    self.sleep(1) # this is to ensure that the order book is updated
+    time.sleep(1) # this is to ensure that the order book is updated
     self.shutdown()
     self.release()
