@@ -297,22 +297,25 @@ def credit():
           config._interest[name][unit][side]['orders'].append([])
           orders = []
           for user in users:
-            orders += [ (user, order) for order in keys[user][unit].liquidity[side][sample] ]
+            orders += [ (user, order) for order in keys[user][unit].liquidity[side][sample] if order[2] <= config._interest[name][unit][side]['rate'] ]
           orders.sort(key = lambda x: (x[1][2], x[1][0]))
           balance = 0.0
           previd = -1
+          mass = sum([orders[i][1][1] for i in xrange(len(orders)) if i == 0 or orders[i][1][0] != orders[i - 1][1][0]])
           for i in xrange(len(orders)):
             user, order = orders[i]
             if order[0] != previd:
               previd = order[0]
               if order[2] <= config._interest[name][unit][side]['rate']:
-                rate = order[2]
-                for j in xrange(i + 1, len(orders)):
-                  if orders[j][1][2] > rate and orders[j][1][2] <= config._interest[name][unit][side]['rate']:
-                    rate = orders[j][1][2]
-                    break
-                if rate == order[2]:
-                  rate = config._interest[name][unit][side]['rate']
+                rate = config._interest[name][unit][side]['rate']
+                if mass > config._interest[name][unit][side]['target']:
+                  rate = order[2]
+                  for j in xrange(i + 1, len(orders)):
+                    if orders[j][1][2] > rate and orders[j][1][2] <= config._interest[name][unit][side]['rate']:
+                      rate = orders[j][1][2]
+                      break
+                  if rate == order[2]:
+                    rate = config._interest[name][unit][side]['rate']
                 #orders[i][1][2] = rate
                 payout = calculate_interest(balance, order[1], config._interest[name][unit][side]['target'], rate) / (config._sampling * 60 * 24)
                 #order[2] = payout / order[1] # effective interest rate
