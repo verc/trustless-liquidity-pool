@@ -11,7 +11,7 @@ _interest = {
         'target' : 20.0
         },
       'ask': {
-        'rate' : 0.0025,
+        'rate' : 0.025,
         'target' : 20.0
         }
       }
@@ -23,7 +23,7 @@ _interest = {
         'target' : 20.0
         },
       'ask': {
-        'rate' : 0.0025,
+        'rate' : 0.025,
         'target' : 20.0
         }
       }
@@ -35,7 +35,7 @@ _interest = {
         'target' : 20.0
         },
       'ask': {
-        'rate' : 0.0025,
+        'rate' : 0.025,
         'target' : 20.0
         }
       }
