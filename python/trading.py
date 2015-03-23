@@ -239,7 +239,7 @@ class PyBot(ConnectionThread):
                       contrib -= order['amount']
                   if mass + self.limit[side] < info['target']:
                     self.logger.info('increasing tier 1 %s limit of unit %s on %s from %.2f to %.2f',
-                      side, self.unit, repr(self.exchange), weight + self.limit[side], info['target'] - mass)
+                      side, self.unit, repr(self.exchange), weight + self.limit[side], weight + info['target'] - mass)
                     self.limit[side] = info['target'] - mass
                   elif weight - contrib >= 1.0 and contrib / weight < 0.9:
                     self.logger.info('decreasing tier 1 %s limit of unit %s on %s from %.2f to %.2f',
