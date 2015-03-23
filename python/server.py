@@ -503,7 +503,7 @@ while True:
       lastcredit = curtime
 
     # make payout
-    if curtime - lastpayout >= 3600: #43200:
+    if curtime - lastpayout >= 21600: #3600: #43200:
       pay(nud)
       lastpayout = curtime
 
