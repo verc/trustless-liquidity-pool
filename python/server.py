@@ -44,6 +44,7 @@ ch.setFormatter(formatter)
 logger.addHandler(fh)
 logger.addHandler(ch)
 _liquidity = []
+_active_users = 0
 
 keys = {}
 pricefeed = PriceFeed(30, logger)
@@ -101,7 +102,7 @@ class NuRPC():
     return False
 
 class User(threading.Thread):
-  def __init__(self, key, address, unit, exchange, pricefeed, sampling, tolerance, logger = None):
+  def __init__(self, key, address, unit, bid, ask, exchange, pricefeed, sampling, tolerance, logger = None):
     threading.Thread.__init__(self)
     self.key = key
     self.active = False
@@ -113,6 +114,8 @@ class User(threading.Thread):
     self.tolerance = tolerance
     self.sampling = sampling
     self.last_error = ""
+    self.cost = { 'ask' : ask, 'bid' : bid }
+    self.rate = { 'ask' : ask, 'bid' : bid }
     self.liquidity = { 'ask' : [[]] * sampling, 'bid' : [[]] * sampling }
     self.lock = threading.Lock()
     self.trigger = threading.Lock()
@@ -122,10 +125,11 @@ class User(threading.Thread):
     self.requests = []
     self.daemon = True
 
-  def set(self, request, sign, bid, ask):
+  def set(self, request, sign):
     if len(self.requests) < 10: # don't accept more requests to avoid simple spamming
       self.lock.acquire()
-      self.requests.append(({ p : v[0] for p,v in request.items() }, sign, bid, ask))
+      if len(self.requests) < 10: # double check to allow lock acquire above
+        self.requests.append(({ p : v[0] for p,v in request.items() }, sign))
       self.lock.release()
     self.active = True
 
@@ -149,7 +153,7 @@ class User(threading.Thread):
               for order in orders:
                 deviation = 1.0 - min(order['price'], price) / max(order['price'], price)
                 if deviation <= self.tolerance:
-                  valid[order['type']].append((order['id'], order['amount'], request[2] if order['type'] == 'bid' else request[3]))
+                  valid[order['type']].append([order['id'], order['amount'], self.cost[order['type']]])
                 else:
                   self.last_error = 'unable to validate request: order of deviates too much from current price'
               for side in [ 'bid', 'ask' ]:
@@ -170,12 +174,18 @@ class User(threading.Thread):
                 self.liquidity[side].append([])
         else:
           self.last_error = "no request received"
-          #logger.debug("no request received for user %s at exchange %s on unit %s" % (self.key, repr(self.exchange), self.unit))
+          logger.debug("no request received for user %s at exchange %s on unit %s" % (self.key, repr(self.exchange), self.unit))
           for side in [ 'bid', 'ask' ]:
             del self.liquidity[side][0]
             self.liquidity[side].append([])
+          self.active = False
         self.response.append(res)
         self.requests = []
+      else:
+        self.last_error = "no request received"
+        for side in [ 'bid', 'ask' ]:
+          del self.liquidity[side][0]
+          self.liquidity[side].append([])
       self.lock.release()
 
   def validate(self):
@@ -183,65 +193,66 @@ class User(threading.Thread):
     except thread.error: pass # user did not finish last request in time
 
   def finish(self):
-    try:
-      self.lock.acquire()
-      self.lock.release()
-    except KeyboardInterrupt:
-      raise
+    if self.active:
+      try:
+        self.lock.acquire()
+        self.lock.release()
+      except KeyboardInterrupt:
+        raise
 
 def response(errcode = 0, message = 'success'):
   return { 'code' : errcode, 'message' : message }
 
 def register(params):
   ret = response()
-  if set(params.keys()) == set(['address', 'key', 'name']):
+  if set(params.keys()) == set(['address', 'key', 'name', 'ask', 'bid']):
     user = params['key'][0]
     name = params['name'][0]
     address = params['address'][0]
-    if address[0] == 'B': # this is certainly not a proper check
-      if name in _wrappers:
-        if not user in keys:
-          lock.acquire()
-          keys[user] = {}
-          for unit in config._interest[name]:
-            keys[user][unit] = User(user, address, unit, _wrappers[name], pricefeed, config._sampling, config._tolerance, logger)
-            keys[user][unit].start()
-          lock.release()
-          logger.info("new user %s on %s: %s" % (user, name, address))
-        elif keys[user].values()[0].address != address:
-          ret = response(9, "user already exists with different address: %s" % user)
+    try:
+      ask = float(params['ask'][0])
+      bid = float(params['bid'][0])
+      if address[0] == 'B': # this is certainly not a proper check
+        if name in _wrappers:
+          if not user in keys:
+            lock.acquire()
+            keys[user] = {}
+            for unit in config._interest[name]:
+              keys[user][unit] = User(user, address, unit, bid, ask, _wrappers[name], pricefeed, config._sampling, config._tolerance, logger)
+              keys[user][unit].start()
+            lock.release()
+            logger.info("new user %s on %s: %s" % (user, name, address))
+          elif keys[user].values()[0].address != address:
+            ret = response(9, "user already exists with different address: %s" % user)
+        else:
+          ret = response(8, "unknown exchange requested: %s" % name)
       else:
-        ret = response(8, "unknown exchange requested: %s" % name)
-    else:
-      ret = response(7, "invalid payout address: %s" % address)
+        ret = response(7, "invalid payout address: %s" % address)
+    except ValueError:
+      ret = response(6, "invalid registration data received: %s" % str(params))
   else:
     ret = response(6, "invalid registration data received: %s" % str(params))
   return ret
 
 def liquidity(params):
   ret = response()
-  if set(params.keys() + ['user', 'sign', 'unit', 'ask', 'bid']) == set(params.keys()):
+  if set(params.keys() + ['user', 'sign', 'unit']) == set(params.keys()):
     user = params.pop('user')[0]
     sign = params.pop('sign')[0]
     unit = params.pop('unit')[0]
-    try:
-      bid = float(params.pop('bid')[0])
-      ask = float(params.pop('ask')[0])
-      if user in keys:
-        if unit in keys[user]:
-          keys[user][unit].set(params, sign, bid, ask)
-        else:
-          ret = response(12, "unit for user %s not found: %s" % (user, unit))
+    if user in keys:
+      if unit in keys[user]:
+        keys[user][unit].set(params, sign)
       else:
-          ret = response(11, "user not found: %s" % user)
-    except ValueError:
-      ret = response(10, "invalid liquidity data received: %s" % str(params))      
+        ret = response(12, "unit for user %s not found: %s" % (user, unit))
+    else:
+        ret = response(11, "user not found: %s" % user)
   else:
     ret = response(10, "invalid liquidity data received: %s" % str(params))
   return ret
 
 def poolstats():
-  return { 'liquidity' : ([ (0,0) ] + _liquidity)[-1], 'sampling' : config._sampling, 'users' : len(keys.keys()) }
+  return { 'liquidity' : ([ (0,0) ] + _liquidity)[-1], 'sampling' : config._sampling, 'users' : _active_users }
 
 def userstats(user):
   res = { 'balance' : 0.0, 'efficiency' : 0.0, 'rejects': 0, 'missing' : 0 }
@@ -257,6 +268,7 @@ def userstats(user):
       res['rejects'] += rejects
       res['units'][unit] = { 'bid' : bid[-1],
                              'ask' : ask[-1],
+                             'rate' : keys[user][unit].rate,
                              'rejects' : rejects,
                              'missing' : missing,
                              'last_error' :  keys[user][unit].last_error }
@@ -276,33 +288,45 @@ def credit():
   for name in config._interest:
     for unit in config._interest[name]:
       users = [ k for k in keys if unit in keys[k] and repr(keys[k][unit].exchange) == name ]
+      for user in users:
+        keys[user][unit].rate['bid'] = 0
+        keys[user][unit].rate['ask'] = 0
       for side in [ 'bid', 'ask' ]:
+        config._interest[name][unit][side]['orders'] = []
         for sample in xrange(config._sampling):
+          config._interest[name][unit][side]['orders'].append([])
           orders = []
           for user in users:
             orders += [ (user, order) for order in keys[user][unit].liquidity[side][sample] ]
           orders.sort(key = lambda x: (x[1][2], x[1][0]))
           balance = 0.0
-          maxinterest = config._interest[name][unit][side]['rate']
           previd = -1
-          for user, order in orders:
+          for i in xrange(len(orders)):
+            user, order = orders[i]
             if order[0] != previd:
+              previd = order[0]
               if order[2] <= config._interest[name][unit][side]['rate']:
-                previd = order[0]
-                if balance + order[1] >= config._interest[name][unit][side]['target']:
-                  maxinterest = order[2]
-                payout = calculate_interest(balance, order[1], config._interest[name][unit][side]['target'], order[2]) / (config._sampling * 60 * 24)
+                rate = order[2]
+                for j in xrange(i + 1, len(orders)):
+                  if orders[j][1][2] > rate and orders[j][1][2] <= config._interest[name][unit][side]['rate']:
+                    rate = orders[j][1][2]
+                    break
+                if rate == order[2]:
+                  rate = config._interest[name][unit][side]['rate']
+                #orders[i][1][2] = rate
+                payout = calculate_interest(balance, order[1], config._interest[name][unit][side]['target'], rate) / (config._sampling * 60 * 24)
                 #order[2] = payout / order[1] # effective interest rate
                 keys[user][unit].balance += payout
+                keys[user][unit].rate[side] += 60 * 24 * payout / sum([o[1][1] for o in orders if o[0] == user])
                 logger.info("credit [%d/%d] %.8f nbt to %s for %.8f %s liquidity on %s for %s at balance %.8f with rate %.2f",
-                  sample + 1, config._sampling, payout, user, order[1], side, name, unit, balance, order[2] * 100)
+                  sample + 1, config._sampling, payout, user, order[1], side, name, unit, balance, rate * 100)
                 balance += order[1]
+                config._interest[name][unit][side]['orders'][sample].append( { 'id': order[0], 'amount' : order[1], 'cost' : config._sampling * 60 * 24 * payout / order[1] } )
               else:
                 logger.warning("unable to credit request for user %s on exchange %s: requested interest rate is too high", user, name)
                 keys[user][unit].last_error = 'unable to credit request: requested interest rate is too high'
             else:
               logger.warning("duplicate order id detected for user %s on exchange %s: %d", user, name, previd)
-          config._interest[name][unit][side]['orders'] = [ { 'id': order[0], 'amount' : order[1], 'cost' : order[2] } for _,order in orders ]
 
 def pay(nud):
   txout = {}
@@ -459,9 +483,13 @@ while True:
 
     # wait for validation round to end:
     lock.acquire()
+    _active_users = 0
     for user in keys:
+      active = False
       for unit in keys[user]:
         keys[user][unit].finish()
+        active = active or keys[user][unit].active
+      if active: _active_users += 1
     lock.release()
 
     # send liquidity

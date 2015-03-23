@@ -61,6 +61,8 @@ class NuBot(ConnectionThread):
           self.process = subprocess.Popen("java -jar NuBot.jar %s" % out.name,
             stdout=fp, stderr=fp, shell=True, cwd = 'nubot')
       time.sleep(10)
+    self.shutdown()
+    self.release()
 
   def shutdown(self):
     if self.process:
@@ -133,11 +135,11 @@ class PyBot(ConnectionThread):
 
   def effective_interest(self, balance, orders, target, cost):
     mod = orders[:]
-    for i in xrange(len(mod)):
+    for i in xrange(len(orders)):
       if mod[i]['id'] in self.orders:
         mod[i]['cost'] = cost
     mod.append({'amount' : balance, 'cost' : cost, 'id' : sys.maxint})
-    mod.sort(key = lambda x: x['cost'])
+    mod.sort(key = lambda x: (x['cost'], x['id']))
     total = 0.0
     mass = 0.0
     for order in mod:
@@ -202,9 +204,12 @@ class PyBot(ConnectionThread):
     prevprice = self.serverprice
     curtime = time.time()
     efftime = time.time()
+    lasttime = time.time()
     while self.active:
-      time.sleep(max(30 - time.time() + curtime, 0))
+      time.sleep(max(1 - time.time() + curtime, 0))
       curtime = time.time()
+      if curtime - lasttime < 30: continue
+      lasttime = curtime
       if self.requester.errorflag:
         self.shutdown()
       else:
@@ -221,45 +226,34 @@ class PyBot(ConnectionThread):
               self.logger.info('price of unit %s moved from %.8f to %.8f, will try to reset orders', self.unit, prevprice, self.serverprice)
               prevprice = self.serverprice
               self.cancel_orders()
-            elif curtime - efftime >= 30:
+            elif curtime - efftime > 60:
               efftime = curtime
               for side in [ 'bid', 'ask' ]:
                 info = self.requester.interest()[side]
-                weight = sum([order['amount'] for order in info['orders'] if order['id'] in self.orders])
-                mass = sum([order['amount'] for order in info['orders']])
-                if self.limit[side] < self.requester.interest()[side]['target'] - mass:
-                  self.limit[side] = self.requester.interest()[side]['target'] - mass
-                  self.logger.info('increasing %s limit to %.2f nbt for unit %s on exchange %s', side, self.limit[side], self.unit, repr(self.exchange))
-                response = self.balance('nbt' if side == 'ask' else self.unit, prevprice)
-                if 'error' in response:
-                  self.logger.error('unable to receive balance for unit %s on exchange %s: %s', 'nbt' if side == 'ask' else self.unit, repr(self.exchange), response['error'])
-                  self.exchange.adjust(response['error'])
-                  self.logger.info('adjusting nonce of exchange %s to %d', repr(self.exchange), self.exchange._shift)
-                else:
-                  cureff = self.effective_interest(response['balance'], info['orders'], info['target'], self.requester.cost[side])
-                  besteff = cureff
-                  bestcost = self.requester.cost[side]
-                  candidates = [ order['cost'] - 0.0001 for order in info['orders'] if order['id'] not in self.orders and order['cost'] - 0.0001 >= self.requester.maxcost[side] and order['cost'] <= info['rate']]
-                  if self.requester.cost[side] + 0.0001 <= info['rate']:
-                    candidates += [ self.requester.cost[side] + 0.0001 ]
-                  for candidate in candidates:
-                    eff = self.effective_interest(response['balance'], info['orders'], info['target'], candidate)
-                    if eff > besteff:
-                      besteff = eff
-                      bestcost = candidate
-                  #print candidates, besteff, bestcost, cureff, response['balance']
-                  #print "<<<<<<<<<<<<<<<", side, "cureff:", cureff, "curcost:", self.requester.cost, 'besteff:', besteff, 'bestcost:', bestcost, 'limit:', self.limit[side], 'weight:', besteff / bestcost
-                  effmass = besteff / bestcost
-                  if self.requester.cost[side] != bestcost:
-                    self.logger.info('setting %s interest rate from %.2f%% to %.2f%% for unit %s on exchange %s to increase expected payout from %.2f to %.2f',
-                      side, self.requester.cost[side] * 100.0, bestcost * 100.0, self.unit, repr(self.exchange), cureff, besteff)
-                    self.requester.cost[side] = bestcost
-                  elif self.limit[side] != effmass and effmass < min(response['balance'], info['target']): # remove balance with 0% interest
-                    self.logger.info('reducing %s limit to %.2f nbt for unit %s on exchange %s', side, effmass, self.unit, repr(self.exchange))
+                if 'orders' in info and len(info['orders']) > 0:
+                  weight = sum([order['amount'] for order in info['orders'][-1] if order['id'] in self.orders])
+                  mass = sum([order['amount'] for order in info['orders'][-1]])
+                  contrib = weight
+                  for order in info['orders'][-1]:
+                    if order['id'] in self.orders and order['cost'] < self.requester.cost[side]:
+                      contrib -= order['amount']
+                  if mass + self.limit[side] < info['target']:
+                    self.logger.info('increasing tier 1 %s limit of unit %s on %s from %.2f to %.2f',
+                      side, self.unit, repr(self.exchange), weight + self.limit[side], info['target'] - mass)
+                    self.limit[side] = info['target'] - mass
+                  elif weight - contrib >= 1.0 and contrib / weight < 0.9:
+                    self.logger.info('decreasing tier 1 %s limit of unit %s on %s from %.2f to %.2f',
+                      side, self.unit, repr(self.exchange), weight + self.limit[side], max(0.5, contrib))
                     self.cancel_orders(side)
-                  self.limit[side] = effmass
+                    self.limit[side] = max(0.5, contrib) # place at least 0.1 NBT to see when interest raises again
+                  elif contrib == weight and self.limit[side] < 0.5:
+                    step = max(1,0, contrib * 0.1)
+                    self.logger.info('increasing tier 1 %s limit of unit %s on %s from %.2f to %.2f',
+                      side, self.unit, repr(self.exchange), weight + self.limit[side], weight + self.limit[side] + step)
+                    self.limit[side] += step
             self.place('bid')
             self.place('ask')
         else:
           self.logger.error('unable to retrieve server price: %s', response['message'])
     self.shutdown()
+    self.release()

@@ -58,12 +58,21 @@ class Connection():
 class ConnectionThread(threading.Thread):
   def __init__(self, conn, logger = None):
     threading.Thread.__init__(self)
+    self.runlock = threading.Lock()
+    self.runlock.acquire()
     self.daemon = True
     self.active = True
     self.pause = False
     self.logger = logger
     self.logger = logger if logger else logging.getLogger('null')
     self.conn = conn
+
+  def release(self):
+    self.runlock.release()
+
+  def terminate(self):
+    self.stop()
+    self.runlock.acquire()
 
   def stop(self):
     self.active = False

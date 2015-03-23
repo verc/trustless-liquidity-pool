@@ -67,7 +67,7 @@ class RequestThread(ConnectionThread):
     self.exchangeupdate = 0
     self.exchangeinfo = self.interest()
     self.maxcost = cost.copy()
-    self.cost = { 'bid' : self.exchangeinfo['bid']['rate'], 'ask' : self.exchangeinfo['ask']['rate'] }
+    self.cost = cost.copy() #{ 'bid' : self.exchangeinfo['bid']['rate'], 'ask' : self.exchangeinfo['ask']['rate'] }
 
   def interest(self):
     curtime = time.time()
@@ -81,7 +81,7 @@ class RequestThread(ConnectionThread):
     return self.exchangeinfo
 
   def register(self):
-    response = self.conn.post('register', { 'address' : self.address, 'key' : self.key, 'name' : repr(self.exchange) })
+    response = self.conn.post('register', { 'address' : self.address, 'key' : self.key, 'name' : repr(self.exchange), 'ask' : self.cost['ask'], 'bid' : self.cost['bid'] })
     if response['code'] == 0: # reset sampling in case of server restart
       self.sampling = self.initsampling
     return response
@@ -90,7 +90,6 @@ class RequestThread(ConnectionThread):
     data, sign = self.exchange.create_request(self.unit, self.key, self.secret)
     params = { 'unit' : self.unit, 'user' : self.key, 'sign' : sign }
     params.update(data)
-    params.update(self.cost)
     curtime = time.time()
     ret = self.conn.post('liquidity', params, trials = 1, timeout = 10)
     if ret['code'] != 0:
@@ -136,14 +135,13 @@ for user in userdata:
     if not unit in exchangeinfo[name]:
       logger.error("unit %s on exchange %s not supported by pool: %s", unit, name)
       sys.exit(2)
-    bot = 'pybot' if len(user) < 6 else user[5]
     cost = { 'bid' : exchangeinfo[name][unit]['bid']['rate'], 'ask' : exchangeinfo[name][unit]['ask']['rate'] }
-    if len(user) >= 7:
-      if float(user[6]) != 0.0:
-        cost['bid'] = float(user[6]) / 100.0
-        cost['ask'] = float(user[6]) / 100.0
-      if len(user) >= 8 and float(user[7]) != 0.0:
-        cost['ask'] = float(user[7]) / 100.0
+    if len(user) >= 6 and float(user[5]) != 0.0:
+      cost['bid'] = float(user[5]) / 100.0
+      cost['ask'] = float(user[5]) / 100.0
+    if len(user) >= 7 and float(user[6]) != 0.0:
+      cost['ask'] = float(user[6]) / 100.0
+    bot = 'pybot' if len(user) < 8 else user[7]
 
     users[key][unit] = { 'request' : RequestThread(conn, key, secret, exchange, unit, user[0], sampling, cost, logger) }
     users[key][unit]['request'].start()
@@ -175,8 +173,16 @@ while True: # print some info every minute until program terminates
         logger.error('unable to receive statistics for user %s: %s', user, response['message'])
         users[user].values()[0]['request'].register() # reassure to be registered if 
       else:
-        logger.info('%s - balance: %.8f efficiency: %.2f%% rejects: %d missing: %d units: %s - %s', repr(users[user].values()[0]['request'].exchange),
-          response['balance'], response['efficiency'] * 100, response['rejects'], response['missing'], response['units'], user )
+        effective_rate = 0.0
+        total = 0.0
+        for unit in response['units']:
+          for side in [ 'bid', 'ask' ]:
+            mass = float(sum([ o[1] for o in response['units'][unit][side] ]))
+            effective_rate += response['units'][unit]['rate'][side] * mass
+            total += mass
+        if total > 0.0: effective_rate /= total
+        logger.info('%s - balance: %.8f rate %.2f%% efficiency: %.2f%% rejects: %d missing: %d units: %s - %s', repr(users[user].values()[0]['request'].exchange),
+          response['balance'], effective_rate * 100, response['efficiency'] * 100, response['rejects'], response['missing'], response['units'], user )
         if curtime - starttime > 90:
           if response['efficiency'] < 0.8:
             for unit in response['units']:
@@ -213,4 +219,8 @@ while True: # print some info every minute until program terminates
 for user in users:
   for unit in users[user]:
     if users[user][unit]['order']:
-      users[user][unit]['order'].shutdown()
+      users[user][unit]['order'].stop()
+for user in users:
+  for unit in users[user]:
+    if users[user][unit]['order']:
+      users[user][unit]['order'].terminate()
