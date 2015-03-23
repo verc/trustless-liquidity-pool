@@ -81,7 +81,7 @@ class RequestThread(ConnectionThread):
     return self.exchangeinfo
 
   def register(self):
-    response = self.conn.post('register', { 'address' : self.address, 'key' : self.key, 'name' : repr(self.exchange), 'ask' : self.cost['ask'], 'bid' : self.cost['bid'] })
+    response = self.conn.post('register', { 'address' : self.address, 'key' : self.key, 'name' : repr(self.exchange) })
     if response['code'] == 0: # reset sampling in case of server restart
       self.sampling = self.initsampling
     return response
@@ -90,6 +90,7 @@ class RequestThread(ConnectionThread):
     data, sign = self.exchange.create_request(self.unit, self.key, self.secret)
     params = { 'unit' : self.unit, 'user' : self.key, 'sign' : sign }
     params.update(data)
+    params.update(self.cost)
     curtime = time.time()
     ret = self.conn.post('liquidity', params, trials = 1, timeout = 10)
     if ret['code'] != 0:

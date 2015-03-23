@@ -1,7 +1,7 @@
 import os
 
 # pool configuration
-_port = 2022
+_port = 2222
 # daily interest rates
 _interest = {
   'poloniex' : {

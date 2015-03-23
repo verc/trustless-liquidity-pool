@@ -222,7 +222,7 @@ class PyBot(ConnectionThread):
             self.shutdown()
           else:
             deviation = 1.0 - min(prevprice, self.serverprice) / max(prevprice, self.serverprice)
-            if deviation > 0.00425:
+            if deviation > 0.00375:
               self.logger.info('price of unit %s moved from %.8f to %.8f, will try to reset orders', self.unit, prevprice, self.serverprice)
               prevprice = self.serverprice
               self.cancel_orders()
@@ -241,7 +241,7 @@ class PyBot(ConnectionThread):
                     self.logger.info('increasing tier 1 %s limit of unit %s on %s from %.2f to %.2f',
                       side, self.unit, repr(self.exchange), weight + self.limit[side], weight + info['target'] - mass)
                     self.limit[side] = info['target'] - mass
-                  elif weight - contrib >= 1.0 and contrib / weight < 0.9:
+                  elif weight >= 2.0 and weight - contrib >= 1.0 and contrib / weight < 0.85:
                     self.logger.info('decreasing tier 1 %s limit of unit %s on %s from %.2f to %.2f',
                       side, self.unit, repr(self.exchange), weight + self.limit[side], max(0.5, contrib))
                     self.cancel_orders(side)
@@ -255,5 +255,6 @@ class PyBot(ConnectionThread):
             self.place('ask')
         else:
           self.logger.error('unable to retrieve server price: %s', response['message'])
+    time.sleep(1) # this is to ensure that the order book is updated
     self.shutdown()
     self.release()
