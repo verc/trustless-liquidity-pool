@@ -321,8 +321,9 @@ def credit():
                 orders[i][1][1] -= amount
                 balance += amount
                 keys[user][unit].rate[side] += 60 * 24 * payout / weight[user]
-                logger.info("credit [%d/%d] %.8f nbt to %s for %.8f %s liquidity on %s for %s at balance %.8f with rate %.2f",
-                  sample + 1, config._sampling, payout, user, amount, side, name, unit, balance - amount, rate * 100)
+                if payout > 0:
+                  logger.info("credit [%d/%d] %.8f nbt to %s for %.8f %s liquidity on %s for %s at balance %.8f with rate %.2f",
+                    sample + 1, config._sampling, payout, user, amount, side, name, unit, balance - amount, rate * 100)
                 config._interest[name][unit][side]['orders'][sample].append( { 'id': order[0], 'amount' : amount, 'cost' : config._sampling * 60 * 24 * payout / amount } )
                 if residual - balance <= 0: break
           rate = config._interest[name][unit][side]['rate']
@@ -335,8 +336,9 @@ def credit():
               keys[user][unit].balance += payout
               balance += order[1]
               keys[user][unit].rate[side] += 60 * 24 * payout / weight[user]
-              logger.info("credit [%d/%d] %.8f nbt to %s for %.8f %s liquidity on %s for %s at balance %.8f with rate %.2f",
-                sample + 1, config._sampling, payout, user, order[1], side, name, unit, balance - order[1], rate * 100)
+              if payout > 0:
+                logger.info("credit [%d/%d] %.8f nbt to %s for %.8f %s liquidity on %s for %s at balance %.8f with rate %.2f",
+                  sample + 1, config._sampling, payout, user, order[1], side, name, unit, balance - order[1], rate * 100)
               config._interest[name][unit][side]['orders'][sample].append( { 'id': order[0], 'amount' : order[1], 'cost' : config._sampling * 60 * 24 * payout / order[1] } )
 
 def pay(nud):
