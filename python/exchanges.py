@@ -114,7 +114,7 @@ class CCEDK(Exchange):
           for unit in response['response']['entities']:
             self.currency_id[unit['iso'].lower()] = unit['currency_id']
       except:
-        if response:
+        if response and not response['response']:
           self.adjust(",".join(response['errors'].values()))
           if failed: print >> sys.stderr, "could not retrieve ccedk ids, will adjust shift to", self._shift, "reason:", ",".join(response['errors'].values())
         else:
