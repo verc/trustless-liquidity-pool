@@ -31,18 +31,25 @@ dummylogger = logging.getLogger('null')
 dummylogger.addHandler(logging.NullHandler())
 dummylogger.propagate = False
 
+logname = str(int(time.time()*100))
+creditor = logging.getLogger("credits")
+creditor.propagate = False
+creditformat = logging.Formatter(fmt = '%(asctime)s: %(message)s', datefmt="%Y/%m/%d-%H:%M:%S")
+ch = logging.FileHandler('logs/%s.credits' % logname)
+ch.setFormatter(creditformat)
+creditor.addHandler(ch)
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
-fh = logging.FileHandler('logs/%d.log' % time.time())
+fh = logging.FileHandler('logs/%s.log' % logname)
 fh.setLevel(logging.DEBUG)
-ch = logging.StreamHandler()
-ch.setLevel(logging.INFO)
+sh = logging.StreamHandler()
+sh.setLevel(logging.INFO)
 
 formatter = logging.Formatter(fmt = '%(asctime)s %(levelname)s: %(message)s', datefmt="%Y/%m/%d-%H:%M:%S")
 fh.setFormatter(formatter)
-ch.setFormatter(formatter)
+sh.setFormatter(formatter)
 logger.addHandler(fh)
-logger.addHandler(ch)
+logger.addHandler(sh)
 _liquidity = []
 _active_users = 0
 
@@ -160,7 +167,7 @@ class User(threading.Thread):
                 self.liquidity[side].append(valid[side])
               if self.last_error != "" and len(valid['bid'] + valid['ask']) == 0:
                 res = 'r'
-                self.logger.warning("unable to validate request %d/%d for user %s at exchange %s on unit %s: orders of deviate too much from current price" % (rid + 1, len(self.requests), self.key, repr(self.exchange), self.unit))
+                self.logger.debug("unable to validate request %d/%d for user %s at exchange %s on unit %s: orders of deviate too much from current price" % (rid + 1, len(self.requests), self.key, repr(self.exchange), self.unit))
               else:
                 res = 'a'
                 break
@@ -319,16 +326,17 @@ def credit():
                 if rate == order[2]:
                   rate = config._interest[name][unit][side]['rate']
                 amount = order[1] if order[1] < residual - balance else residual - balance
-                payout = calculate_interest(balance, amount, residual, rate) / (config._sampling * 60 * 24)
-                keys[user][unit].balance += payout
-                orders[i][1][1] -= amount
-                balance += amount
-                keys[user][unit].rate[side] += 60 * 24 * payout / weight[user]
-                if payout > 0:
-                  logger.info("credit [%d/%d] %.8f nbt to %s for %.8f %s liquidity on %s for %s at balance %.8f with rate %.2f",
-                    sample + 1, config._sampling, payout, user, amount, side, name, unit, balance - amount, rate * 100)
-                config._interest[name][unit][side]['orders'][sample].append( { 'id': order[0], 'amount' : amount, 'cost' : config._sampling * 60 * 24 * payout / amount } )
-                if residual - balance <= 0: break
+                if amount > 0:
+                  payout = calculate_interest(balance, amount, residual, rate) / (config._sampling * 60 * 24)
+                  keys[user][unit].balance += payout
+                  orders[i][1][1] -= amount
+                  balance += amount
+                  keys[user][unit].rate[side] += 60 * 24 * payout / weight[user]
+                  if payout > 0:
+                    creditor.info("[%d/%d] %.8f %s %.8f %s %s %s %.8f %.2f",
+                      sample + 1, config._sampling, payout, user, amount, side, name, unit, balance - amount, rate * 100)
+                  config._interest[name][unit][side]['orders'][sample].append( { 'id': order[0], 'amount' : amount, 'cost' : config._sampling * 60 * 24 * payout / amount } )
+                  if residual - balance <= 0: break
           rate = config._interest[name][unit][side]['rate']
           previd = -1
           for i in xrange(len(orders)):
@@ -343,7 +351,7 @@ def credit():
               balance += order[1]
               keys[user][unit].rate[side] += 60 * 24 * payout / weight[user]
               if payout > 0:
-                logger.info("credit [%d/%d] %.8f nbt to %s for %.8f %s liquidity on %s for %s at balance %.8f with rate %.2f",
+                creditor.info("[%d/%d] %.8f %s %.8f %s %s %s %.8f %.2f",
                   sample + 1, config._sampling, payout, user, order[1], side, name, unit, balance - order[1], rate * 100)
               config._interest[name][unit][side]['orders'][sample].append( { 'id': order[0], 'amount' : order[1], 'cost' : config._sampling * 60 * 24 * payout / order[1] } )
 
