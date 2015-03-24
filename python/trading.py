@@ -231,12 +231,14 @@ class PyBot(ConnectionThread):
               for side in [ 'bid', 'ask' ]:
                 info = self.requester.interest()[side]
                 if 'orders' in info and len(info['orders']) > 0:
-                  weight = sum([order['amount'] for order in info['orders'][-1] if order['id'] in self.orders])
-                  mass = sum([order['amount'] for order in info['orders'][-1]])
-                  contrib = weight
-                  for order in info['orders'][-1]:
-                    if order['id'] in self.orders and order['cost'] < self.requester.cost[side]:
-                      contrib -= order['amount']
+                  orders = {}
+                  for sample in info['orders']:
+                    for order in sample:
+                      if order['cost'] < self.requester.cost[side]:
+                        orders[order['id']] = (order['amount'], order['cost'])
+                  weight = sum([ orders[o][0] for o in orders if o in self.orders ]) # sum([order['amount'] for order in info['orders'][-1] if order['id'] in self.orders])
+                  mass = sum([ orders[o][0] for o in orders ]) #sum([order['amount'] for order in info['orders'][-1]])
+                  contrib = sum([ orders[o][0] for o in orders if o in self.orders and orders[o][1] <= self.requester.cost[side] ])
                   if mass + self.limit[side] < info['target']:
                     self.logger.info('increasing tier 1 %s limit of unit %s on %s from %.2f to %.2f',
                       side, self.unit, repr(self.exchange), weight + self.limit[side], weight + info['target'] - mass)
