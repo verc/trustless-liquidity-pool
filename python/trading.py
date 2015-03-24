@@ -248,7 +248,7 @@ class PyBot(ConnectionThread):
                       side, self.unit, repr(self.exchange), weight + self.limit[side], max(0.5, weight * 0.9))
                     self.cancel_orders(side)
                     self.limit[side] = max(0.5, weight * 0.9) # place at least 0.5 NBT to see when interest raises again
-                  elif self.limit[side] == 0 and contrib / weight > 0.95:
+                  elif self.limit[side] == 0 and (weight == 0 or contrib / weight > 0.95):
                     step = max(0.5, contrib * 0.1)
                     self.logger.info('increasing tier 1 %s limit of unit %s on %s from %.2f to %.2f',
                       side, self.unit, repr(self.exchange), weight + self.limit[side], weight + self.limit[side] + step)
