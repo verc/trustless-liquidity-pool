@@ -217,6 +217,8 @@ while True: # print some info every minute until program terminates
   except Exception as e:
     logger.error('exception caught in main loop: %s', sys.exc_info()[1])
 
+logger.info('stopping trading bots, please allow the program up to 1 minute to close.')
+
 for user in users:
   for unit in users[user]:
     if users[user][unit]['order']:
@@ -224,4 +226,4 @@ for user in users:
 for user in users:
   for unit in users[user]:
     if users[user][unit]['order']:
-      users[user][unit]['order'].terminate()
+      users[user][unit]['order'].join()
