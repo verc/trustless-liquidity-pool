@@ -288,8 +288,8 @@ def credit():
     for unit in config._interest[name]:
       users = [ k for k in keys if unit in keys[k] and repr(keys[k][unit].exchange) == name ]
       for user in users:
-        keys[user][unit].rate['bid'] = 0
-        keys[user][unit].rate['ask'] = 0
+        keys[user][unit].rate['bid'] = 0.0
+        keys[user][unit].rate['ask'] = 0.0
       for side in [ 'bid', 'ask' ]:
         config._interest[name][unit][side]['orders'] = []
         for sample in xrange(config._sampling):
@@ -307,6 +307,9 @@ def credit():
             for i in xrange(len(orders)):
               user, order = orders[i]
               if order[0] != previd:
+                if weight[user] == 0:
+                  logger.warning('detected zero weight order for user %s: %s', user, str(order))
+                  continue
                 previd = order[0]
                 rate = order[2]
                 for j in xrange(i + 1, len(orders)):
@@ -331,6 +334,9 @@ def credit():
           for i in xrange(len(orders)):
             user, order = orders[i]
             if order[0] != previd and order[1] > 0:
+              if weight[user] == 0:
+                logger.warning('detected zero weight order for user %s: %s', user, str(order))
+                continue
               previd = order[0]
               payout = calculate_interest(balance, order[1], config._interest[name][unit][side]['target'], rate) / (config._sampling * 60 * 24)
               keys[user][unit].balance += payout
