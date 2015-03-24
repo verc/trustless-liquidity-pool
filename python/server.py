@@ -174,7 +174,9 @@ class User(threading.Thread):
             else:
               res = 'r'
               self.last_error = "unable to validate request: " + orders['error']
-              self.logger.warning("unable to validate request %d/%d for user %s at exchange %s on unit %s: %s" % (rid + 1, len(self.requests), self.key, repr(self.exchange), self.unit, orders['error']))
+              if rid + 1 == len(self.requests):
+                self.logger.warning("unable to validate request %d/%d for user %s at exchange %s on unit %s: %s",
+                  rid + 1, len(self.requests), self.key, repr(self.exchange), self.unit, orders['error'])
               for side in [ 'bid', 'ask' ]:
                 del self.liquidity[side][0]
                 self.liquidity[side].append([])
