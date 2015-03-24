@@ -226,7 +226,7 @@ class PyBot(ConnectionThread):
               self.logger.info('price of unit %s moved from %.8f to %.8f, will try to reset orders', self.unit, prevprice, self.serverprice)
               prevprice = self.serverprice
               self.cancel_orders()
-            elif curtime - efftime > 60:
+            elif curtime - efftime > 120:
               efftime = curtime
               for side in [ 'bid', 'ask' ]:
                 info = self.requester.interest()[side]
@@ -247,7 +247,7 @@ class PyBot(ConnectionThread):
                     self.logger.info('decreasing tier 1 %s limit of unit %s on %s from %.2f to %.2f',
                       side, self.unit, repr(self.exchange), weight + self.limit[side], max(0.5, contrib))
                     self.cancel_orders(side)
-                    self.limit[side] = max(0.5, contrib) # place at least 0.1 NBT to see when interest raises again
+                    self.limit[side] = max(0.5, contrib) # place at least 0.5 NBT to see when interest raises again
                   elif self.limit[side] == 0 and contrib / weight > 0.95:
                     step = max(0.5, contrib * 0.1)
                     self.logger.info('increasing tier 1 %s limit of unit %s on %s from %.2f to %.2f',
