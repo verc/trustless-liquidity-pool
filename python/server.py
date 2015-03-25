@@ -349,7 +349,7 @@ def credit():
                 amount = order[1] if order[1] < config._interest[name][unit][side]['target'] - balance else config._interest[name][unit][side]['target'] - balance
                 payout = calculate_interest(balance, amount, config._interest[name][unit][side]['target'], rate) / (config._sampling * 60 * 24)
                 keys[user][unit].balance += payout
-                balance += order[1]
+                balance += amount
                 keys[user][unit].rate[side] += 60 * 24 * payout / weight[user]
                 if payout > 0:
                   creditor.info("[%d/%d] %.8f %s %.8f %s %s %s %.8f %.2f",
