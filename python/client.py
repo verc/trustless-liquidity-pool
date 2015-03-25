@@ -39,11 +39,10 @@ logger.addHandler(sh)
 logger.addHandler(fh)
 logger.addHandler(ch)
 
-userfile = 'users.dat'
-userdata = [ line.strip().split() for line in sys.stdin.readlines() if len(line.strip().split('#')[0].split()) >= 5 ]
-if len(userdata) == 0:
-  if len(sys.argv) == 3:
-    userfile = sys.argv[2]
+userfile = 'users.dat' if len(sys.argv) == 2 else sys.argv[2]
+if userfile == "-":
+  userdata = [ line.strip().split() for line in sys.stdin.readlines() if len(line.strip().split('#')[0].split()) >= 5 ]
+else:
   try:
     userdata = [ line.strip().split() for line in open(userfile).readlines() if len(line.strip().split('#')[0].split()) >= 5 ] # address units exchange key secret [trader]
   except:

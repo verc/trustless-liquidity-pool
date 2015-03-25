@@ -355,7 +355,7 @@ def credit():
                   creditor.info("[%d/%d] %.8f %s %.8f %s %s %s %.8f %.2f",
                     sample + 1, config._sampling, payout, user, order[1], side, name, unit, balance - order[1], rate * 100)
                 if amount != order[1]:
-                  config._interest[name][unit][side]['orders'][sample].append( { 'id': order[0], 'amount' : order[1], 'cost' : config._sampling * 60 * 24 * payout / (amount if amount else 1) } )
+                  config._interest[name][unit][side]['orders'][sample].append( { 'id': order[0], 'amount' : amount, 'cost' : config._sampling * 60 * 24 * payout / (amount if amount else 1) } )
                   config._interest[name][unit][side]['orders'][sample].append( { 'id': order[0], 'amount' : order[1] - amount, 'cost' : 0.0 } )
                 else:
                   config._interest[name][unit][side]['orders'][sample].append( { 'id': order[0], 'amount' : order[1], 'cost' : config._sampling * 60 * 24 * payout / order[1] } )

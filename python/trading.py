@@ -231,13 +231,13 @@ class PyBot(ConnectionThread):
                 for side in [ 'bid', 'ask' ]:
                   info = self.requester.interest()[side]
                   if 'orders' in info and len(info['orders']) > 0:
-                    orders = {}
+                    orders = set([])
                     for sample in info['orders']:
                       for order in sample:
-                        orders[order['id']] = (order['amount'], order['cost'])
-                    weight = sum([ orders[o][0] for o in orders if o in self.orders and orders[o][1] <= info['target'] ]) #sum([order['amount'] for order in info['orders'][-1] if order['id'] in self.orders])
-                    mass = sum([ orders[o][0] for o in orders ]) #sum([order['amount'] for order in info['orders'][-1]])
-                    contrib = sum([ orders[o][0] for o in orders if o in self.orders and orders[o][1] >= self.requester.cost[side] ])
+                        orders.add((order['id'], order['amount'], order['cost']))
+                    weight = sum([ o[1] for o in orders if o[0] in self.orders ]) #sum([order['amount'] for order in info['orders'][-1] if order['id'] in self.orders])
+                    mass = sum([ o[1] for o in orders if o[2] <= info['target'] ]) #sum([order['amount'] for order in info['orders'][-1]])
+                    contrib = sum([ o[0] for o in orders if o[0] in self.orders and o[2] >= 0.0 ])
                     #print "weight:", weight, "mass:", mass, "contrib:", contrib, "sel:", len(orders.keys()), "info:", len(info['orders'])
                     if mass + self.limit[side] < info['target']:
                       self.logger.info('increasing tier 1 %s limit of unit %s on %s from %.2f to %.2f',
