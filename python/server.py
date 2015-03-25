@@ -310,7 +310,7 @@ def credit():
           balance = 0.0
           previd = -1
           mass = sum([orders[i][1][1] for i in xrange(len(orders)) if i == 0 or orders[i][1][0] != orders[i - 1][1][0]])
-          residual = min(mass - config._interest[name][unit][side]['target'], config._interest[name][unit][side]['target'])
+          residual = mass - config._interest[name][unit][side]['target']
           weight = { user : sum([o[1][1] for o in orders if o[0] == user]) for user in users }
           if residual > 0:
             for i in xrange(len(orders)):
@@ -325,9 +325,9 @@ def credit():
                       break
                   if rate == order[2]:
                     rate = config._interest[name][unit][side]['rate']
-                  amount = order[1] if order[1] < residual - balance else residual - balance
+                  amount = order[1] if order[1] < (residual - balance) else (residual - balance)
                   if amount > 0:
-                    payout = calculate_interest(balance, amount, residual, rate) / (config._sampling * 60 * 24)
+                    payout = calculate_interest(balance, amount, config._interest[name][unit][side]['target'], rate) / (config._sampling * 60 * 24)
                     keys[user][unit].balance += payout
                     orders[i][1][1] -= amount
                     balance += amount
@@ -336,7 +336,7 @@ def credit():
                       creditor.info("[%d/%d] %.8f %s %.8f %s %s %s %.8f %.2f",
                         sample + 1, config._sampling, payout, user, amount, side, name, unit, balance - amount, rate * 100)
                     config._interest[name][unit][side]['orders'][sample].append( { 'id': order[0], 'amount' : amount, 'cost' : config._sampling * 60 * 24 * payout / amount } )
-                  if residual - balance <= 0: break
+                  if balance >= config._interest[name][unit][side]['target'] or balance >= residual: break
                 else:
                   logger.warning('detected zero weight order for user %s: %s', user, str(order))
           rate = config._interest[name][unit][side]['rate']
@@ -346,7 +346,7 @@ def credit():
             if order[0] != previd and order[1] > 0:
               previd = order[0]
               if weight[user] > 0:
-                amount = order[1] if order[1] < config._interest[name][unit][side]['target'] - balance else config._interest[name][unit][side]['target'] - balance
+                amount = order[1] if order[1] < (config._interest[name][unit][side]['target'] - balance) else (config._interest[name][unit][side]['target'] - balance)
                 payout = calculate_interest(balance, amount, config._interest[name][unit][side]['target'], rate) / (config._sampling * 60 * 24)
                 keys[user][unit].balance += payout
                 balance += amount
