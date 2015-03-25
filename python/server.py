@@ -325,9 +325,9 @@ def credit():
                       break
                   if rate == order[2]:
                     rate = config._interest[name][unit][side]['rate']
-                  amount = order[1] if order[1] < (residual - balance) else (residual - balance)
+                  amount = min(order[1], residual - balance)
                   if amount > 0:
-                    payout = calculate_interest(balance, amount, config._interest[name][unit][side]['target'], rate) / (config._sampling * 60 * 24)
+                    payout = calculate_interest(balance, amount, residual, rate) / (config._sampling * 60 * 24)
                     keys[user][unit].balance += payout
                     orders[i][1][1] -= amount
                     balance += amount
