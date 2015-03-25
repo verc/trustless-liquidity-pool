@@ -310,7 +310,7 @@ def credit():
           balance = 0.0
           previd = -1
           mass = sum([orders[i][1][1] for i in xrange(len(orders)) if i == 0 or orders[i][1][0] != orders[i - 1][1][0]])
-          residual = mass - config._interest[name][unit][side]['target']
+          residual = min(config._interest[name][unit][side]['target'], mass - config._interest[name][unit][side]['target'])
           weight = { user : sum([o[1][1] for o in orders if o[0] == user]) for user in users }
           if residual > 0:
             for i in xrange(len(orders)):
