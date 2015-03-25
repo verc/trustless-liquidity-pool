@@ -231,10 +231,13 @@ class PyBot(ConnectionThread):
                 for side in [ 'bid', 'ask' ]:
                   info = self.requester.interest()[side]
                   if 'orders' in info and len(info['orders']) > 0:
-                    orders = set([])
-                    for sample in info['orders']:
-                      for order in sample:
-                        orders.add((order['id'], order['amount'], order['cost']))
+                    maxsample = 0
+                    maxindex = 0
+                    for i in xrange(len(info['orders'])):
+                      if len(info['orders'][i]) > maxsample:
+                        maxsample = len(info['orders'][i])
+                        maxindex = i
+                    orders = [ (order['id'], order['amount'], order['cost']) for order in info['orders'][maxindex] ]
                     weight = sum([ o[1] for o in orders if o[0] in self.orders ]) #sum([order['amount'] for order in info['orders'][-1] if order['id'] in self.orders])
                     mass = sum([ o[1] for o in orders if o[2] <= info['target'] ]) #sum([order['amount'] for order in info['orders'][-1]])
                     contrib = sum([ o[0] for o in orders if o[0] in self.orders and o[2] >= 0.0 ])
@@ -257,6 +260,7 @@ class PyBot(ConnectionThread):
               self.place('ask')
           else:
             self.logger.error('unable to retrieve server price: %s', response['message'])
-      except: break
+      except Exception as e:
+        logger.error('exception caught in trading bot: %s', sys.exc_info()[1])
     time.sleep(1) # this is to ensure that the order book is updated
     self.shutdown()
