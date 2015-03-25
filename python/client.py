@@ -40,13 +40,15 @@ logger.addHandler(fh)
 logger.addHandler(ch)
 
 userfile = 'users.dat'
-if len(sys.argv) == 3:
-  userfile = sys.argv[2]
-try:
-  userdata = [ line.strip().split() for line in open(userfile).readlines() if len(line.strip().split('#')[0].split()) >= 5 ] # address units exchange key secret [trader]
-except:
-  logger.error("%s could not be read", userfile)
-  sys.exit(1)
+userdata = [ line.strip().split() for line in sys.stdin.readlines() if len(line.strip().split('#')[0].split()) >= 5 ]
+if len(userdata) == 0:
+  if len(sys.argv) == 3:
+    userfile = sys.argv[2]
+  try:
+    userdata = [ line.strip().split() for line in open(userfile).readlines() if len(line.strip().split('#')[0].split()) >= 5 ] # address units exchange key secret [trader]
+  except:
+    logger.error("%s could not be read", userfile)
+    sys.exit(1)
 
 _server = sys.argv[1]
 _wrappers = { 'poloniex' : Poloniex(), 'ccedk' : CCEDK(), 'bitcoincoid' : BitcoinCoId(), 'bter' : BTER() }
@@ -217,13 +219,16 @@ while True: # print some info every minute until program terminates
   except Exception as e:
     logger.error('exception caught in main loop: %s', sys.exc_info()[1])
 
-logger.info('stopping trading bots, please allow the program up to 1 minute to close.')
-
-for user in users:
-  for unit in users[user]:
-    if users[user][unit]['order']:
-      users[user][unit]['order'].stop()
-for user in users:
-  for unit in users[user]:
-    if users[user][unit]['order']:
-      users[user][unit]['order'].join()
+logger.info('stopping trading bots, please allow the client up to 1 minute to terminate')
+while True:
+  try:
+    for user in users:
+      for unit in users[user]:
+        if users[user][unit]['order']:
+          users[user][unit]['order'].stop()
+    for user in users:
+      for unit in users[user]:
+        if users[user][unit]['order']:
+          users[user][unit]['order'].join()
+  except KeyboardInterrupt: continue
+  break
