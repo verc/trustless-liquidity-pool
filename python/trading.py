@@ -197,7 +197,11 @@ class PyBot(ConnectionThread):
   def run(self):
     self.logger.info("starting PyBot for unit %s on exchange %s", self.unit, repr(self.exchange))
     self.serverprice = self.conn.get('price/' + self.unit, timeout = 30)['price']
-    self.cancel_orders()
+    trials = 0
+    while trials < 10:
+      response = self.cancel_orders(reset = False)
+      if not 'error' in response: break
+      trials = trials + 1
     self.place('bid')
     self.place('ask')
     prevprice = self.serverprice

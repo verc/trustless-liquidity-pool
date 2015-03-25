@@ -192,6 +192,7 @@ while True: # print some info every minute until program terminates
                 if response['units'][unit]['last_error'] != "":
                   if 'deviates too much from current price' in response['units'][unit]['last_error']:
                     PyBot.pricefeed.price(unit, True) # force a price update
+                    if users[user][unit]['order']: users[user][unit]['order'].shutdown()
                     logger.warning('price missmatch for unit %s on exchange %s, forcing price update', unit, repr(users[user][unit]['request'].exchange))
                   else:
                     users[user][unit]['request'].exchange.adjust(response['units'][unit]['last_error'])
