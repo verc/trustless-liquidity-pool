@@ -303,7 +303,7 @@ class BTER(Exchange):
 
   def https_request(self, method, params, headers = None):
     if not headers: headers = {}
-    connection = httplib.HTTPSConnection('data.bter.com', timeout=60)
+    connection = httplib.HTTPSConnection('data.bter.com', timeout=3)
     connection.request('POST', '/api/1/private/' + method, params, headers)
     response = connection.getresponse().read()
     return json.loads(response)
@@ -391,7 +391,6 @@ class Peato(Exchange):
         pass
     else: print error
 
-
   def urlencode(self, params): # from https://github.com/JohnnyZhao/peatio-client-python/blob/master/lib/auth.py#L11
     keys = sorted(params.keys())
     query = ''
@@ -467,7 +466,7 @@ class Peato(Exchange):
     return request, ''
 
   def validate_request(self, key, unit, data, sign):
-    connection = httplib.HTTPSConnection('178.62.140.24', timeout=60)
+    connection = httplib.HTTPSConnection('178.62.140.24', timeout=3)
     connection.request('GET', '/api/v2/orders.json?' + self.urlencode(data))
     response = json.loads(connection.getresponse().read())
     if 'error' in response:
