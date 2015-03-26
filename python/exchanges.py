@@ -303,8 +303,8 @@ class BTER(Exchange):
 
   def https_request(self, method, params, headers = None, timeout = None):
     if not headers: headers = {}
-    connection = httplib.HTTPSConnection('data.bter.com')
-    connection.request('POST', '/api/1/private/' + method, params, headers, timeout = timeout)
+    connection = httplib.HTTPSConnection('data.bter.com', timeout = timeout)
+    connection.request('POST', '/api/1/private/' + method, params, headers)
     response = connection.getresponse().read()
     return json.loads(response)
 
