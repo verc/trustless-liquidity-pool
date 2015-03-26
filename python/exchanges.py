@@ -81,7 +81,7 @@ class Poloniex(Exchange):
 
   def validate_request(self, key, unit, data, sign):
     headers = { 'Sign' : sign, 'Key' : key }
-    ret = urllib2.urlopen(urllib2.Request('https://poloniex.com/tradingApi', urllib.urlencode(data), headers))
+    ret = urllib2.urlopen(urllib2.Request('https://poloniex.com/tradingApi', urllib.urlencode(data), headers), timeout = 1)
     response = json.loads(ret.read())
     if 'error' in response: return response
     return [ {
@@ -202,7 +202,7 @@ class CCEDK(Exchange):
 
   def validate_request(self, key, unit, data, sign):
     headers = {"Content-type": "application/x-www-form-urlencoded", "Key": key, "Sign": sign}
-    response = json.loads(urllib2.urlopen(urllib2.Request('https://www.ccedk.com/api/v1/order/list', urllib.urlencode(data), headers)).read())
+    response = json.loads(urllib2.urlopen(urllib2.Request('https://www.ccedk.com/api/v1/order/list', urllib.urlencode(data), headers), timeout = 1).read())
     if not response['response']:
       response['error'] = ",".join(response['errors'].values())
       return response
@@ -279,7 +279,7 @@ class BitcoinCoId(Exchange):
 
   def validate_request(self, key, unit, data, sign):
     headers = {"Key": key, "Sign": sign}
-    response = json.loads(urllib2.urlopen(urllib2.Request('https://vip.bitcoin.co.id/tapi', urllib.urlencode(data), headers)).read())
+    response = json.loads(urllib2.urlopen(urllib2.Request('https://vip.bitcoin.co.id/tapi', urllib.urlencode(data), headers), timeout = 1).read())
     if response['success'] == 0:
       return response
     if not response['return']['orders']:
