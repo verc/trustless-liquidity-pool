@@ -265,6 +265,6 @@ class PyBot(ConnectionThread):
           else:
             self.logger.error('unable to retrieve server price: %s', response['message'])
       except Exception as e:
-        logger.error('exception caught in trading bot: %s', sys.exc_info()[1])
+        self.logger.error('exception caught in trading bot: %s', sys.exc_info()[1])
     time.sleep(1) # this is to ensure that the order book is updated
     self.shutdown()

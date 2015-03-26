@@ -375,10 +375,22 @@ class Peato(Exchange):
   def __init__(self):
     super(Peato, self).__init__(0.002)
 
-  def __repr__(self): return "peato"
+  def __repr__(self): return "testing"
+
+  def nonce(self, factor = 1.0):
+    return int(1000.0 * (time.time() + self._shift))
 
   def adjust(self, error):
-    print error
+    if "is invalid, current timestamp is" in error:
+      try:
+        tonce = int(error.split()[2])
+        times = int(error.split()[-1].replace('.', ''))
+        self._shift = int(float(times - tonce)/1000.0)
+      except:
+        print error
+        pass
+    else: print error
+
 
   def urlencode(self, params): # from https://github.com/JohnnyZhao/peatio-client-python/blob/master/lib/auth.py#L11
     keys = sorted(params.keys())

@@ -52,7 +52,7 @@ _interest = {
         }
       }
     },
-  'peato' : {
+  'testing' : {
     'btc' : {
       'bid': {
         'rate' : 0.025,
