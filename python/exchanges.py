@@ -473,5 +473,5 @@ class Peato(Exchange):
       'id' : int(order['id']),
       'price' : float(order['price']),
       'type' : 'ask' if order['side'] == 'sell' else 'bid',
-      'amount' : float(order['volume']),
+      'amount' : float(order['remaining_volume']),
       } for order in response ]
