@@ -22,7 +22,7 @@ class Exchange(object):
   def nonce(self, factor = 1000.0):
     nonce = int((time.time() + self._shift) * float(factor))
     if self._nonce >= nonce:
-      nonce = self._nonce + int(factor)
+      nonce = self._nonce + 1
     self._nonce = nonce
     return nonce
 
@@ -376,9 +376,6 @@ class Peato(Exchange):
     super(Peato, self).__init__(0.002)
 
   def __repr__(self): return "testing"
-
-  def nonce(self, factor = 1.0):
-    return int(1000.0 * (time.time() + self._shift))
 
   def adjust(self, error):
     if "is invalid, current timestamp is" in error:
