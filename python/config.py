@@ -51,6 +51,18 @@ _interest = {
         'target' : 25.0
         }
       }
+    },
+  'peato' : {
+    'btc' : {
+      'bid': {
+        'rate' : 0.025,
+        'target' : 1000.0
+        },
+      'ask': {
+        'rate' : 0.025,
+        'target' : 1000.0
+        }
+      }
     }
 }
 

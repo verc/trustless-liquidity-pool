@@ -369,3 +369,101 @@ class BTER(Exchange):
       'type' : 'ask' if order['buy_type'].lower() == unit.lower() else 'bid',
       'amount' : float(order['amount']) / (1.0 if order['buy_type'].lower() == unit.lower() else float(order['rate'])),
       } for order in response['orders'] if order['pair'] == 'nbt_' + unit.lower() ]
+
+
+class Peato(Exchange):
+  def __init__(self):
+    super(Peato, self).__init__(0.002)
+
+  def __repr__(self): return "peato"
+
+  def adjust(self, error):
+    print error
+
+  def urlencode(self, params): # from https://github.com/JohnnyZhao/peatio-client-python/blob/master/lib/auth.py#L11
+    keys = sorted(params.keys())
+    query = ''
+    for key in keys:
+      value = params[key]
+      if key != "orders":
+        query = "%s&%s=%s" % (query, key, value) if len(query) else "%s=%s" % (key, value)
+      else:
+        d = {key: params[key]}
+        for v in value:
+          ks = v.keys()
+          ks.sort()
+          for k in ks:
+            item = "orders[][%s]=%s" % (k, v[k])
+            query = "%s&%s" % (query, item) if len(query) else "%s" % item
+    return query
+
+  def query(self, qtype, method, params, key, secret):
+    request = { 'tonce' : self.nonce(), 'access_key' : key }
+    request.update(params)
+    data = self.urlencode(request)
+    msg = "%s|/api/v2/%s|%s" % (qtype, method, data)
+    data += "&signature=" + hmac.new(secret, msg, hashlib.sha256).hexdigest()
+    connection = httplib.HTTPSConnection('178.62.140.24', timeout=60)
+    connection.request(qtype, '/api/v2/' + method + '?' + data)
+    return json.loads(connection.getresponse().read())
+
+  def post(self, method, params, key, secret):
+    return self.query('POST', method, params, key, secret)
+
+  def get(self, method, params, key, secret):
+    return self.query('GET', method, params, key, secret)
+
+  def cancel_orders(self, unit, side, key, secret):
+    response = self.get('orders.json', { 'market' : "nbt%s"%unit.lower() }, key, secret)
+    if 'error' in response:
+      response['error'] = response['error']['message']
+      return response
+    for order in response:
+      if side == 'all' or (side == 'bid' and order['side'] == 'buy') or (side == 'ask' and order['side'] == 'sell'):
+        ret = self.post('order/delete.json', { 'id' : order['id'] }, key, secret)
+        if 'error' in ret:
+          if isinstance(response,list): response = { 'error': "" }
+          response['error'] += "," + ret['error']['message']
+    return response
+
+  def place_order(self, unit, side, key, secret, amount, price):
+    params = { 'market' : "nbt%s"%unit.lower(), "side" : 'buy' if side == 'bid' else 'sell', "volume" : amount, "price" : price  }
+    response = self.post('orders', params, key, secret)
+    if 'error' in response:
+      response['error'] = response['error']['message']
+    else:
+      response['id'] = int(response['id'])
+    return response
+
+  def get_balance(self, unit, key, secret):
+    response = self.get('members/me.json', {}, key, secret)
+    if 'error' in response:
+      response['error'] = response['error']['message']
+    else:
+      response['balance'] = 0.0
+      for pair in response['accounts']:
+        if pair['currency'] == unit.lower():
+          response['balance'] = float(pair['balance'])
+    return response
+
+  def create_request(self, unit, key = None, secret = None):
+    if not secret: return None, None
+    request = { 'tonce' : self.nonce(), 'access_key' : key, 'market' : "nbt%s"%unit.lower() }
+    data = self.urlencode(request)
+    msg = "GET|/api/v2/orders.json|%s" % data
+    request['signature'] = hmac.new(secret, msg, hashlib.sha256).hexdigest()
+    return request, ''
+
+  def validate_request(self, key, unit, data, sign):
+    connection = httplib.HTTPSConnection('178.62.140.24', timeout=60)
+    connection.request('GET', '/api/v2/orders.json?' + self.urlencode(data))
+    response = json.loads(connection.getresponse().read())
+    if 'error' in response:
+      response['error'] = response['error']['message']
+      return response
+    return [ {
+      'id' : int(order['id']),
+      'price' : float(order['price']),
+      'type' : 'ask' if order['side'] == 'sell' else 'bid',
+      'amount' : float(order['volume']),
+      } for order in response ]
