@@ -75,10 +75,11 @@ class ConnectionThread(threading.Thread):
 class PriceFeed():
   def __init__(self, update_interval, logger):
     self.update_interval = update_interval
-    self.feed = { 'btc' : [0, threading.Lock(), 0.0] }
+    self.feed = { x : [0, threading.Lock(), 0.0] for x in [ 'btc', 'eur' ] }
     self.logger = logger if logger else logging.getLogger('null')
 
   def price(self, unit, force = False):
+    if unit == 'usd': return 1.0
     if not unit in self.feed: return None
     self.feed[unit][1].acquire()
     curtime = time.time()
@@ -101,5 +102,13 @@ class PriceFeed():
               self.feed['btc'][2] = 2.0 / (float(ret['ask']) + float(ret['bid']))
             except:
               self.logger.error("unable to update price for BTC")
+      elif unit == 'eur':
+        try: # yahoo
+          ret = json.loads(urllib2.urlopen(urllib2.Request('http://finance.yahoo.com/webservice/v1/symbols/allcurrencies/quote?format=json'), timeout = 1).read())
+          for res in ret['list']['resources']:
+            if res['resource']['fields']['name'] == 'USD/EUR':
+              self.feed['eur'][2] = float(res['resource']['fields']['price'])
+        except:
+          self.logger.error("unable to update price for BTC")
     self.feed[unit][1].release()
     return self.feed[unit][2]

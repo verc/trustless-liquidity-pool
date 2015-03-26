@@ -135,7 +135,8 @@ for user in userdata:
   for unit in user[1].split(','):
     unit = unit.lower()
     if not unit in exchangeinfo[name]:
-      logger.error("unit %s on exchange %s not supported by pool: %s", unit, name)
+      logger.error("unit %s on exchange %s not supported by pool", unit, name)
+      logger.info("supported units on exchange %s are: %s", name, " ".join(exchangeinfo[name]))
       sys.exit(2)
     cost = { 'bid' : exchangeinfo[name][unit]['bid']['rate'], 'ask' : exchangeinfo[name][unit]['ask']['rate'] }
     if len(user) >= 6 and float(user[5]) != 0.0:

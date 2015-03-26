@@ -62,8 +62,28 @@ _interest = {
         'rate' : 0.025,
         'target' : 1000.0
         }
+      },
+    'usd' : {
+      'bid': {
+        'rate' : 0.0025,
+        'target' : 100000.0
+        },
+      'ask': {
+        'rate' : 0.0025,
+        'target' : 100000.0
+        }
+    },
+    'eur' : {
+      'bid': {
+        'rate' : 0.0025,
+        'target' : 100000.0
+      },
+      'ask': {
+        'rate' : 0.0025,
+        'target' : 100000.0
       }
     }
+  }
 }
 
 _nuconfig = '%s/.nu/nu.conf'%os.getenv("HOME") # path to nu.conf
