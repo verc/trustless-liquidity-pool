@@ -301,10 +301,10 @@ class BTER(Exchange):
   def adjust(self, error):
     print error
 
-  def https_request(self, method, params, headers = None):
+  def https_request(self, method, params, headers = None, timeout = None):
     if not headers: headers = {}
-    connection = httplib.HTTPSConnection('data.bter.com', timeout=3)
-    connection.request('POST', '/api/1/private/' + method, params, headers)
+    connection = httplib.HTTPSConnection('data.bter.com')
+    connection.request('POST', '/api/1/private/' + method, params, headers, timeout = timeout)
     response = connection.getresponse().read()
     return json.loads(response)
 
@@ -357,7 +357,7 @@ class BTER(Exchange):
 
   def validate_request(self, key, unit, data, sign):
     headers = { 'Sign' : sign, 'Key' : key, "Content-type": "application/x-www-form-urlencoded" }
-    response = self.https_request('orderlist', urllib.urlencode(data), headers)
+    response = self.https_request('orderlist', urllib.urlencode(data), headers, timeout = 1)
     if not response['result']:
       response['error'] = response['msg']
       return response
