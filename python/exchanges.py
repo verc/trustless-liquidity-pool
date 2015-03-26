@@ -463,7 +463,7 @@ class Peato(Exchange):
     return request, ''
 
   def validate_request(self, key, unit, data, sign):
-    connection = httplib.HTTPSConnection('178.62.140.24', timeout = 5)
+    connection = httplib.HTTPSConnection('178.62.140.24', timeout = 15)
     connection.request('GET', '/api/v2/orders.json?' + self.urlencode(data))
     response = json.loads(connection.getresponse().read())
     if 'error' in response:
