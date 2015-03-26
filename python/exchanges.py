@@ -81,7 +81,7 @@ class Poloniex(Exchange):
 
   def validate_request(self, key, unit, data, sign):
     headers = { 'Sign' : sign, 'Key' : key }
-    ret = urllib2.urlopen(urllib2.Request('https://poloniex.com/tradingApi', urllib.urlencode(data), headers), timeout = 1)
+    ret = urllib2.urlopen(urllib2.Request('https://poloniex.com/tradingApi', urllib.urlencode(data), headers), timeout = 5)
     response = json.loads(ret.read())
     if 'error' in response: return response
     return [ {
@@ -202,7 +202,7 @@ class CCEDK(Exchange):
 
   def validate_request(self, key, unit, data, sign):
     headers = {"Content-type": "application/x-www-form-urlencoded", "Key": key, "Sign": sign}
-    response = json.loads(urllib2.urlopen(urllib2.Request('https://www.ccedk.com/api/v1/order/list', urllib.urlencode(data), headers), timeout = 1).read())
+    response = json.loads(urllib2.urlopen(urllib2.Request('https://www.ccedk.com/api/v1/order/list', urllib.urlencode(data), headers), timeout = 5).read())
     if not response['response']:
       response['error'] = ",".join(response['errors'].values())
       return response
@@ -279,7 +279,7 @@ class BitcoinCoId(Exchange):
 
   def validate_request(self, key, unit, data, sign):
     headers = {"Key": key, "Sign": sign}
-    response = json.loads(urllib2.urlopen(urllib2.Request('https://vip.bitcoin.co.id/tapi', urllib.urlencode(data), headers), timeout = 1).read())
+    response = json.loads(urllib2.urlopen(urllib2.Request('https://vip.bitcoin.co.id/tapi', urllib.urlencode(data), headers), timeout = 5).read())
     if response['success'] == 0:
       return response
     if not response['return']['orders']:
@@ -357,7 +357,7 @@ class BTER(Exchange):
 
   def validate_request(self, key, unit, data, sign):
     headers = { 'Sign' : sign, 'Key' : key, "Content-type": "application/x-www-form-urlencoded" }
-    response = self.https_request('orderlist', urllib.urlencode(data), headers, timeout = 1)
+    response = self.https_request('orderlist', urllib.urlencode(data), headers, timeout = 5)
     if not response['result']:
       response['error'] = response['msg']
       return response
@@ -414,7 +414,7 @@ class Peato(Exchange):
     data = self.urlencode(request)
     msg = "%s|/api/v2/%s|%s" % (qtype, method, data)
     data += "&signature=" + hmac.new(secret, msg, hashlib.sha256).hexdigest()
-    connection = httplib.HTTPSConnection('178.62.140.24', timeout=60)
+    connection = httplib.HTTPSConnection('178.62.140.24', timeout = 5)
     connection.request(qtype, '/api/v2/' + method + '?' + data)
     return json.loads(connection.getresponse().read())
 
@@ -466,7 +466,7 @@ class Peato(Exchange):
     return request, ''
 
   def validate_request(self, key, unit, data, sign):
-    connection = httplib.HTTPSConnection('178.62.140.24', timeout = 1)
+    connection = httplib.HTTPSConnection('178.62.140.24', timeout = 5)
     connection.request('GET', '/api/v2/orders.json?' + self.urlencode(data))
     response = json.loads(connection.getresponse().read())
     if 'error' in response:
