@@ -469,7 +469,6 @@ class Peato(Exchange):
     if 'error' in response:
       response['error'] = response['error']['message']
       return response
-    print response
     return [ {
       'id' : int(order['id']),
       'price' : float(order['price']),

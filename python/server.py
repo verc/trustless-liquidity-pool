@@ -123,11 +123,11 @@ class User(threading.Thread):
     self.last_error = ""
     self.cost = { 'ask' : config._interest[repr(exchange)][unit]['bid']['rate'], 'bid' : config._interest[repr(exchange)][unit]['ask']['rate'] }
     self.rate = { 'ask' : config._interest[repr(exchange)][unit]['bid']['rate'], 'bid' : config._interest[repr(exchange)][unit]['ask']['rate'] }
-    self.liquidity = { 'ask' : [[]] * sampling, 'bid' : [[]] * sampling }
+    self.liquidity = { 'ask' : [[] for i in xrange(sampling)], 'bid' : [[] for i in xrange(sampling)] }
     self.lock = threading.Lock()
     self.trigger = threading.Lock()
     self.trigger.acquire()
-    self.response = ['m'] * sampling
+    self.response = ['m' for i in xrange(sampling)]
     self.logger = logger if logger else logging.getLogger('null')
     self.requests = []
     self.daemon = True
@@ -312,6 +312,7 @@ def credit():
           mass = sum([orders[i][1][1] for i in xrange(len(orders)) if i == 0 or orders[i][1][0] != orders[i - 1][1][0]])
           residual = min(config._interest[name][unit][side]['target'], mass - config._interest[name][unit][side]['target'])
           weight = { user : sum([o[1][1] for o in orders if o[0] == user]) for user in users }
+          print mass, residual, weight
           if residual > 0:
             for i in xrange(len(orders)):
               user, order = orders[i]
