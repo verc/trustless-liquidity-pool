@@ -79,7 +79,7 @@ class PriceFeed():
     self.logger = logger if logger else logging.getLogger('null')
 
   def price(self, unit, force = False):
-    if unit == 'usd': return 1.0
+    if unit == 'usd' or unit == 'nbt': return 1.0 #AlwaysADollar
     if not unit in self.feed: return None
     self.feed[unit][1].acquire()
     curtime = time.time()

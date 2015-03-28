@@ -232,34 +232,23 @@ class PyBot(ConnectionThread):
                 self.cancel_orders()
               elif curtime - efftime > 120:
                 efftime = curtime
-                for side in [ 'bid', 'ask' ]:
-                  info = self.requester.interest()[side]
-                  if 'orders' in info and len(info['orders']) > 0:
-                    maxsample = 0
-                    maxindex = 0
-                    for i in xrange(len(info['orders'])):
-                      if len(info['orders'][i]) > maxsample:
-                        maxsample = len(info['orders'][i])
-                        maxindex = i
-                    orders = [ (order['id'], order['amount'], order['cost']) for order in info['orders'][maxindex] ]
-                    weight = sum([ o[1] for o in orders if o[0] in self.orders ]) #sum([order['amount'] for order in info['orders'][-1] if order['id'] in self.orders])
-                    mass = sum([ o[1] for o in orders if o[2] <= info['target'] ]) #sum([order['amount'] for order in info['orders'][-1]])
-                    contrib = sum([ o[0] for o in orders if o[0] in self.orders and o[2] >= 0.0 ])
-                    #print "weight:", weight, "mass:", mass, "contrib:", contrib, "sel:", len(orders.keys()), "info:", len(info['orders'])
-                    if mass + self.limit[side] < info['target']:
-                      self.logger.info('increasing tier 1 %s limit of unit %s on %s from %.2f to %.2f',
-                        side, self.unit, repr(self.exchange), weight + self.limit[side], weight + info['target'] - mass)
-                      self.limit[side] = info['target'] - mass
-                    elif weight >= 2.0 and weight - contrib > 0.1 * info['target'] and contrib / weight < 0.80:
-                      self.logger.info('decreasing tier 1 %s limit of unit %s on %s from %.2f to %.2f',
-                        side, self.unit, repr(self.exchange), weight + self.limit[side], max(0.5, weight * 0.9))
-                      self.cancel_orders(side)
-                      self.limit[side] = max(0.5, weight * 0.9) # place at least 0.5 NBT to see when interest raises again
-                    elif self.limit[side] == 0 and (weight == 0 or contrib / weight > 0.95):
-                      step = max(0.5, contrib * 0.1)
-                      self.logger.info('increasing tier 1 %s limit of unit %s on %s from %.2f to %.2f',
-                        side, self.unit, repr(self.exchange), weight + self.limit[side], weight + self.limit[side] + step)
-                      self.limit[side] += step
+                response = self.conn.get(self.key, trials = 1)
+                if 'error' in response:
+                  self.logger.error('unable to receive statistics for user %s: %s', self.key, response['message'])
+                else:
+                  for side in [ 'bid', 'ask' ]:
+                    effective_rate = 0.0
+                    total = 0.0
+                    effective_rate = float(sum([ o[1] * o[2] for o in response['units'][self.unit][side] ]))
+                    total = float(sum([ o[1] for o in response['units'][self.unit][side] ]))
+                    if total == 0:
+                      self.limit[side] = 0.5
+                    else:
+                      effective_rate /= total
+                      if effective_rate < self.requester.cost[side]:
+                        self.cancel_orders(side)
+                      deviation = 1.0 - min(effective_rate, self.requester.cost[side]) / max(effective_rate, self.requester.cost[side])
+                      self.limit[side] = total * deviation
               self.place('bid')
               self.place('ask')
           else:
