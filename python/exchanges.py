@@ -361,7 +361,6 @@ class BTER(Exchange):
     if not response['result']:
       response['error'] = response['msg']
       return response
-    print response
     if not response['orders']:
       response['orders'] = []
     return [ {
