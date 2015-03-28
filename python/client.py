@@ -190,7 +190,8 @@ while True: # print some info every minute until program terminates
           response['balance'], effective_rate * 100, response['efficiency'] * 100, response['rejects'], response['missing'], user )
         for unit in response['units']:
           market = response['units'][unit]
-          logger.info('%s - %s - bid: %.8f x %.2f, %.8f x %.2f, %.8f x %.2f ask: %.8f x %.2f, %.8f x %.2f, %.8f x %.2f', repr(users[user].values()[0]['request'].exchange), unit, 
+          print market
+          logger.info('%s - %s - bid: %.8f x %.2f%%, %.8f x %.2f%%, %.8f x %.2f%% ask: %.8f x %.2f%%, %.8f x %.2f%%, %.8f x %.2f%%', repr(users[user].values()[0]['request'].exchange), unit, 
             market['bid'][0]['amount'], market['bid'][0]['cost'] * 100.0, market['bid'][1]['amount'], market['bid'][1]['cost'] * 100.0, market['bid'][2]['amount'], market['bid'][2]['cost'] * 100.0,
             market['ask'][0]['amount'], market['ask'][0]['cost'] * 100.0, market['ask'][1]['amount'], market['ask'][1]['cost'] * 100.0, market['ask'][2]['amount'], market['ask'][2]['cost'] * 100.0)
 

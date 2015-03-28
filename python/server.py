@@ -124,7 +124,8 @@ class User(threading.Thread):
     self.cost = { 'ask' : config._interest[repr(exchange)][unit]['bid']['rate'], 'bid' : config._interest[repr(exchange)][unit]['ask']['rate'] }
     self.rate = { 'ask' : config._interest[repr(exchange)][unit]['bid']['rate'], 'bid' : config._interest[repr(exchange)][unit]['ask']['rate'] }
     self.liquidity = { 'ask' : [[] for i in xrange(sampling)], 'bid' : [[] for i in xrange(sampling)] }
-    self.credits = { 'ask' : [ [] for i in xrange(sampling) ], 'bid' : [ [] for i in xrange(sampling) ] }
+    self.credits = { 'ask' : [ {'amount' : 0.0, 'cost' : 0.0}, {'amount' : 0.0, 'cost' : 0.0}, {'amount' : 0.0, 'cost' : 0.0} ],
+                     'bid' : [ {'amount' : 0.0, 'cost' : 0.0}, {'amount' : 0.0, 'cost' : 0.0}, {'amount' : 0.0, 'cost' : 0.0} ] }
     self.lock = threading.Lock()
     self.trigger = threading.Lock()
     self.trigger.acquire()
