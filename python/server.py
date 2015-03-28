@@ -341,7 +341,7 @@ def credit():
                   keys[user][unit].rate[side] += price * contrib / (volume[0][user] * config._sampling)
                   config._interest[name][unit][side]['orders'][sample].append({ 'amount' : contrib, 'cost' : price })
                   creditor.info("[%d/%d] %.8f %s %.8f %s %s %s %.2f", 
-                    sample + 1, config._sampling, payout / float(24 * 60  * config._sampling), user, contrib, side, name, unit, price*100)
+                    sample + 1, config._sampling, payout / float(24 * 60  * config._sampling), user, contrib, side, name, unit, price * 100)
               norm = float(sum([ max(0,v) for v in volume[1].values()]))
               if norm > 0: # credit lower payout level
                 for user in volume[1]:
@@ -355,7 +355,7 @@ def credit():
                     keys[user][unit].rate[side] += price * contrib / (volume[1][user] * config._sampling)
                     config._interest[name][unit][side]['orders'][sample].append( { 'amount' : contrib, 'cost' : price } )
                     creditor.info("[%d/%d] %.8f %s %.8f %s %s %s %.2f", 
-                      sample + 1, config._sampling, payout / float(24 * 60  * config._sampling), user, contrib, side, name, unit, price*100)
+                      sample + 1, config._sampling, payout / float(24 * 60  * config._sampling), user, contrib, side, name, unit, price * 100)
             for user in volume[2]:
               if volume[2][user] > 0:
                 keys[user][unit].credits[side][sample].append({'amount' : volume[2][user], 'cost' : 0.0})

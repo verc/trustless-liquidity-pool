@@ -99,11 +99,6 @@ class PyBot(ConnectionThread):
       self.logger.info('adjusting nonce of exchange %s to %d', repr(self.exchange), self.exchange._shift)
     else:
       self.logger.info('successfully deleted %s orders for unit %s on exchange %s', side, self.unit, repr(self.exchange))
-      if reset:
-        if side == 'all' or side == 'bid':
-          self.limit['bid'] = self.requester.interest()['bid']['target']
-        if side == 'all' or side == 'ask':
-          self.limit['ask'] = self.requester.interest()['ask']['target']
     return response
 
   def shutdown(self):
@@ -202,8 +197,8 @@ class PyBot(ConnectionThread):
     self.place('ask')
     prevprice = self.serverprice
     curtime = time.time()
-    efftime = time.time()
-    lasttime = time.time()
+    efftime = curtime
+    lasttime = curtime
     while self.active:
       try:
         time.sleep(max(1 - time.time() + curtime, 0))
@@ -212,6 +207,7 @@ class PyBot(ConnectionThread):
         lasttime = curtime
         if self.requester.errorflag:
           self.shutdown()
+          efftime = curtime
         else:
           response = self.conn.get('price/' + self.unit, trials = 3, timeout = 15)
           if not 'error' in response:
@@ -220,12 +216,14 @@ class PyBot(ConnectionThread):
             if 1.0 - min(self.serverprice, userprice) / max(self.serverprice, userprice) > 0.005: # validate server price
               self.logger.error('server price %.8f for unit %s deviates too much from price %.8f received from ticker, will delete all orders for this unit', self.serverprice, self.unit, userprice)
               self.shutdown()
+              efftime = curtime
             else:
               deviation = 1.0 - min(prevprice, self.serverprice) / max(prevprice, self.serverprice)
               if deviation > 0.00375:
                 self.logger.info('price of unit %s moved from %.8f to %.8f, will try to reset orders', self.unit, prevprice, self.serverprice)
                 prevprice = self.serverprice
                 self.cancel_orders()
+                efftime = curtime
               elif curtime - efftime > 120:
                 efftime = curtime
                 response = self.conn.get(self.key, trials = 1)
@@ -243,15 +241,16 @@ class PyBot(ConnectionThread):
                       effective_rate /= total
                       deviation = 1.0 - min(effective_rate, self.requester.cost[side]) / max(effective_rate, self.requester.cost[side])
                       if deviation > 0.02:
-                        if effective_rate < self.requester.cost[side]:
-                          self.logger.info("decreasing tier 1 fund limit from %.8f to %.8f", total, total * (1.0 - deviation))
+                        if self.limit[side] >= 0.5 and effective_rate < self.requester.cost[side]:
+                          funds = max(0.5, total * (1.0 - deviation))
+                          self.logger.info("decreasing tier 1 fund limit from %.8f to %.8f", total, funds)
                           self.cancel_orders(side)
-                          self.limit[side] = total * (1.0 - deviation)
+                          self.limit[side] = funds
                         elif self.limit[side] < total * deviation:
                           self.logger.info("increasing tier 1 fund limit from %.8f to %.8f", total, total * (1.0 + deviation))
                           self.limit[side] = total * deviation
-              self.place('bid')
-              self.place('ask')
+                self.place('bid')
+                self.place('ask')
           else:
             self.logger.error('unable to retrieve server price: %s', response['message'])
       except Exception as e:
