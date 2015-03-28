@@ -173,7 +173,6 @@ class PyBot(ConnectionThread):
       self.exchange.adjust(response['error'])
       self.logger.info('adjusting nonce of exchange %s to %d', repr(self.exchange), self.exchange._shift)
     elif response['balance'] > 0.1:
-      #balance = response['balance'] if exunit == 'nbt' else response['balance'] / price
       amount = min(self.limit[side], response['balance'])
       if amount > 0.1:
         try:
@@ -182,16 +181,13 @@ class PyBot(ConnectionThread):
         except: response = { 'error' : 'exception caught: %s' % sys.exc_info()[1] }
         if 'error' in response:
           self.logger.error('unable to place %s %s order of %.4f nbt at %.8f on exchange %s: %s',
-            side, exunit, amount, price, repr(self.exchange), response['error'])
+            side, self.unit, amount, price, repr(self.exchange), response['error'])
           self.exchange.adjust(response['error'])
         else:
           self.logger.info('successfully placed %s %s order of %.4f nbt at %.8f on exchange %s',
-            side, exunit, amount, price, repr(self.exchange))
+            side, self.unit, amount, price, repr(self.exchange))
           self.orders.append(response['id'])
           self.limit[side] -= amount
-      #else:
-      #  self.logger.error('not placing %s %s order of %.4f nbt at %.8f on exchange %s: target limit reached',
-      #      side, exunit, response['balance'], price, repr(self.exchange))
     return response
 
   def run(self):

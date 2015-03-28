@@ -357,10 +357,11 @@ class BTER(Exchange):
 
   def validate_request(self, key, unit, data, sign):
     headers = { 'Sign' : sign, 'Key' : key, "Content-type": "application/x-www-form-urlencoded" }
-    response = self.https_request('orderlist', urllib.urlencode(data), headers, timeout = 5)
+    response = self.https_request('orderlist', urllib.urlencode(data), headers, timeout = 15)
     if not response['result']:
       response['error'] = response['msg']
       return response
+    print response
     if not response['orders']:
       response['orders'] = []
     return [ {
