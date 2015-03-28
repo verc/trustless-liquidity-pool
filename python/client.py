@@ -180,8 +180,8 @@ while True: # print some info every minute until program terminates
         total = 0.0
         for unit in response['units']:
           for side in [ 'bid', 'ask' ]:
-            effective_rate += float(sum([ o[1] * o[2] for o in response['units'][unit][side] ]))
-            total += float(sum([ o[1] for o in response['units'][unit][side] ]))
+            effective_rate += float(sum([ o['amount'] * o['cost'] for o in response['units'][unit][side] ]))
+            total += float(sum([ o['amount'] for o in response['units'][unit][side] ]))
         if total > 0.0: effective_rate /= total
         logger.info('%s - balance: %.8f rate %.2f%% efficiency: %.2f%% rejects: %d missing: %d units: %s - %s', repr(users[user].values()[0]['request'].exchange),
           response['balance'], effective_rate * 100, response['efficiency'] * 100, response['rejects'], response['missing'], response['units'], user )

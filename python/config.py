@@ -7,79 +7,79 @@ _interest = {
   'poloniex' : {
     'btc' : {
       'bid': {
-        'rate' : 0.025,
-        'target' : 25.0
+        'rate' : 0.01,
+        'target' : 50.0
         },
       'ask': {
-        'rate' : 0.025,
-        'target' : 25.0
+        'rate' : 0.01,
+        'target' : 50.0
         }
       }
   },
   'ccedk' : {
     'btc' : {
       'bid': {
-        'rate' : 0.025,
-        'target' : 25.0
+        'rate' : 0.01,
+        'target' : 50.0
         },
       'ask': {
-        'rate' : 0.025,
-        'target' : 25.0
+        'rate' : 0.01,
+        'target' : 50.0
         }
       }
   },
   'bitcoincoid' : {
     'btc' : {
       'bid': {
-        'rate' : 0.025,
-        'target' : 25.0
+        'rate' : 0.01,
+        'target' : 50.0
         },
       'ask': {
-        'rate' : 0.025,
-        'target' : 25.0
+        'rate' : 0.01,
+        'target' : 50.0
         }
       }
     },
   'bter' : {
     'btc' : {
       'bid': {
-        'rate' : 0.025,
-        'target' : 25.0
+        'rate' : 0.01,
+        'target' : 50.0
         },
       'ask': {
-        'rate' : 0.025,
-        'target' : 25.0
+        'rate' : 0.01,
+        'target' : 50.0
         }
       }
     },
   'testing' : {
     'btc' : {
       'bid': {
-        'rate' : 0.025,
+        'rate' : 0.0,
         'target' : 1000.0
         },
       'ask': {
-        'rate' : 0.025,
+        'rate' : 0.0,
         'target' : 1000.0
         }
       },
     'usd' : {
       'bid': {
-        'rate' : 0.0025,
+        'rate' : 0.0,
         'target' : 100000.0
         },
       'ask': {
-        'rate' : 0.0025,
+        'rate' : 0.0,
         'target' : 100000.0
         }
     },
     'eur' : {
       'bid': {
-        'rate' : 0.0025,
+        'rate' : 0.0,
         'target' : 100000.0
       },
       'ask': {
-        'rate' : 0.0025,
+        'rate' : 0.0,
         'target' : 100000.0
       }
     }

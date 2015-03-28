@@ -239,8 +239,8 @@ class PyBot(ConnectionThread):
                   for side in [ 'bid', 'ask' ]:
                     effective_rate = 0.0
                     total = 0.0
-                    effective_rate = float(sum([ o[1] * o[2] for o in response['units'][self.unit][side] ]))
-                    total = float(sum([ o[1] for o in response['units'][self.unit][side] ]))
+                    effective_rate = float(sum([ o['amount'] * o['cost'] for o in response['units'][self.unit][side] ]))
+                    total = float(sum([ o['amount'] for o in response['units'][self.unit][side] ]))
                     if total == 0:
                       self.limit[side] = 0.5
                     else:

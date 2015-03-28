@@ -124,6 +124,7 @@ class User(threading.Thread):
     self.cost = { 'ask' : config._interest[repr(exchange)][unit]['bid']['rate'], 'bid' : config._interest[repr(exchange)][unit]['ask']['rate'] }
     self.rate = { 'ask' : config._interest[repr(exchange)][unit]['bid']['rate'], 'bid' : config._interest[repr(exchange)][unit]['ask']['rate'] }
     self.liquidity = { 'ask' : [[] for i in xrange(sampling)], 'bid' : [[] for i in xrange(sampling)] }
+    self.credits = { 'ask' : [ [] for i in xrange(sampling) ], 'bid' : [ [] for i in xrange(sampling) ] }
     self.lock = threading.Lock()
     self.trigger = threading.Lock()
     self.trigger.acquire()
@@ -267,15 +268,21 @@ def userstats(user):
   res['units'] = {}
   for unit in keys[user]:
     if keys[user][unit].active:
-      bid = [[]] + [ x for x in keys[user][unit].liquidity['bid'] if x ]
-      ask = [[]] + [ x for x in keys[user][unit].liquidity['ask'] if x ]
+      maxsum = 0.0
+      maxidx = 0
+      for i in xrange(config._sampling):
+        sumbids = sum([ order['amount'] for order in keys[user][unit].credits['bid'][i] ])
+        sumasks = sum([ order['amount'] for order in keys[user][unit].credits['ask'][i] ])
+        if sumbids + sumasks > maxsum:
+          maxsum = sumbids + sumasks
+          maxidx = i
       missing = keys[user][unit].response.count('m')
       rejects = keys[user][unit].response.count('r')
       res['balance'] += keys[user][unit].balance
       res['missing'] += missing
       res['rejects'] += rejects
-      res['units'][unit] = { 'bid' : bid[-1],
-                             'ask' : ask[-1],
+      res['units'][unit] = { 'bid' : keys[user][unit].credits['bid'][maxidx],
+                             'ask' : keys[user][unit].credits['ask'][maxidx],
                              'rate' : keys[user][unit].rate,
                              'rejects' : rejects,
                              'missing' : missing,
@@ -297,50 +304,54 @@ def credit():
           config._interest[name][unit][side]['orders'].append([])
           # payout variables
           maxrate = config._interest[name][unit][side]['rate'] 
-          orders = []
+          submitted = []
           for user in users:
-            orders += [ (user, order) for order in keys[user][unit].liquidity[side][sample] if order[2] <= maxrate ]
-          orders.sort(key = lambda x: (x[1][2], x[1][0]))
-          mass = sum([orders[i][1][1] for i in xrange(len(orders)) if i == 0 or orders[i][1][0] != orders[i - 1][1][0]])
+            submitted += [ (user, order) for order in keys[user][unit].liquidity[side][sample] if order[2] <= maxrate ]
+          submitted.sort(key = lambda x: (x[1][2], x[1][0]))
+          orders = [ submitted[i] for i in xrange(len(submitted)) if i == 0 or submitted[i][1][0] != submitted[i - 1][1][0] ]
+          mass = sum([order[1] for _,order in submitted])
           if mass > 0:
             target = min(mass, config._interest[name][unit][side]['target'])
             lvl = int(mass / target)
-            pricelevels = sorted(list(set( [ order[2] for _,order in orders if order[2] <= maxrate ])) + [ maxrate ], reverse = True)
+            pricelevels = sorted(list(set( [ order[2] for _,order in orders ])) + [ maxrate ])
             # collect user contribution
             volume = [ { user : 0.0 for user in users }, { user : 0.0 for user in users } ]
             for i in xrange(len(orders)):
               user,order = orders[i]
               if order[0] != orders[i-1][1][0]:
                 ulvl = pricelevels.index(order[2])
-                if ulvl >= lvl:
+                if ulvl <= lvl:
                   volume[0][user] += order[1]
-                  if ulvl >= lvl + 1:
+                  if ulvl <= lvl - 1:
                     volume[1][user] += order[1]
             # credit payout according to contribution
-            #print lvl, target, mass, ((lvl+1) * target - mass),
             norm = float(sum(volume[0].values()))
             if norm > 0: # credit higher payout level
               for user in volume[0]:
                 if volume[0][user] > 0:
+                  price = pricelevels[-lvl]
                   contrib = ((lvl+1) * target - mass) * volume[0][user] / norm
-                  payout = contrib * pricelevels[lvl]
+                  payout = contrib * price
                   volume[1][user] -= contrib
                   keys[user][unit].balance += payout
-                  keys[user][unit].rate[side] += pricelevels[lvl] * contrib / (volume[0][user] * 24 * 60 * config._sampling)
-                  config._interest[name][unit][side]['orders'][sample].append( { 'id': 0, 'amount' : contrib, 'cost' : pricelevels[lvl] } )
+                  keys[user][unit].credits[side][sample] = [{'amount' : contrib, 'cost' : price}] # TODO: REMOVE COMPAT
+                  keys[user][unit].rate[side] += price * contrib / (volume[0][user] * config._sampling)
+                  config._interest[name][unit][side]['orders'][sample].append( { 'id': 0, 'amount' : contrib, 'cost' : price } )
                   creditor.info("[%d/%d] %.8f %s %.8f %s %s %s %.2f", 
-                    sample + 1, config._sampling, payout, user, contrib, side, name, unit, pricelevels[lvl])
+                    sample + 1, config._sampling, payout, user, contrib, side, name, unit, price*100)
               norm = float(sum([ max(0,v) for v in volume[1].values()]))
               if norm > 0: # credit lower payout level
                 for user in volume[1]:
                   if volume[1][user] > 0:
+                    price = pricelevels[-lvl-1]
                     contrib = (mass - lvl * target) * volume[1][user] / norm
-                    payout = contrib * pricelevels[lvl+1]
+                    payout = contrib * price
                     keys[user][unit].balance += payout
-                    keys[user][unit].rate[side] += pricelevels[lvl+1] * contrib / (volume[1][user] * 24 * 60 * config._sampling)
-                    config._interest[name][unit][side]['orders'][sample].append( { 'id': 0, 'amount' : contrib, 'cost' : pricelevels[lvl+1] } )
+                    keys[user][unit].credits[side][sample].append({'amount' : contrib, 'cost' : price}) # TODO: REMOVE COMPAT
+                    keys[user][unit].rate[side] += price * contrib / (volume[1][user] * config._sampling)
+                    config._interest[name][unit][side]['orders'][sample].append( { 'amount' : contrib, 'cost' : price } )
                     creditor.info("[%d/%d] %.8f %s %.8f %s %s %s %.2f", 
-                      sample + 1, config._sampling, payout, user, contrib, side, name, unit, pricelevels[lvl+1])
+                      sample + 1, config._sampling, payout, user, contrib, side, name, unit, price*100)
 
 def pay(nud):
   txout = {}
