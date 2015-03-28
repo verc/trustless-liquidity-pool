@@ -115,7 +115,7 @@ class RequestThread(ConnectionThread):
 conn = Connection(_server, logger)
 basestatus = conn.get('status')
 exchangeinfo = conn.get('exchanges')
-sampling = min(240, basestatus['sampling'] * 2)
+sampling = min(240, 3 * basestatus['sampling'] / 2)
 
 # parse user data
 users = {}
@@ -175,6 +175,10 @@ while True: # print some info every minute until program terminates
       if 'error' in response:
         logger.error('unable to receive statistics for user %s: %s', user, response['message'])
         users[user].values()[0]['request'].register() # reassure to be registered if 
+        newstatus = conn.get('status', trials = 3)
+        if not error in newstatus:
+          basestatus = newstatus
+          sampling = min(240, 3 * basestatus['sampling'] / 2)
       else:
         effective_rate = 0.0
         total = 0.0
@@ -200,7 +204,7 @@ while True: # print some info every minute until program terminates
                       unit, repr(users[user][unit]['request'].exchange), users[user][unit]['request'].exchange._shift)
                     break
               if response['units'][unit]['missing'] / float(basestatus['sampling']) >= 0.1: # look for missing error and adjust sampling
-                if users[user][unit]['request'].sampling < 120: # just send more requests
+                if users[user][unit]['request'].sampling < 2 * sampling: # just send more requests
                   users[user][unit]['request'].sampling = users[user][unit]['request'].sampling + 1
                   logger.warning('too many missing requests for unit %s on exchange %s, increasing sampling to %d',
                     unit, repr(users[user][unit]['request'].exchange), users[user][unit]['request'].sampling)
