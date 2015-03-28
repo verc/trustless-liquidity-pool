@@ -302,11 +302,11 @@ def credit():
         config._interest[name][unit][side]['orders'] = []
         for sample in xrange(config._sampling):
           config._interest[name][unit][side]['orders'].append([])
-          keys[user][unit].credits[side][sample] = []
           # payout variables
           maxrate = config._interest[name][unit][side]['rate'] 
           submitted = []
           for user in users:
+            keys[user][unit].credits[side][sample] = []
             submitted += [ (user, order) for order in keys[user][unit].liquidity[side][sample] if order[2] <= maxrate ]
           submitted.sort(key = lambda x: (x[1][2], x[1][0]))
           orders = [ submitted[i] for i in xrange(len(submitted)) if i == 0 or submitted[i][1][0] != submitted[i - 1][1][0] ]
