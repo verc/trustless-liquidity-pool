@@ -355,9 +355,9 @@ def credit():
                     config._interest[name][unit][side]['orders'][sample].append( { 'amount' : contrib, 'cost' : price } )
                     creditor.info("[%d/%d] %.8f %s %.8f %s %s %s %.2f", 
                       sample + 1, config._sampling, payout / float(24 * 60  * config._sampling), user, contrib, side, name, unit, price*100)
-              for user in volume[2]:
-                if volume[2][user] > 0:
-                  keys[user][unit].credits[side][sample].append({'amount' : volume[2][user], 'cost' : 0.0})
+            for user in volume[2]:
+              if volume[2][user] > 0:
+                keys[user][unit].credits[side][sample].append({'amount' : volume[2][user], 'cost' : 0.0})
 
 def pay(nud):
   txout = {}
