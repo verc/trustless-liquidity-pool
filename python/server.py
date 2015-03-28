@@ -306,7 +306,7 @@ def credit():
           maxrate = config._interest[name][unit][side]['rate'] 
           submitted = []
           for user in users:
-            keys[user][unit].credits[side][sample] = [ {}, {}, {} ]
+            keys[user][unit].credits[side][sample] = [ {'amount' : 0.0, 'cost' : 0.0}, {'amount' : 0.0, 'cost' : 0.0}, {'amount' : 0.0, 'cost' : 0.0} ]
             submitted += [ (user, order) for order in keys[user][unit].liquidity[side][sample] if order[2] <= maxrate ]
           submitted.sort(key = lambda x: (x[1][2], x[1][0]))
           orders = [ submitted[i] for i in xrange(len(submitted)) if i == 0 or submitted[i][1][0] != submitted[i - 1][1][0] ]
@@ -341,8 +341,6 @@ def credit():
                 config._interest[name][unit][side]['orders'][sample].append({ 'amount' : contrib, 'cost' : price })
                 creditor.info("[%d/%d] %.8f %s %.8f %s %s %s %.2f", 
                   sample + 1, config._sampling, payout / float(24 * 60  * config._sampling), user, contrib, side, name, unit, price * 100)
-              else:
-                keys[user][unit].credits[side][sample][0] = {'amount' : 0.0, 'cost' : 0.0}
             norm = float(sum([ max(0,v) for v in volume[1].values()]))
             for user in volume[1]: # credit lower payout level
               if norm > 0 and volume[1][user] > 0:
@@ -356,13 +354,9 @@ def credit():
                 config._interest[name][unit][side]['orders'][sample][1] = { 'amount' : contrib, 'cost' : price }
                 creditor.info("[%d/%d] %.8f %s %.8f %s %s %s %.2f", 
                   sample + 1, config._sampling, payout / float(24 * 60  * config._sampling), user, contrib, side, name, unit, price * 100)
-              else:
-                keys[user][unit].credits[side][sample][1] = {'amount' : 0.0, 'cost' : 0.0}
             for user in volume[2]: # mark zero payouts
               if volume[2][user] > 0:
                 keys[user][unit].credits[side][sample][2] = {'amount' : volume[2][user], 'cost' : 0.0}
-              else:
-                keys[user][unit].credits[side][sample][2] = {'amount' : 0.0, 'cost' : 0.0}
 
 def pay(nud):
   txout = {}
