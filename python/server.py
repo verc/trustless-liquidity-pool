@@ -311,17 +311,18 @@ def credit():
             for i in xrange(len(orders)):
               user,order = orders[i]
               if order[0] != orders[i-1][1][0]:
-                ulvl = max(pricelevels.index(order[2]) - 1, 0)
+                ulvl = pricelevels.index(order[2])
                 if ulvl >= lvl:
                   volume[0][user] += order[1]
                   if ulvl >= lvl + 1:
                     volume[1][user] += order[1]
             # credit payout according to contribution
+            #print lvl, target, mass, ((lvl+1) * target - mass),
             norm = float(sum(volume[0].values()))
             if norm > 0: # credit higher payout level
               for user in volume[0]:
                 if volume[0][user] > 0:
-                  contrib = (lvl * target - mass) * volume[0][user] / norm
+                  contrib = ((lvl+1) * target - mass) * volume[0][user] / norm
                   payout = contrib * pricelevels[lvl]
                   volume[1][user] -= contrib
                   keys[user][unit].balance += payout
@@ -333,7 +334,7 @@ def credit():
               if norm > 0: # credit lower payout level
                 for user in volume[1]:
                   if volume[1][user] > 0:
-                    contrib = (mass - (lvl+1) * target) * volume[1][user] / norm
+                    contrib = (mass - lvl * target) * volume[1][user] / norm
                     payout = contrib * pricelevels[lvl+1]
                     keys[user][unit].balance += payout
                     keys[user][unit].rate[side] += pricelevels[lvl+1] * contrib / (volume[1][user] * 24 * 60 * config._sampling)
