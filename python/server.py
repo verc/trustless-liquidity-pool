@@ -333,25 +333,25 @@ def credit():
                   contrib = ((lvl+1) * target - mass) * volume[0][user] / norm
                   payout = contrib * price
                   volume[1][user] -= contrib
-                  keys[user][unit].balance += payout
+                  keys[user][unit].balance += payout / float(24 * 60  * config._sampling)
                   keys[user][unit].credits[side][sample] = [{'amount' : contrib, 'cost' : price}]
                   keys[user][unit].rate[side] += price * contrib / (volume[0][user] * config._sampling)
                   config._interest[name][unit][side]['orders'][sample].append( { 'id': 0, 'amount' : contrib, 'cost' : price } )
                   creditor.info("[%d/%d] %.8f %s %.8f %s %s %s %.2f", 
-                    sample + 1, config._sampling, payout, user, contrib, side, name, unit, price*100)
+                    sample + 1, config._sampling, payout / float(24 * 60  * config._sampling), user, contrib, side, name, unit, price*100)
               norm = float(sum([ max(0,v) for v in volume[1].values()]))
               if norm > 0: # credit lower payout level
                 for user in volume[1]:
                   if volume[1][user] > 0:
                     price = pricelevels[-lvl-1]
                     contrib = (mass - lvl * target) * volume[1][user] / norm
-                    payout = contrib * price
-                    keys[user][unit].balance += payout
+                    payout = contrib * price 
+                    keys[user][unit].balance += payout / float(24 * 60  * config._sampling)
                     keys[user][unit].credits[side][sample].append({'amount' : contrib, 'cost' : price})
                     keys[user][unit].rate[side] += price * contrib / (volume[1][user] * config._sampling)
                     config._interest[name][unit][side]['orders'][sample].append( { 'amount' : contrib, 'cost' : price } )
                     creditor.info("[%d/%d] %.8f %s %.8f %s %s %s %.2f", 
-                      sample + 1, config._sampling, payout, user, contrib, side, name, unit, price*100)
+                      sample + 1, config._sampling, payout / float(24 * 60  * config._sampling), user, contrib, side, name, unit, price*100)
 
 def pay(nud):
   txout = {}
