@@ -179,6 +179,7 @@ while True: # print some info every minute until program terminates
           basestatus = newstatus
           sampling = min(240, 3 * basestatus['sampling'] / 2)
       else:
+        # collect user information
         effective_rate = 0.0
         total = 0.0
         for unit in response['units']:
@@ -194,7 +195,7 @@ while True: # print some info every minute until program terminates
             coststring = ""
             for order in response['units'][unit][side]:
               if order['amount'] > 0:
-                coststring += " %.8f x %.2f%%," % (order['amount'], order['cost'])
+                coststring += " %.8f x %.2f%%," % (order['amount'], order['cost'] * 100.0)
             if len(coststring):
               unitstring += " - %s:%s" % (side, coststring[:-1])
           if len(unitstring):
