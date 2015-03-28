@@ -337,7 +337,7 @@ def credit():
                 volume[1][user] -= contrib
                 volume[2][user] -= contrib
                 keys[user][unit].balance += payout / float(24 * 60  * config._sampling)
-                keys[user][unit].credits[side][sample].append({'amount' : contrib, 'cost' : price})
+                keys[user][unit].credits[side][sample][0] = {'amount' : contrib, 'cost' : price}
                 keys[user][unit].rate[side] += price * contrib / (volume[0][user] * config._sampling)
                 config._interest[name][unit][side]['orders'][sample].append({ 'amount' : contrib, 'cost' : price })
                 creditor.info("[%d/%d] %.8f %s %.8f %s %s %s %.2f", 
@@ -350,7 +350,7 @@ def credit():
                 payout = contrib * price
                 volume[2][user] -= contrib 
                 keys[user][unit].balance += payout / float(24 * 60  * config._sampling)
-                keys[user][unit].credits[side][sample].append({'amount' : contrib, 'cost' : price})
+                keys[user][unit].credits[side][sample][1] = {'amount' : contrib, 'cost' : price}
                 keys[user][unit].rate[side] += price * contrib / (volume[1][user] * config._sampling)
                 config._interest[name][unit][side]['orders'][sample][1] = { 'amount' : contrib, 'cost' : price }
                 creditor.info("[%d/%d] %.8f %s %.8f %s %s %s %.2f", 
