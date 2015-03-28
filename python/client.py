@@ -176,7 +176,7 @@ while True: # print some info every minute until program terminates
         logger.error('unable to receive statistics for user %s: %s', user, response['message'])
         users[user].values()[0]['request'].register() # reassure to be registered if 
         newstatus = conn.get('status', trials = 3)
-        if not error in newstatus:
+        if not 'error' in newstatus:
           basestatus = newstatus
           sampling = min(240, 3 * basestatus['sampling'] / 2)
       else:
