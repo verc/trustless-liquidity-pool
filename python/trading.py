@@ -245,10 +245,11 @@ class PyBot(ConnectionThread):
                       self.limit[side] = 0.5
                     else:
                       effective_rate /= total
-                      if effective_rate < self.requester.cost[side]:
-                        self.cancel_orders(side)
                       deviation = 1.0 - min(effective_rate, self.requester.cost[side]) / max(effective_rate, self.requester.cost[side])
-                      self.limit[side] = total * deviation
+                      if deviation > 0.02:
+                        if effective_rate < self.requester.cost[side]:
+                          self.cancel_orders(side)
+                        self.limit[side] = total * deviation
               self.place('bid')
               self.place('ask')
           else:

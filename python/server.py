@@ -334,7 +334,7 @@ def credit():
                   payout = contrib * price
                   volume[1][user] -= contrib
                   keys[user][unit].balance += payout
-                  keys[user][unit].credits[side][sample] = [{'amount' : contrib, 'cost' : price}] # TODO: REMOVE COMPAT
+                  keys[user][unit].credits[side][sample] = [{'amount' : contrib, 'cost' : price}]
                   keys[user][unit].rate[side] += price * contrib / (volume[0][user] * config._sampling)
                   config._interest[name][unit][side]['orders'][sample].append( { 'id': 0, 'amount' : contrib, 'cost' : price } )
                   creditor.info("[%d/%d] %.8f %s %.8f %s %s %s %.2f", 
@@ -347,7 +347,7 @@ def credit():
                     contrib = (mass - lvl * target) * volume[1][user] / norm
                     payout = contrib * price
                     keys[user][unit].balance += payout
-                    keys[user][unit].credits[side][sample].append({'amount' : contrib, 'cost' : price}) # TODO: REMOVE COMPAT
+                    keys[user][unit].credits[side][sample].append({'amount' : contrib, 'cost' : price})
                     keys[user][unit].rate[side] += price * contrib / (volume[1][user] * config._sampling)
                     config._interest[name][unit][side]['orders'][sample].append( { 'amount' : contrib, 'cost' : price } )
                     creditor.info("[%d/%d] %.8f %s %.8f %s %s %s %.2f", 
