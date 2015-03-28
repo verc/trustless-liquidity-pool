@@ -186,13 +186,20 @@ while True: # print some info every minute until program terminates
             effective_rate += float(sum([ o['amount'] * o['cost'] for o in response['units'][unit][side] ]))
             total += float(sum([ o['amount'] for o in response['units'][unit][side] ]))
         if total > 0.0: effective_rate /= total
-        logger.info('%s - balance: %.8f rate %.2f%% efficiency: %.2f%% rejects: %d missing: %d - %s', repr(users[user].values()[0]['request'].exchange),
-          response['balance'], effective_rate * 100, response['efficiency'] * 100, response['rejects'], response['missing'], user )
+        orderstring = ""
         for unit in response['units']:
-          market = response['units'][unit]
-          logger.info('%s - %s - bid: %.8f x %.2f%%, %.8f x %.2f%%, %.8f x %.2f%% ask: %.8f x %.2f%%, %.8f x %.2f%%, %.8f x %.2f%%', repr(users[user].values()[0]['request'].exchange), unit, 
+          for side in ['bid', 'ask']:
+            market = response['units'][unit][side]
+            coststring = ""
+            for order in response['units'][unit][side]:
+              if order['amount'] > 0:
+                coststring += " %.8f x %.2f%%"
+
+          orderstring += '- %s - bid: %.8f x %.2f%%, %.8f x %.2f%%, %.8f x %.2f%% - ask: %.8f x %.2f%%, %.8f x %.2f%%, %.8f x %.2f%%' % (unit,
             market['bid'][0]['amount'], market['bid'][0]['cost'] * 100.0, market['bid'][1]['amount'], market['bid'][1]['cost'] * 100.0, market['bid'][2]['amount'], market['bid'][2]['cost'] * 100.0,
             market['ask'][0]['amount'], market['ask'][0]['cost'] * 100.0, market['ask'][1]['amount'], market['ask'][1]['cost'] * 100.0, market['ask'][2]['amount'], market['ask'][2]['cost'] * 100.0)
+        logger.info('%s - balance: %.8f rate %.2f%% efficiency: %.2f%% rejects: %d missing: %d - %s %s', repr(users[user].values()[0]['request'].exchange),
+          response['balance'], effective_rate * 100, response['efficiency'] * 100, response['rejects'], response['missing'], user, orderstring)
 
         if curtime - starttime > 90:
           if response['efficiency'] < 0.8:
