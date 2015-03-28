@@ -315,9 +315,10 @@ def credit():
             lvl = int(mass / target)
             pricelevels = sorted(list(set( [ order[2] for _,order in orders ])) + [ maxrate ])
             # collect user contribution
-            volume = [ { user : 0.0 for user in users }, { user : 0.0 for user in users } ]
+            volume = [ { user : 0.0 for user in users }, { user : 0.0 for user in users }, { user : 0.0 for user in users } ]
             for i in xrange(len(orders)):
               user,order = orders[i]
+              volume[2][user] += order[1]
               if order[0] != orders[i-1][1][0]:
                 ulvl = pricelevels.index(order[2])
                 if ulvl <= lvl:
@@ -333,10 +334,11 @@ def credit():
                   contrib = ((lvl+1) * target - mass) * volume[0][user] / norm
                   payout = contrib * price
                   volume[1][user] -= contrib
+                  volume[2][user] -= contrib
                   keys[user][unit].balance += payout / float(24 * 60  * config._sampling)
                   keys[user][unit].credits[side][sample] = [{'amount' : contrib, 'cost' : price}]
                   keys[user][unit].rate[side] += price * contrib / (volume[0][user] * config._sampling)
-                  config._interest[name][unit][side]['orders'][sample].append( { 'id': 0, 'amount' : contrib, 'cost' : price } )
+                  config._interest[name][unit][side]['orders'][sample].append({ 'amount' : contrib, 'cost' : price })
                   creditor.info("[%d/%d] %.8f %s %.8f %s %s %s %.2f", 
                     sample + 1, config._sampling, payout / float(24 * 60  * config._sampling), user, contrib, side, name, unit, price*100)
               norm = float(sum([ max(0,v) for v in volume[1].values()]))
@@ -345,13 +347,17 @@ def credit():
                   if volume[1][user] > 0:
                     price = pricelevels[-lvl-1]
                     contrib = (mass - lvl * target) * volume[1][user] / norm
-                    payout = contrib * price 
+                    payout = contrib * price
+                    volume[2][user] -= contrib 
                     keys[user][unit].balance += payout / float(24 * 60  * config._sampling)
                     keys[user][unit].credits[side][sample].append({'amount' : contrib, 'cost' : price})
                     keys[user][unit].rate[side] += price * contrib / (volume[1][user] * config._sampling)
                     config._interest[name][unit][side]['orders'][sample].append( { 'amount' : contrib, 'cost' : price } )
                     creditor.info("[%d/%d] %.8f %s %.8f %s %s %s %.2f", 
                       sample + 1, config._sampling, payout / float(24 * 60  * config._sampling), user, contrib, side, name, unit, price*100)
+              for user in volume[2]:
+                if volume[2][user] > 0:
+                  keys[user][unit].credits[side][sample].append({'amount' : volume[2][user], 'cost' : 0.0})
 
 def pay(nud):
   txout = {}

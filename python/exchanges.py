@@ -322,11 +322,12 @@ class BTER(Exchange):
     if not response['orders']: response['orders'] = []
     for order in response['orders']:
       if side == 'all' or (side == 'ask' and order['buy_type'] == unit) or (side == 'bid' and order['buy_type'] != unit):
-        params = { 'order_id' : order['oid'] }
-        ret = self.post('cancelorder', params, key, secret)
-        if not ret['result']:
-          if not 'error' in response: response['error'] = ""
-          response['error'] += "," + ret['msg']
+        if order['pair'] == 'nbt_' + unit.lower():
+          params = { 'order_id' : order['oid'] }
+          ret = self.post('cancelorder', params, key, secret)
+          if not ret['result']:
+            if not 'error' in response: response['error'] = ""
+            response['error'] += "," + ret['msg']
     return response
 
   def place_order(self, unit, side, key, secret, amount, price):
@@ -463,6 +464,8 @@ class Peato(Exchange):
     return request, ''
 
   def validate_request(self, key, unit, data, sign):
+    if not 'market' in data or data['market'] != "nbt%s"%unit.lower():
+      return { 'error' : 'invalid market' }
     connection = httplib.HTTPSConnection('178.62.140.24', timeout = 15)
     connection.request('GET', '/api/v2/orders.json?' + self.urlencode(data))
     response = json.loads(connection.getresponse().read())
