@@ -242,10 +242,12 @@ while True:
   try:
     for user in users:
       for unit in users[user]:
+        users[user][unit]['request'].stop()
         if users[user][unit]['order']:
           users[user][unit]['order'].stop()
     for user in users:
       for unit in users[user]:
+        users[user][unit]['request'].join()
         if users[user][unit]['order']:
           users[user][unit]['order'].join()
   except KeyboardInterrupt: continue

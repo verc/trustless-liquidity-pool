@@ -97,7 +97,6 @@ class NuRPC():
   def liquidity(self, bid, ask):
     try:
       self.rpc.liquidityinfo('B', bid, ask, self.address)
-      print response
       self.logger.info("successfully sent liquidity: buy: %.8f sell: %.8f", bid, ask)
       return True
     except AttributeError:
@@ -112,7 +111,7 @@ class User(threading.Thread):
   def __init__(self, key, address, unit, exchange, pricefeed, sampling, tolerance, logger = None):
     threading.Thread.__init__(self)
     self.key = key
-    self.active = False
+    self.active = True
     self.address = address
     self.balance = 0.0
     self.pricefeed = pricefeed
@@ -169,7 +168,8 @@ class User(threading.Thread):
                 self.liquidity[side].append(valid[side])
               if self.last_error != "" and len(valid['bid'] + valid['ask']) == 0:
                 res = 'r'
-                self.logger.debug("unable to validate request %d/%d for user %s at exchange %s on unit %s: orders of deviate too much from current price" % (rid + 1, len(self.requests), self.key, repr(self.exchange), self.unit))
+                self.logger.debug("unable to validate request %d/%d for user %s at exchange %s on unit %s: orders of deviate too much from current price",
+                  rid + 1, len(self.requests), self.key, repr(self.exchange), self.unit)
               else:
                 res = 'a'
                 break
@@ -184,11 +184,9 @@ class User(threading.Thread):
                 self.liquidity[side].append([])
         else:
           self.last_error = "no request received"
-          logger.debug("no request received for user %s at exchange %s on unit %s" % (self.key, repr(self.exchange), self.unit))
           for side in [ 'bid', 'ask' ]:
             del self.liquidity[side][0]
             self.liquidity[side].append([])
-          self.active = False
         self.response.append(res)
         self.requests = []
       else:
@@ -196,6 +194,7 @@ class User(threading.Thread):
         for side in [ 'bid', 'ask' ]:
           del self.liquidity[side][0]
           self.liquidity[side].append([])
+      self.active = self.liquidity['bid'].count([]) + self.liquidity['ask'].count([]) < 2 * self.sampling
       self.lock.release()
 
   def validate(self):
@@ -269,21 +268,20 @@ def userstats(user):
   res['units'] = {}
   for unit in keys[user]:
     if keys[user][unit].active:
-      maxsum = 0.0
-      maxidx = 0
+      credits = { 'bid' : [ { 'amount': 0.0, 'cost': 0.0 }, { 'amount': 0.0, 'cost': 0.0 }, { 'amount': 0.0, 'cost': 0.0 } ],
+                  'ask' : [ { 'amount': 0.0, 'cost': 0.0 }, { 'amount': 0.0, 'cost': 0.0 }, { 'amount': 0.0, 'cost': 0.0 } ] }
       for i in xrange(config._sampling):
-        sumbids = sum([ order['amount'] for order in keys[user][unit].credits['bid'][i] ])
-        sumasks = sum([ order['amount'] for order in keys[user][unit].credits['ask'][i] ])
-        if sumbids + sumasks > maxsum:
-          maxsum = sumbids + sumasks
-          maxidx = i
+        for side in ['bid', 'ask']:
+          for j in xrange(3):
+            credits[side][j]['amount'] += keys[user][unit].credits[side][i][j]['amount'] / float(config._sampling)
+            credits[side][j]['cost'] += keys[user][unit].credits[side][i][j]['cost'] / float(config._sampling)
       missing = keys[user][unit].response.count('m')
       rejects = keys[user][unit].response.count('r')
       res['balance'] += keys[user][unit].balance
       res['missing'] += missing
       res['rejects'] += rejects
-      res['units'][unit] = { 'bid' : keys[user][unit].credits['bid'][maxidx],
-                             'ask' : keys[user][unit].credits['ask'][maxidx],
+      res['units'][unit] = { 'bid' : credits['bid'],
+                             'ask' : credits['ask'],
                              'rate' : keys[user][unit].rate,
                              'rejects' : rejects,
                              'missing' : missing,
@@ -308,20 +306,19 @@ def credit():
           submitted = []
           for user in users:
             keys[user][unit].credits[side][sample] = [ {'amount' : 0.0, 'cost' : 0.0}, {'amount' : 0.0, 'cost' : 0.0}, {'amount' : 0.0, 'cost' : 0.0} ]
-            submitted += [ (user, order) for order in keys[user][unit].liquidity[side][sample] if order[2] <= maxrate ]
+            submitted.extend([ (user, order) for order in keys[user][unit].liquidity[side][sample] ])
           submitted.sort(key = lambda x: (x[1][2], x[1][0]))
           orders = [ submitted[i] for i in xrange(len(submitted)) if i == 0 or submitted[i][1][0] != submitted[i - 1][1][0] ]
           mass = sum([order[1] for _,order in submitted])
           if mass > 0:
             target = min(mass, config._interest[name][unit][side]['target'])
-            pricelevels = sorted(list(set( [ order[2] for _,order in orders ])) + [ maxrate ])
+            pricelevels = sorted(list(set( [ order[2] for _,order in orders if order[2] <= maxrate ])) + [ maxrate ])
             lvl = max(1, len(pricelevels) - int(mass / target))
             # collect user contribution
             volume = [ { user : 0.0 for user in users }, { user : 0.0 for user in users }, { user : 0.0 for user in users } ]
-            for i in xrange(len(orders)):
-              user,order = orders[i]
-              volume[2][user] += order[1]
-              if order[0] != orders[i-1][1][0]:
+            for user,order in orders:
+              if order[2] <= maxrate:
+                volume[2][user] += order[1]
                 ulvl = pricelevels.index(order[2])
                 if ulvl <= lvl:
                   volume[1][user] += order[1]
@@ -331,7 +328,7 @@ def credit():
             norm = float(sum(volume[1].values()))
             for user in volume[1]:
               if norm > 0 and volume[1][user] > 0:
-                price = pricelevels[lvl-1]
+                price = pricelevels[lvl]
                 contrib = ((int(mass / target)+1) * target - mass) * volume[0][user] / norm
                 payout = contrib * price
                 volume[0][user] -= contrib
@@ -346,7 +343,7 @@ def credit():
             norm = float(sum([ max(0,v) for v in volume[0].values()]))
             for user in volume[0]:
               if norm > 0 and volume[0][user] > 0:
-                price = pricelevels[lvl]
+                price = pricelevels[lvl-1]
                 contrib = (mass - int(mass / target) * target) * volume[0][user] / norm
                 payout = contrib * price
                 volume[2][user] -= contrib
@@ -360,6 +357,7 @@ def credit():
             for user in volume[2]:
               if volume[2][user] > 0:
                 keys[user][unit].credits[side][sample][2] = {'amount' : volume[2][user], 'cost' : 0.0}
+                config._interest[name][unit][side]['orders'][sample].append({ 'amount' : volume[2][user], 'cost' : 0.0 })
 
 def pay(nud):
   txout = {}
