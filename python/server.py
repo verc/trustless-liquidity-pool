@@ -349,7 +349,7 @@ def credit():
                 price = pricelevels[lvl]
                 contrib = (mass - int(mass / target) * target) * volume[0][user] / norm
                 payout = contrib * price
-                volume[2][user] -= contrib 
+                volume[2][user] -= contrib
                 keys[user][unit].balance += payout / float(24 * 60  * config._sampling)
                 keys[user][unit].credits[side][sample][0] = {'amount' : contrib, 'cost' : price}
                 keys[user][unit].rate[side] += price * contrib / (volume[0][user] * config._sampling)
