@@ -511,7 +511,7 @@ class Peatio(Exchange):
     return response
 
   def get_price(self, unit):
-    connection = httplib.HTTPSConnection('178.62.140.24', timeout = 5)
+    connection = httplib.HTTPSConnection('178.62.140.24', timeout = 15)
     connection.request('GET', '/api/v2/depth.json?' + self.urlencode({'market' : "nbt%s"%unit.lower(), 'limit' : 1}))
     response = json.loads(connection.getresponse().read())
     if 'error' in response:
