@@ -314,7 +314,7 @@ def credit():
           if mass > 0:
             target = min(mass, config._interest[name][unit][side]['target'])
             pricelevels = sorted(list(set( [ order[2] for _,order in orders if order[2] <= maxrate ])) + [ maxrate ])
-            lvl = max(1, len(pricelevels) - int(mass / target))
+            lvl = max(1, len(pricelevels) - int(mass / target) - 1)
             # collect user contribution
             volume = [ { user : 0.0 for user in users }, { user : 0.0 for user in users }, { user : 0.0 for user in users } ]
             for user,order in orders:
@@ -329,7 +329,7 @@ def credit():
             norm = float(sum(volume[1].values()))
             for user in volume[1]:
               if norm > 0 and volume[1][user] > 0:
-                price = pricelevels[lvl]
+                price = pricelevels[lvl+1]
                 contrib = ((int(mass / target)+1) * target - mass) * volume[0][user] / norm
                 payout = contrib * price
                 volume[0][user] -= contrib
@@ -344,7 +344,7 @@ def credit():
             norm = float(sum([ max(0,v) for v in volume[0].values()]))
             for user in volume[0]:
               if norm > 0 and volume[0][user] > 0:
-                price = pricelevels[lvl-1]
+                price = pricelevels[lvl]
                 contrib = (mass - int(mass / target) * target) * volume[0][user] / norm
                 payout = contrib * price
                 volume[2][user] -= contrib
