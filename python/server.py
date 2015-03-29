@@ -321,9 +321,9 @@ def credit():
               if order[2] <= maxrate:
                 volume[2][user] += order[1]
                 ulvl = pricelevels.index(order[2]) + 1
-                if ulvl <= lvl:
+                if ulvl <= lvl + 1:
                   volume[1][user] += order[1]
-                  if ulvl <= lvl - 1:
+                  if ulvl <= lvl:
                     volume[0][user] += order[1]
             # credit higher payout level
             norm = float(sum(volume[1].values()))
