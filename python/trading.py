@@ -249,7 +249,7 @@ class PyBot(ConnectionThread):
                       deviation = 1.0 - min(effective_rate, self.requester.cost[side]) / max(effective_rate, self.requester.cost[side])
                       if deviation > 0.02:
                         if self.limit[side] >= 0.5 and effective_rate < self.requester.cost[side]:
-                          funds = max(0.5, total * (1.0 - deviation))
+                          funds = max(0.5, total * (1.0 - max(deviation, 0.1)))
                           self.logger.info("decreasing tier 1 %s limit of %s on %s from %.8f to %.8f", side, self.unit, repr(self.exchange), total, funds)
                           self.cancel_orders(side)
                           self.limit[side] = funds
