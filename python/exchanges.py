@@ -208,7 +208,7 @@ class CCEDK(Exchange):
 
   def get_price(self, unit):
     response = json.loads(urllib2.urlopen(urllib2.Request(
-        'https://www.ccedk.com/api/v1/orderbook/info?' + urllib.urlencode({ 'nonce' : self.nonce(), 'pair_id' : self.pair_id[unit.upper()] }))).read())
+        'https://www.ccedk.com/api/v1/orderbook/info?' + urllib.urlencode({ 'nonce' : self.nonce(), 'pair_id' : self.pair_id[unit.upper()] })), timeout = 5).read())
     if not response['response']:
       response['error'] = ",".join(response['errors'].values())
       return response
@@ -295,7 +295,7 @@ class BitcoinCoId(Exchange):
     return response
 
   def get_price(self, unit):
-    response = json.loads(urllib2.urlopen(urllib2.Request('https://vip.bitcoin.co.id/api/nbt_%s/depth' % unit.lower())).read())
+    response = json.loads(urllib2.urlopen(urllib2.Request('https://vip.bitcoin.co.id/api/nbt_%s/depth' % unit.lower()), timeout = 5).read())
     if 'error' in response:
       return response
     response.update({'bid': None, 'ask': None})
@@ -393,12 +393,14 @@ class BTER(Exchange):
     return response
 
   def get_price(self, unit):
-    response = json.loads(urllib2.urlopen(urllib2.Request('http://data.bter.com/api/1/depth/nbt_%s' % unit.lower())).read())
+    connection = httplib.HTTPSConnection('data.bter.com', timeout = 5)
+    connection.request('GET', '/api/1/depth/nbt_' + unit.lower())
+    response = json.loads(connection.getresponse().read())
     if not 'result' in response or not response['result']:
       response['error'] = response['msg'] if 'msg' in response else 'invalid response: %s' % str(response)
       return response
     response.update({'bid': None, 'ask': None})
-    if response['buy']: response['bid'] = float(response['buy'][0][0])
+    if response['bids']: response['bid'] = float(response['bids'][0][0])
     if response['asks']: response['ask'] = float(response['asks'][-1][0])
     return response
 
@@ -425,9 +427,9 @@ class BTER(Exchange):
       } for order in response['orders'] if order['pair'] == 'nbt_' + unit.lower() ]
 
 
-class Peato(Exchange):
+class Peatio(Exchange):
   def __init__(self):
-    super(Peato, self).__init__(0.002)
+    super(Peatio, self).__init__(0.002)
 
   def __repr__(self): return "testing"
 
@@ -506,6 +508,18 @@ class Peato(Exchange):
       for pair in response['accounts']:
         if pair['currency'] == unit.lower():
           response['balance'] = float(pair['balance'])
+    return response
+
+  def get_price(self, unit):
+    connection = httplib.HTTPSConnection('178.62.140.24', timeout = 5)
+    connection.request('GET', '/api/v2/depth.json?' + self.urlencode({'market' : "nbt%s"%unit.lower(), 'limit' : 1}))
+    response = json.loads(connection.getresponse().read())
+    if 'error' in response:
+      response['error'] = response['error']['message']
+      return response
+    response.update({'bid': None, 'ask': None})
+    if response['bids']: response['bid'] = float(response['bids'][0][0])
+    if response['asks']: response['ask'] = float(response['asks'][-1][0])
     return response
 
   def create_request(self, unit, key = None, secret = None):

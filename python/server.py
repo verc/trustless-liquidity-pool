@@ -17,7 +17,7 @@ from exchanges import *
 from utils import *
 import config
 
-_wrappers = { 'poloniex' : Poloniex, 'ccedk' : CCEDK, 'bitcoincoid' : BitcoinCoId, 'bter' : BTER, 'testing' : Peato }
+_wrappers = { 'poloniex' : Poloniex, 'ccedk' : CCEDK, 'bitcoincoid' : BitcoinCoId, 'bter' : BTER, 'testing' : Peatio }
 for e in config._interest:
   _wrappers[e] = _wrappers[e]()
   for u in config._interest[e]:
