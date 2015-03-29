@@ -256,8 +256,8 @@ class PyBot(ConnectionThread):
                         elif self.limit[side] < total * deviation and effective_rate > self.requester.cost[side]:
                           self.logger.info("increasing tier 1 %s limit of %s on %s from %.8f to %.8f", side, self.unit, repr(self.exchange), total, total * (1.0 + deviation))
                           self.limit[side] = total * deviation
-                self.place('bid')
-                self.place('ask')
+            self.place('bid')
+            self.place('ask')
           else:
             self.logger.error('unable to retrieve server price: %s', response['message'])
       except Exception as e:

@@ -20,11 +20,11 @@ class Exchange(object):
       self._shift = ((self._shift + 7) % 200) - 100 # -92 15 -78 29 -64 43 -50 57 ...
 
   def nonce(self, factor = 1000.0):
-    nonce = int((time.time() + self._shift) * float(factor))
-    if self._nonce >= nonce:
-      nonce = self._nonce + 1
-    self._nonce = nonce
-    return nonce
+    n = int((time.time() + self._shift) * float(factor))
+    if self._nonce >= n:
+      n = self._nonce + 1
+    self._nonce = n
+    return n
 
 class Poloniex(Exchange):
   def __init__(self):
@@ -125,7 +125,11 @@ class CCEDK(Exchange):
   def __repr__(self): return "ccedk"
 
   def nonce(self, factor = 1.0):
-    return int(time.time() + self._shift)
+    n = int(time.time() + self._shift)
+    if n == self._nonce:
+      n = self._nonce + 1
+    self._nonce = n
+    return n
 
   def adjust(self, error):
     if "incorrect range" in error: #(TODO: regex)

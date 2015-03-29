@@ -270,16 +270,17 @@ def userstats(user):
     if keys[user][unit].active:
       credits = { 'bid' : [ { 'amount': 0.0, 'cost': 0.0 }, { 'amount': 0.0, 'cost': 0.0 }, { 'amount': 0.0, 'cost': 0.0 } ],
                   'ask' : [ { 'amount': 0.0, 'cost': 0.0 }, { 'amount': 0.0, 'cost': 0.0 }, { 'amount': 0.0, 'cost': 0.0 } ] }
-      for i in xrange(config._sampling):
-        for side in ['bid', 'ask']:
-          for j in xrange(3):
-            credits[side][j]['amount'] += keys[user][unit].credits[side][i][j]['amount'] / float(config._sampling)
-            credits[side][j]['cost'] += keys[user][unit].credits[side][i][j]['cost'] / float(config._sampling)
       missing = keys[user][unit].response.count('m')
       rejects = keys[user][unit].response.count('r')
       res['balance'] += keys[user][unit].balance
       res['missing'] += missing
       res['rejects'] += rejects
+      norm = max(1.0, float(keys[user][unit].sampling - missing - rejects))
+      for i in xrange(keys[user][unit].sampling):
+        for side in ['bid', 'ask']:
+          for j in xrange(3):
+            credits[side][j]['amount'] += keys[user][unit].credits[side][i][j]['amount'] / norm
+            credits[side][j]['cost'] += keys[user][unit].credits[side][i][j]['cost'] / norm
       res['units'][unit] = { 'bid' : credits['bid'],
                              'ask' : credits['ask'],
                              'rate' : keys[user][unit].rate,
