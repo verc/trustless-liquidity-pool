@@ -190,6 +190,21 @@ class PyBot(ConnectionThread):
           self.limit[side] -= amount
     return response
 
+  def sync(self, trials = 3):
+    ts = int(time.time() * 1000.0)
+    response = self.conn.get('sync', trials = 1, timeout = 30)
+    if not 'error' in response:
+      delay = (response['sync'] - (ts % response['sync'])) - (int(time.time() * 1000.0) - ts) / 2
+      if delay <= 0:
+        self.logger.error("unable to synchronize time with server for %s on %s: time difference to small", self.unit, repr(self.exchange))
+        if trials > 0:
+          return self.sync(trials - 1)
+      self.logger.info("waiting %.2f seconds to synchronize with other trading bots for %s on %s", delay / 1000.0, self.unit, repr(self.exchange))
+      time.sleep(delay / 1000.0)
+    elif trials > 0:
+      self.logger.error("unable to synchronize time with server for %s on %s: %s", self.unit, repr(self.exchange), response['message'])
+      return self.sync(trials - 1)
+
   def run(self):
     self.logger.info("starting PyBot for %s on %s", self.unit, repr(self.exchange))
     self.serverprice = self.conn.get('price/' + self.unit, trials = 3, timeout = 15)['price']
@@ -198,6 +213,7 @@ class PyBot(ConnectionThread):
       response = self.cancel_orders(reset = False)
       if not 'error' in response: break
       trials = trials + 1
+    self.sync()
     self.place('bid')
     self.place('ask')
     prevprice = self.serverprice
@@ -205,14 +221,29 @@ class PyBot(ConnectionThread):
     efftime = curtime
     lasttime = curtime
     lastdev = 1.0
+    delay = 0.0
     while self.active:
       try:
-        time.sleep(max(1 - time.time() + curtime, 0))
+        sleep = 10 - time.time() + curtime
+        if sleep < 0:
+          delay += abs(sleep)
+          if delay > 1.0:
+            self.logger.warning('need to resynchronize trading bot for %s on %s because the deviation reached %.2f', self.unit, repr(self.exchange), delay)
+            self.shutdown()
+            self.sync()
+            delay = 0.0
+        else:
+          while sleep > 0:
+            step = min(sleep, 0.5)
+            time.sleep(step)
+            if not self.active: break
+            sleep -= step
+        if not self.active: break
         curtime = time.time()
-        if curtime - lasttime < 30: continue
+        if curtime - lasttime < 10: continue
         lasttime = curtime
         if self.requester.errorflag:
-          self.logger.error('server unresponsive for %s', repr(self.exchange))
+          self.logger.error('server unresponsive for %s on %s', self.unit, repr(self.exchange))
           self.shutdown()
           efftime = curtime
         else:
@@ -221,7 +252,7 @@ class PyBot(ConnectionThread):
             self.serverprice = response['price']
             userprice = PyBot.pricefeed.price(self.unit)
             if 1.0 - min(self.serverprice, userprice) / max(self.serverprice, userprice) > 0.005: # validate server price
-              self.logger.error('server price %.8f for unit %s deviates too much from price %.8f received from ticker, will try to delete orders on %s',
+              self.logger.error('server price %.8f for %s deviates too much from price %.8f received from ticker, will try to delete orders on %s',
                 self.serverprice, self.unit, userprice, repr(self.exchange))
               self.shutdown()
               efftime = curtime

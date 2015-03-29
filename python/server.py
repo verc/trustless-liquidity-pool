@@ -405,6 +405,10 @@ def submit(nud):
   _liquidity.append(curliquidity)
   nud.liquidity(curliquidity[0], curliquidity[1])
 
+def sync():
+  ts = int(time.time() * 1000.0)
+  return { 'time' : ts, 'sync' : 15000 }
+
 class RequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
   def do_POST(self):
     if len(self.path) == 0:
@@ -437,7 +441,7 @@ class RequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
       self.wfile.write("\n")
       self.wfile.write(method.replace('/',''))
       self.end_headers()
-    elif method in [ 'status', 'exchanges' ]:
+    elif method in [ 'status', 'exchanges', 'sync' ]:
       self.send_response(200)
       self.send_header('Content-Type', 'application/json')
       self.wfile.write("\n")
@@ -445,6 +449,8 @@ class RequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         self.wfile.write(json.dumps(poolstats()))
       elif method == 'exchanges':
         self.wfile.write(json.dumps(config._interest))
+      elif method == 'sync':
+        self.wfile.write(json.dumps(sync()))
       self.end_headers()
     elif method in keys:
       self.send_response(200)
