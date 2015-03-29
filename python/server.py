@@ -11,7 +11,7 @@ import time
 import thread
 import threading
 import sys
-from math import log, exp
+from math import log, exp, ceil
 from thread import start_new_thread
 from exchanges import *
 from utils import *
@@ -320,7 +320,7 @@ def credit():
             for user,order in orders:
               if order[2] <= maxrate:
                 volume[2][user] += order[1]
-                ulvl = pricelevels.index(order[2])
+                ulvl = pricelevels.index(order[2]) + 1
                 if ulvl <= lvl:
                   volume[1][user] += order[1]
                   if ulvl <= lvl - 1:
