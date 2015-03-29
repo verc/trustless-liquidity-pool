@@ -72,6 +72,15 @@ class Poloniex(Exchange):
       response['balance'] = float(response[unit.upper()])
     return response
 
+  def get_price(self, unit):
+    response = json.loads(urllib2.urlopen('https://poloniex.com/public?' + 
+      urllib.urlencode({'command' : 'returnOrderBook', 'currencyPair' : "%s_NBT"%unit.upper(), 'depth' : 1}), timeout = 5).read())
+    if not 'error' in response:
+      response.update({'bid': None, 'ask': None})
+      if response['bid']: response['bid'] = float(response['bid'][0])
+      if response['ask']: response['ask'] = float(response['ask'][0])
+    return response
+
   def create_request(self, unit, key = None, secret = None):
     if not secret: return None, None
     request = { 'command' : 'returnOpenOrders', 'nonce' : self.nonce(),  'currencyPair' : "%s_NBT"%unit.upper() }
@@ -104,13 +113,13 @@ class CCEDK(Exchange):
         response = None
         if not self.pair_id:
           response = json.loads(urllib2.urlopen(urllib2.Request(
-            'https://www.ccedk.com/api/v1/stats/marketdepthfull?' + urllib.urlencode({ 'nonce' : self.nonce(1) }))).read())
+            'https://www.ccedk.com/api/v1/stats/marketdepthfull?' + urllib.urlencode({ 'nonce' : self.nonce() }))).read())
           for unit in response['response']['entities']:
             if unit['pair_name'][:4] == 'NBT/':
               self.pair_id[unit['pair_name'][4:]] = unit['pair_id']
         if not self.currency_id:
           response = json.loads(urllib2.urlopen(urllib2.Request(
-            'https://www.ccedk.com/api/v1/currency/list?' + urllib.urlencode({ 'nonce' : self.nonce(1) }))).read())
+            'https://www.ccedk.com/api/v1/currency/list?' + urllib.urlencode({ 'nonce' : self.nonce() }))).read())
           for unit in response['response']['entities']:
             self.currency_id[unit['iso'].lower()] = unit['currency_id']
       except:
@@ -197,6 +206,17 @@ class CCEDK(Exchange):
       response['balance'] = float(response['response']['entity']['balance'])
     return response
 
+  def get_price(self, unit):
+    response = json.loads(urllib2.urlopen(urllib2.Request(
+        'https://www.ccedk.com/api/v1/orderbook/info?' + urllib.urlencode({ 'nonce' : self.nonce(), 'pair_id' : self.pair_id[unit.upper()] }))).read())
+    if not response['response']:
+      response['error'] = ",".join(response['errors'].values())
+      return response
+    response.update({'bid': None, 'ask': None})
+    if response['response']['entity']['bids']: response['bid'] = float(response['response']['entity']['bids'][0]['price'])
+    if response['response']['entity']['asks']: response['ask'] = float(response['response']['entity']['asks'][0]['price'])
+    return response
+
   def create_request(self, unit, key = None, secret = None):
     if not secret: return None, None
     request = { 'nonce' : self.nonce() }
@@ -272,6 +292,25 @@ class BitcoinCoId(Exchange):
     response = self.post('getInfo', {}, key, secret)
     if response['success'] == 1:
       response['balance'] = float(response['return']['balance'][unit.lower()])
+    return response
+
+  def get_price(self, unit):
+    response = json.loads(urllib2.urlopen(urllib2.Request('https://vip.bitcoin.co.id/api/nbt_%s/depth' % unit.lower())).read())
+    if 'error' in response:
+      return response
+    response.update({'bid': None, 'ask': None})
+    if response['buy']: response['bid'] = float(response['buy'][0][0])
+    if response['sell']: response['ask'] = float(response['sell'][0][0])
+    return response
+
+  def place_order(self, unit, side, key, secret, amount, price):
+    params = { "type" : 'buy' if side == 'bid' else 'sell',
+               "price" : price,
+               "pair_id" : int(self.pair_id[unit.upper()]),
+               "volume" : amount }
+    response = self.post('order/new', params, key, secret)
+    if not 'error' in response:
+      response['id'] = int(response['response']['entity']['order_id'])
     return response
 
   def create_request(self, unit, key = None, secret = None):
@@ -351,6 +390,16 @@ class BTER(Exchange):
       else:
         response['balance'] = 0.0
     else: response['error'] = response['msg']
+    return response
+
+  def get_price(self, unit):
+    response = json.loads(urllib2.urlopen(urllib2.Request('http://data.bter.com/api/1/depth/nbt_%s' % unit.lower())).read())
+    if not 'result' in response or not response['result']:
+      response['error'] = response['msg'] if 'msg' in response else 'invalid response: %s' % str(response)
+      return response
+    response.update({'bid': None, 'ask': None})
+    if response['buy']: response['bid'] = float(response['buy'][0][0])
+    if response['asks']: response['ask'] = float(response['asks'][-1][0])
     return response
 
   def create_request(self, unit, key = None, secret = None):

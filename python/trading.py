@@ -120,17 +120,17 @@ class PyBot(ConnectionThread):
   def release_lock(self):
     PyBot.lock[repr(self.exchange)].release()
 
-  def place(self, side, balance, price):
-    try:
-      response = self.exchange.place_order(self.unit, side, self.key, self.secret, balance, price)
-    except KeyboardInterrupt: raise
-    except: response = { 'error' : 'exception caught: %s' % sys.exc_info()[1] }
-    if 'error' in response:
-      self.logger.error('unable to place %s %s order of %.4f nbt at %.8f on %s: %s', side, self.unit, balance, price, repr(self.exchange), response['error'])
-      self.exchange.adjust(response['error'])
-    else:
-      self.logger.info('successfully placed %s %s order of %.4f nbt at %.8f on %s', side, self.unit, balance, price, repr(self.exchange))
-    return response
+#  def place(self, side, balance, price):
+#    try:
+#      response = self.exchange.place_order(self.unit, side, self.key, self.secret, balance, price)
+#    except KeyboardInterrupt: raise
+#    except: response = { 'error' : 'exception caught: %s' % sys.exc_info()[1] }
+#    if 'error' in response:
+#      self.logger.error('unable to place %s %s order of %.4f nbt at %.8f on %s: %s', side, self.unit, balance, price, repr(self.exchange), response['error'])
+#      self.exchange.adjust(response['error'])
+#    else:
+#      self.logger.info('successfully placed %s %s order of %.4f nbt at %.8f on %s', side, self.unit, balance, price, repr(self.exchange))
+#    return response
 
   def effective_interest(self, balance, orders, target, cost):
     mod = orders[:]
@@ -157,16 +157,8 @@ class PyBot(ConnectionThread):
     except: response = { 'error' : 'exception caught: %s' % sys.exc_info()[1] }
     return response
 
-  def place(self, side):
-    price = self.serverprice
-    spread = max(self.exchange.fee, 0.002)
-    if side == 'ask':
-      exunit = 'nbt'
-      price *= (1.0 + spread)
-    else:
-      exunit = self.unit
-      price *= (1.0 - spread)
-    price = ceil(price * 10**8) / float(10**8) # truncate floating point precision after 8th position
+  def place(self, side, price):
+    exunit = 'nbt' if side == 'ask' else self.unit
     response = self.balance(exunit, price)
     if 'error' in response:
       self.logger.error('unable to receive balance for %s on %s: %s', exunit, repr(self.exchange), response['error'])
@@ -189,6 +181,26 @@ class PyBot(ConnectionThread):
           self.orders.append(response['id'])
           self.limit[side] -= amount
     return response
+
+  def place_orders(self):
+    try:
+      response = self.exchange.get_price(self.unit)
+    except:
+      response = { 'error': 'exception caught: %s' % sys.exc_info()[1] }
+    if 'error' in response:
+      self.logger.error('unable to retrieve order book for %s on %s: %s', self.unit, repr(self.exchange), response['error'])
+    else:
+      spread = max(self.exchange.fee, 0.002)
+      bidprice = ceil(self.serverprice * (1.0 - spread) * 10**8) / float(10**8) # truncate floating point precision after 8th position
+      askprice = ceil(self.serverprice * (1.0 + spread) * 10**8) / float(10**8)
+      if response['ask'] == None or response['ask'] > bidprice:
+        self.place('bid', bidprice)
+      else:
+        self.logger.error('unable to place %s bid order of at %.8f on %s: matching order at %.8f detected', self.unit, bidprice, repr(self.exchange), response['ask'])
+      if response['bid'] == None or response['bid'] < askprice:
+        self.place('ask', askprice)
+      else:
+        self.logger.error('unable to place %s ask order of at %.8f on %s: matching order at %.8f detected', self.unit, askprice, repr(self.exchange), response['bid'])
 
   def sync(self, trials = 3):
     ts = int(time.time() * 1000.0)
@@ -214,8 +226,7 @@ class PyBot(ConnectionThread):
       if not 'error' in response: break
       trials = trials + 1
     self.sync()
-    self.place('bid')
-    self.place('ask')
+    self.place_orders()
     prevprice = self.serverprice
     curtime = time.time()
     efftime = curtime
@@ -289,8 +300,7 @@ class PyBot(ConnectionThread):
                           self.logger.info("increasing tier 1 %s limit of %s on %s from %.8f to %.8f", side, self.unit, repr(self.exchange), total, total * (1.0 + deviation))
                           self.limit[side] = total * deviation
                       lastdev = deviation
-              self.place('bid')
-              self.place('ask')
+              self.place_orders()
           else:
             self.logger.error('unable to retrieve server price: %s', response['message'])
       except Exception as e:
