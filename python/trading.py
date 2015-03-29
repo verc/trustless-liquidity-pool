@@ -196,11 +196,19 @@ class PyBot(ConnectionThread):
       if response['ask'] == None or response['ask'] > bidprice:
         self.place('bid', bidprice)
       else:
-        self.logger.error('unable to place bid %s order of at %.8f on %s: matching order at %.8f detected', self.unit, bidprice, repr(self.exchange), response['ask'])
+        if 1.0 - response['ask'] / bidprice < 0.00425 - spread:
+          self.logger.warning('decreasing bid %s order at %.8f on %s to %.8f to avoid order match', self.unit, bidprice, repr(self.exchange), bidprice * (1.0 - 0.0045 + spread))
+          self.place('bid', bidprice * (1.0 - 0.0045 + spread))
+        else:
+          self.logger.error('unable to place bid %s order at %.8f on %s: matching order at %.8f detected', self.unit, bidprice, repr(self.exchange), response['ask'])
       if response['bid'] == None or response['bid'] < askprice:
         self.place('ask', askprice)
       else:
-        self.logger.error('unable to place ask %s order of at %.8f on %s: matching order at %.8f detected', self.unit, askprice, repr(self.exchange), response['bid'])
+        if 1.0 - askprice / response['bid'] < 0.00425 - spread:
+          self.logger.warning('increasing ask %s order at %.8f on %s to %.8f to avoid order match', self.unit, askprice, repr(self.exchange), askprice * (1.0045 - spread))
+          self.place('ask', askprice * (1.0045 - spread))
+        else:
+          self.logger.error('unable to place ask %s order at %.8f on %s: matching order at %.8f detected', self.unit, askprice, repr(self.exchange), response['bid'])
 
   def sync(self, trials = 3):
     ts = int(time.time() * 1000.0)
