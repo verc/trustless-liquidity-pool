@@ -314,8 +314,8 @@ def credit():
           mass = sum([order[1] for _,order in submitted])
           if mass > 0:
             target = min(mass, config._interest[name][unit][side]['target'])
-            lvl = int(mass / target)
             pricelevels = sorted(list(set( [ order[2] for _,order in orders ])) + [ maxrate ])
+            lvl = max(1, len(pricelevels) - int(mass / target))
             # collect user contribution
             volume = [ { user : 0.0 for user in users }, { user : 0.0 for user in users }, { user : 0.0 for user in users } ]
             for i in xrange(len(orders)):
@@ -327,12 +327,12 @@ def credit():
                   volume[0][user] += order[1]
                   if ulvl <= lvl - 1:
                     volume[1][user] += order[1]
-            # credit payout according to contribution
+            # credit higher payout level
             norm = float(sum(volume[0].values()))
-            for user in volume[0]: # credit higher payout level
+            for user in volume[0]:
               if norm > 0 and volume[0][user] > 0:
                 price = pricelevels[-lvl]
-                contrib = ((lvl+1) * target - mass) * volume[0][user] / norm
+                contrib = ((int(mass / target)+1) * target - mass) * volume[0][user] / norm
                 payout = contrib * price
                 volume[1][user] -= contrib
                 volume[2][user] -= contrib
@@ -342,11 +342,12 @@ def credit():
                 config._interest[name][unit][side]['orders'][sample].append({ 'amount' : contrib, 'cost' : price })
                 creditor.info("[%d/%d] %.8f %s %.8f %s %s %s %.2f", 
                   sample + 1, config._sampling, payout / float(24 * 60  * config._sampling), user, contrib, side, name, unit, price * 100)
+            # credit lower payout level
             norm = float(sum([ max(0,v) for v in volume[1].values()]))
-            for user in volume[1]: # credit lower payout level
+            for user in volume[1]:
               if norm > 0 and volume[1][user] > 0:
                 price = pricelevels[-lvl-1]
-                contrib = (mass - lvl * target) * volume[1][user] / norm
+                contrib = (mass - int(mass / target) * target) * volume[1][user] / norm
                 payout = contrib * price
                 volume[2][user] -= contrib 
                 keys[user][unit].balance += payout / float(24 * 60  * config._sampling)
@@ -355,7 +356,8 @@ def credit():
                 config._interest[name][unit][side]['orders'][sample].append({ 'amount' : contrib, 'cost' : price })
                 creditor.info("[%d/%d] %.8f %s %.8f %s %s %s %.2f", 
                   sample + 1, config._sampling, payout / float(24 * 60  * config._sampling), user, contrib, side, name, unit, price * 100)
-            for user in volume[2]: # mark zero payouts
+            # mark zero payout level
+            for user in volume[2]:
               if volume[2][user] > 0:
                 keys[user][unit].credits[side][sample][2] = {'amount' : volume[2][user], 'cost' : 0.0}
 

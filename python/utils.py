@@ -39,10 +39,10 @@ class Connection():
         msg = 'unknown connection error'
       if trials:
         if trials <= 1:
-          self.logger.error("%s: %s", method, msg)
+          self.logger.debug("%s: %s", method, msg)
           return { 'message' : msg, 'code' : -1, 'error' : True }
         trials = trials - 1
-      self.logger.error("%s: %s, retrying in 5 seconds with timeout %d...", method, msg, timeout)
+      self.logger.debug("%s: %s, retrying in 5 seconds with timeout %d...", method, msg, timeout)
       time.sleep(max(5.0 - time.time() + curtime, 0))
 
   def get(self, method, params = None, trials = None, timeout = 5):

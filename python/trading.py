@@ -191,7 +191,7 @@ class PyBot(ConnectionThread):
     return response
 
   def run(self):
-    self.logger.info("starting PyBot for unit %s on %s", self.unit, repr(self.exchange))
+    self.logger.info("starting PyBot for %s on %s", self.unit, repr(self.exchange))
     self.serverprice = self.conn.get('price/' + self.unit, trials = 3, timeout = 15)['price']
     trials = 0
     while trials < 10:
@@ -211,6 +211,7 @@ class PyBot(ConnectionThread):
         if curtime - lasttime < 30: continue
         lasttime = curtime
         if self.requester.errorflag:
+          self.logger.error('server unresponsive for %s', repr(self.exchange))
           self.shutdown()
           efftime = curtime
         else:

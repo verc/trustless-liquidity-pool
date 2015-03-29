@@ -74,7 +74,7 @@ class RequestThread(ConnectionThread):
     if curtime - self.exchangeupdate > 30:
       response = self.conn.get('info/%s/%s' % (repr(self.exchange), self.unit), {}, 1)
       if 'error' in response:
-        self.logger.error('unable to update interest rates for unit %s on exchange %s', self.unit, repr(self.exchange))
+        self.logger.error('unable to update interest rates for unit %s on %s', self.unit, repr(self.exchange))
       else:
         self.exchangeinfo = response
         self.exchangeupdate = curtime
