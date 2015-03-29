@@ -243,7 +243,7 @@ class PyBot(ConnectionThread):
                     effective_rate = float(sum([ o['amount'] * o['cost'] for o in response['units'][self.unit][side] ]))
                     total = float(sum([ o['amount'] for o in response['units'][self.unit][side] ]))
                     if total == 0:
-                      self.limit[side] = 0.5
+                      self.limit[side] = self.requester.interest()[side]['target']
                     else:
                       effective_rate /= total
                       deviation = 1.0 - min(effective_rate, self.requester.cost[side]) / max(effective_rate, self.requester.cost[side])
