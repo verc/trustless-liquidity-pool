@@ -331,7 +331,7 @@ def credit():
             norm = float(sum(volume[0].values()))
             for user in volume[0]:
               if norm > 0 and volume[0][user] > 0:
-                price = pricelevels[-lvl]
+                price = pricelevels[lvl]
                 contrib = ((int(mass / target)+1) * target - mass) * volume[0][user] / norm
                 payout = contrib * price
                 volume[1][user] -= contrib
@@ -346,7 +346,7 @@ def credit():
             norm = float(sum([ max(0,v) for v in volume[1].values()]))
             for user in volume[1]:
               if norm > 0 and volume[1][user] > 0:
-                price = pricelevels[-lvl-1]
+                price = pricelevels[lvl-1]
                 contrib = (mass - int(mass / target) * target) * volume[1][user] / norm
                 payout = contrib * price
                 volume[2][user] -= contrib 
