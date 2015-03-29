@@ -88,30 +88,30 @@ class PriceFeed():
       #self.feed[unit][2] = None
       if unit == 'btc': 
         try: # bitfinex
-          ret = json.loads(urllib2.urlopen(urllib2.Request('https://api.bitfinex.com/v1//pubticker/btcusd'), timeout = 1).read())
+          ret = json.loads(urllib2.urlopen(urllib2.Request('https://api.bitfinex.com/v1//pubticker/btcusd'), timeout = 3).read())
           self.feed['btc'][2] = 1.0 / float(ret['mid'])
         except:
           self.logger.warning("unable to update BTC price from bitfinex")
           try: # coinbase
-            ret = json.loads(urllib2.urlopen(urllib2.Request('https://coinbase.com/api/v1/prices/spot_rate?currency=USD'), timeout = 1).read())
+            ret = json.loads(urllib2.urlopen(urllib2.Request('https://coinbase.com/api/v1/prices/spot_rate?currency=USD'), timeout = 3).read())
             self.feed['btc'][2] = 1.0 / float(ret['amount'])
           except:
             self.logger.warning("unable to update BTC price from coinbase")
             try: # bitstamp
-              ret = json.loads(urllib2.urlopen(urllib2.Request('https://www.bitstamp.net/api/ticker/'), timeout = 1).read())
+              ret = json.loads(urllib2.urlopen(urllib2.Request('https://www.bitstamp.net/api/ticker/'), timeout = 3).read())
               self.feed['btc'][2] = 2.0 / (float(ret['ask']) + float(ret['bid']))
             except:
               self.logger.error("unable to update price for BTC")
       elif unit == 'eur':
         try: # yahoo
-          ret = json.loads(urllib2.urlopen(urllib2.Request('http://finance.yahoo.com/webservice/v1/symbols/allcurrencies/quote?format=json'), timeout = 2).read())
+          ret = json.loads(urllib2.urlopen(urllib2.Request('http://finance.yahoo.com/webservice/v1/symbols/allcurrencies/quote?format=json'), timeout = 3).read())
           for res in ret['list']['resources']:
             if res['resource']['fields']['name'] == 'USD/EUR':
               self.feed['eur'][2] = float(res['resource']['fields']['price'])
         except:
           self.logger.warning("unable to update EUR price from yahoo")
           try: # bitstamp
-            ret = json.loads(urllib2.urlopen(urllib2.Request('https://www.bitstamp.net/api/eur_usd/'), timeout = 1).read())
+            ret = json.loads(urllib2.urlopen(urllib2.Request('https://www.bitstamp.net/api/eur_usd/'), timeout = 3).read())
             self.feed['eur'][2] = 2.0 / (float(ret['sell']) + float(ret['buy']))
           except:
             self.logger.error("unable to update price for EUR")
