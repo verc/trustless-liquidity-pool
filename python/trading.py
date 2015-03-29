@@ -253,7 +253,7 @@ class PyBot(ConnectionThread):
                           self.logger.info("decreasing tier 1 %s limit of %s on %s from %.8f to %.8f", side, self.unit, repr(self.exchange), total, funds)
                           self.cancel_orders(side)
                           self.limit[side] = funds
-                        elif self.limit[side] < total * deviation:
+                        elif self.limit[side] < total * deviation and effective_rate > self.requester.cost[side]:
                           self.logger.info("increasing tier 1 %s limit of %s on %s from %.8f to %.8f", side, self.unit, repr(self.exchange), total, total * (1.0 + deviation))
                           self.limit[side] = total * deviation
                 self.place('bid')
