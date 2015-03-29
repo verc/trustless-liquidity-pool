@@ -204,6 +204,7 @@ class PyBot(ConnectionThread):
     curtime = time.time()
     efftime = curtime
     lasttime = curtime
+    lastdev = 1.0
     while self.active:
       try:
         time.sleep(max(1 - time.time() + curtime, 0))
@@ -247,7 +248,7 @@ class PyBot(ConnectionThread):
                     else:
                       effective_rate /= total
                       deviation = 1.0 - min(effective_rate, self.requester.cost[side]) / max(effective_rate, self.requester.cost[side])
-                      if deviation > 0.02:
+                      if deviation > 0.02 and lastdev > 0.02:
                         if self.limit[side] >= 0.5 and effective_rate < self.requester.cost[side]:
                           funds = max(0.5, total * (1.0 - max(deviation, 0.1)))
                           self.logger.info("decreasing tier 1 %s limit of %s on %s from %.8f to %.8f", side, self.unit, repr(self.exchange), total, funds)
@@ -256,8 +257,9 @@ class PyBot(ConnectionThread):
                         elif self.limit[side] < total * deviation and effective_rate > self.requester.cost[side]:
                           self.logger.info("increasing tier 1 %s limit of %s on %s from %.8f to %.8f", side, self.unit, repr(self.exchange), total, total * (1.0 + deviation))
                           self.limit[side] = total * deviation
-            self.place('bid')
-            self.place('ask')
+                      lastdev = deviation
+              self.place('bid')
+              self.place('ask')
           else:
             self.logger.error('unable to retrieve server price: %s', response['message'])
       except Exception as e:
