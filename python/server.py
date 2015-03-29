@@ -314,7 +314,7 @@ def credit():
           if mass > 0:
             target = min(mass, config._interest[name][unit][side]['target'])
             pricelevels = sorted(list(set( [ order[2] for _,order in orders if order[2] <= maxrate ])) + [ maxrate ])
-            lvl = max(1, len(pricelevels) - int(mass / target) - 1)
+            lvl = max(0, len(pricelevels) - int(mass / target) - 1)
             # collect user contribution
             volume = [ { user : 0.0 for user in users }, { user : 0.0 for user in users }, { user : 0.0 for user in users } ]
             for user,order in orders:
