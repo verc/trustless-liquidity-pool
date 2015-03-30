@@ -306,7 +306,7 @@ class BitcoinCoId(Exchange):
   def place_order(self, unit, side, key, secret, amount, price):
     params = { "type" : 'buy' if side == 'bid' else 'sell',
                "price" : price,
-               "pair_id" : int(self.pair_id[unit.upper()]),
+               "pair" : int(self.pair_id[unit.upper()]),
                "volume" : amount }
     response = self.post('order/new', params, key, secret)
     if not 'error' in response:
