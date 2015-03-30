@@ -303,16 +303,6 @@ class BitcoinCoId(Exchange):
     if response['sell']: response['ask'] = float(response['sell'][0][0])
     return response
 
-  def place_order(self, unit, side, key, secret, amount, price):
-    params = { "type" : 'buy' if side == 'bid' else 'sell',
-               "price" : price,
-               "pair" : int(self.pair_id[unit.upper()]),
-               "volume" : amount }
-    response = self.post('order/new', params, key, secret)
-    if not 'error' in response:
-      response['id'] = int(response['response']['entity']['order_id'])
-    return response
-
   def create_request(self, unit, key = None, secret = None):
     if not secret: return None, None
     request = { 'nonce' : self.nonce(), 'pair' : 'nbt_' + unit.lower(), 'method' : 'openOrders' }
