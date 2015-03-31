@@ -255,6 +255,8 @@ class PyBot(ConnectionThread):
             self.shutdown()
             self.sync()
             delay = 0.0
+            if not self.requester.errorflag:
+              self.place_orders()
         else:
           while sleep > 0:
             step = min(sleep, 0.5)
@@ -316,6 +318,6 @@ class PyBot(ConnectionThread):
           else:
             self.logger.error('unable to retrieve server price: %s', response['message'])
       except Exception as e:
-        self.logger.error('exception caught in trading bot: %s', sys.exc_info()[1])
+        self.logger.debug('exception caught in trading bot: %s', sys.exc_info()[1])
     time.sleep(1) # this is to ensure that the order book is updated
     self.shutdown()
