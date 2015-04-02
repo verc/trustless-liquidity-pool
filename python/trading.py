@@ -14,7 +14,7 @@ from utils import *
 
 
 class NuBot(ConnectionThread):
-  def __init__(self, conn, requester, key, secret, exchange, unit, logger = None):
+  def __init__(self, conn, requester, key, secret, exchange, unit, target, logger = None):
     super(NuBot, self).__init__(conn, logger)
     self.requester = requester
     self.process = None
@@ -72,7 +72,7 @@ class NuBot(ConnectionThread):
 
 
 class PyBot(ConnectionThread):
-  def __init__(self, conn, requester, key, secret, exchange, unit, logger = None):
+  def __init__(self, conn, requester, key, secret, exchange, unit, target, logger = None):
     super(PyBot, self).__init__(conn, logger)
     self.requester = requester
     self.key = key
@@ -80,8 +80,9 @@ class PyBot(ConnectionThread):
     self.exchange = exchange
     self.unit = unit
     self.orders = []
-    self.limit = { 'bid' : self.requester.interest()['bid']['target'], 'ask' : self.requester.interest()['ask']['target'] }
+    self.limit = target
     self.lastlimit = { 'bid' : 0, 'ask' : 0 }
+    self.target = target.copy()
     if not hasattr(PyBot, 'lock'):
       PyBot.lock = {}
     if not repr(exchange) in PyBot.lock:
@@ -102,9 +103,9 @@ class PyBot(ConnectionThread):
       self.logger.info('successfully deleted %s orders for %s on %s', side, self.unit, repr(self.exchange))
       if reset:
         if side == 'all':
-          self.limit = { 'bid' : self.requester.interest()['bid']['target'], 'ask' : self.requester.interest()['ask']['target'] }
+          self.limit = self.target.copy()
         else:
-          self.limit[side] = self.requester.interest()[side]['target']
+          self.limit[side] = self.target[side]
     return response
 
   def shutdown(self):
@@ -120,33 +121,6 @@ class PyBot(ConnectionThread):
 
   def release_lock(self):
     PyBot.lock[repr(self.exchange)].release()
-
-#  def place(self, side, balance, price):
-#    try:
-#      response = self.exchange.place_order(self.unit, side, self.key, self.secret, balance, price)
-#    except KeyboardInterrupt: raise
-#    except: response = { 'error' : 'exception caught: %s' % sys.exc_info()[1] }
-#    if 'error' in response:
-#      self.logger.error('unable to place %s %s order of %.4f nbt at %.8f on %s: %s', side, self.unit, balance, price, repr(self.exchange), response['error'])
-#      self.exchange.adjust(response['error'])
-#    else:
-#      self.logger.info('successfully placed %s %s order of %.4f nbt at %.8f on %s', side, self.unit, balance, price, repr(self.exchange))
-#    return response
-
-  def effective_interest(self, balance, orders, target, cost):
-    mod = orders[:]
-    for i in xrange(len(orders)):
-      if mod[i]['id'] in self.orders:
-        mod[i]['cost'] = cost
-    mod.append({'amount' : balance, 'cost' : cost, 'id' : sys.maxint})
-    mod.sort(key = lambda x: (x['cost'], x['id']))
-    total = 0.0
-    mass = 0.0
-    for order in mod:
-      if order['id'] in self.orders or order['id'] == sys.maxint:
-        mass += max(min(order['amount'], target - total), 0.0)
-      total += order['amount']
-    return mass * cost
 
   def balance(self, exunit, price):
     try:
@@ -300,7 +274,7 @@ class PyBot(ConnectionThread):
                     effective_rate = float(sum([ o['amount'] * o['cost'] for o in response['units'][self.unit][side] ]))
                     total = float(sum([ o['amount'] for o in response['units'][self.unit][side] ]))
                     if total == 0:
-                      self.limit[side] = self.requester.interest()[side]['target']
+                      self.limit[side] = self.target[side]
                     else:
                       effective_rate /= total
                       deviation = 1.0 - min(effective_rate, self.requester.cost[side]) / max(effective_rate, self.requester.cost[side])

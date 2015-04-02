@@ -66,19 +66,7 @@ class RequestThread(ConnectionThread):
     self.errorflag = False
     self.trials = 0
     self.exchangeupdate = 0
-    self.exchangeinfo = self.interest()
     self.cost = cost.copy()
-
-  def interest(self):
-    curtime = time.time()
-    if curtime - self.exchangeupdate > 30:
-      response = self.conn.get('info/%s/%s' % (repr(self.exchange), self.unit), {}, 1)
-      if 'error' in response:
-        self.logger.error('unable to update interest rates for unit %s on %s', self.unit, repr(self.exchange))
-      else:
-        self.exchangeinfo = response
-        self.exchangeupdate = curtime
-    return self.exchangeinfo
 
   def register(self):
     response = self.conn.post('register', { 'address' : self.address, 'key' : self.key, 'name' : repr(self.exchange) })
@@ -148,12 +136,14 @@ for user in userdata:
     users[key][unit] = { 'request' : RequestThread(conn, key, secret, exchange, unit, user[0], sampling, cost, logger) }
     users[key][unit]['request'].start()
 
+    target = { 'bid': exchangeinfo[name][unit]['bid']['target'], 'ask': exchangeinfo[name][unit]['ask']['target'] }
+
     if bot == 'none':
       users[key][unit]['order'] = None
     elif bot == 'nubot':
-      users[key][unit]['order'] = NuBot(conn, users[key][unit]['request'], key, secret, exchange, unit, logger)
+      users[key][unit]['order'] = NuBot(conn, users[key][unit]['request'], key, secret, exchange, unit, target, logger)
     elif bot == 'pybot':
-      users[key][unit]['order'] = PyBot(conn, users[key][unit]['request'], key, secret, exchange, unit, logger)
+      users[key][unit]['order'] = PyBot(conn, users[key][unit]['request'], key, secret, exchange, unit, target, logger)
     else:
       logger.error("unknown order handler: %s", bot)
       users[key][unit]['order'] = None

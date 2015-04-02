@@ -7,48 +7,48 @@ _interest = {
   'poloniex' : {
     'btc' : {
       'bid': {
-        'rate' : 0.01,
-        'target' : 50.0
+        'rate' : 0.001,
+        'target' : 10.0
         },
       'ask': {
-        'rate' : 0.01,
-        'target' : 50.0
+        'rate' : 0.001,
+        'target' : 10.0
         }
       }
   },
   'ccedk' : {
     'btc' : {
       'bid': {
-        'rate' : 0.01,
-        'target' : 50.0
+        'rate' : 0.001,
+        'target' : 500.0
         },
       'ask': {
-        'rate' : 0.01,
-        'target' : 50.0
+        'rate' : 0.001,
+        'target' : 500.0
         }
       }
   },
   'bitcoincoid' : {
     'btc' : {
       'bid': {
-        'rate' : 0.01,
-        'target' : 50.0
+        'rate' : 0.001,
+        'target' : 500.0
         },
       'ask': {
-        'rate' : 0.01,
-        'target' : 50.0
+        'rate' : 0.001,
+        'target' : 500.0
         }
       }
     },
   'bter' : {
     'btc' : {
       'bid': {
-        'rate' : 0.01,
-        'target' : 50.0
+        'rate' : 0.001,
+        'target' : 500.0
         },
       'ask': {
-        'rate' : 0.01,
-        'target' : 50.0
+        'rate' : 0.001,
+        'target' : 500.0
         }
       }
     },
