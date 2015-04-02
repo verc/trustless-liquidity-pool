@@ -281,7 +281,7 @@ def userstats(user):
       for i in xrange(keys[user][unit].sampling):
         for side in ['bid', 'ask']:
           stats = config._interest[repr(keys[user][unit].exchange)][unit][side]
-          if credits[side][0]['cost'] == stats['high'] or credits[side][1]['cost'] == stats['low']:
+          if keys[user][unit].credits[side][i][j]['cost'] == stats['high'] or keys[user][unit].credits[side][i][j]['cost'] == stats['low']:
             for j in xrange(3):
               credits[side][j]['amount'] = keys[user][unit].credits[side][i][j]['amount']
       for side in ['bid', 'ask']:
