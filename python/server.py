@@ -280,17 +280,14 @@ def userstats(user):
       norm = max(1.0, float(keys[user][unit].sampling - missing - rejects))
       for i in xrange(keys[user][unit].sampling):
         for side in ['bid', 'ask']:
-          for j in xrange(3):
-            credits[side][j]['amount'] += keys[user][unit].credits[side][i][j]['amount'] / norm
-            credits[side][j]['cost'] += keys[user][unit].credits[side][i][j]['cost'] / norm
+          stats = config._interest[repr(keys[user][unit].exchange)][unit][side]
+          if credits[side][0]['cost'] == stats['high'] or credits[side][1]['cost'] == stats['low']:
+            for j in xrange(3):
+              credits[side][j]['amount'] = keys[user][unit].credits[side][i][j]['amount']
       for side in ['bid', 'ask']:
         stats = config._interest[repr(keys[user][unit].exchange)][unit][side]
-        if credits[side][0]['cost'] > 0:
-          credits[side][0]['amount'] *= stats['high'] / credits[side][0]['cost']
-          credits[side][0]['cost'] = stats['high']
-        if credits[side][1]['cost'] > 0:
-          credits[side][1]['amount'] *= stats['low'] / credits[side][1]['cost']
-          credits[side][1]['cost'] = stats['low']
+        credits[side][0]['cost'] = stats['high']
+        credits[side][1]['cost'] = stats['low']
 
       res['units'][unit] = { 'bid' : credits['bid'],
                              'ask' : credits['ask'],
