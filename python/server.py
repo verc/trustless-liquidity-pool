@@ -324,7 +324,7 @@ def credit():
           if mass > 0:
             target = min(mass, config._interest[name][unit][side]['target'])
             maxlevel = int(ceil(mass / target))
-            pricelevels = sorted(list(set( [ order[2] for _,order in orders if order[2] < maxrate ])))
+            pricelevels = sorted(list(set( [ order[2] for _,order in orders if order[2] < maxrate ])) + [maxrate, maxrate])
             if len(pricelevels) < maxlevel + 2:
               pricelevels += [maxrate] * (2 + maxlevel - len(pricelevels))
             lvl = len(pricelevels) - maxlevel - 1
