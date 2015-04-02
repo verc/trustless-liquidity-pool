@@ -341,8 +341,8 @@ def credit():
                   volume[1][user] += order[1]
                   if ulvl < lvl:
                     volume[0][user] += order[1]
-            config._interest[name][unit][side]['low'] += pricelevels[lvl] / float(config._sampling)
-            config._interest[name][unit][side]['high'] += pricelevels[lvl+1] / float(config._sampling)
+            config._interest[name][unit][side]['low'] = pricelevels[lvl]
+            config._interest[name][unit][side]['high'] = pricelevels[lvl+1]
             # credit higher payout level
             norm = float(sum(volume[1].values()))
             for user in volume[1]:
