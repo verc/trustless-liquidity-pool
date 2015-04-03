@@ -271,7 +271,7 @@ def poolstats():
 
 critical_message = ""
 def userstats(user):
-  res = { 'balance' : 0.0, 'efficiency' : 0.0, 'rejects': 0, 'missing' : 0, 'message' : critical_message }
+  res = { 'balance' : 0.0, 'efficiency' : 1.0, 'rejects': 0, 'missing' : 0, 'message' : critical_message }
   res['units'] = {}
   for unit in keys[user]:
     if keys[user][unit].active:
