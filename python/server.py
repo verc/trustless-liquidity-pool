@@ -134,6 +134,7 @@ class User(threading.Thread):
     self.logger = logger if logger else logging.getLogger('null')
     self.requests = []
     self.daemon = True
+    self.default_message = ""
 
   def set(self, request, bid, ask, sign):
     if len(self.requests) < 10: # don't accept more requests to avoid simple spamming
@@ -159,21 +160,24 @@ class User(threading.Thread):
             if not 'error' in orders:
               valid = { 'bid': [], 'ask' : [] }
               price = self.pricefeed.price(self.unit)
+              last_error = ''
               for order in orders:
                 deviation = 1.0 - min(order['price'], price) / max(order['price'], price)
                 if deviation <= self.tolerance:
                   valid[order['type']].append([order['id'], order['amount'], request[2][order['type']]])
                 else:
-                  self.last_error = 'unable to validate request: order of deviates too much from current price'
+                  last_error = 'unable to validate request: order of deviates too much from current price'
               for side in [ 'bid', 'ask' ]:
                 del self.liquidity[side][0]
                 self.liquidity[side].append(valid[side])
-              if self.last_error != "" and len(valid['bid'] + valid['ask']) == 0:
+              if last_error != "" and len(valid['bid'] + valid['ask']) == 0:
                 res = 'r'
+                self.last_error = last_error
                 self.logger.debug("unable to validate request %d/%d for user %s at exchange %s on unit %s: orders of deviate too much from current price",
                   rid + 1, len(self.requests), self.key, repr(self.exchange), self.unit)
               else:
                 res = 'a'
+                self.last_error = self.default_message
                 break
             else:
               res = 'r'
@@ -566,7 +570,7 @@ while True:
     lock.acquire()
     for user in keys:
       for unit in keys[user]:
-        keys[user][unit].last_error = critical_message
+        keys[user][unit].default_message = critical_message
         keys[user][unit].validate()
     lock.release()
 
