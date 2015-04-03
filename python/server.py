@@ -121,7 +121,7 @@ class User(threading.Thread):
     self.exchange = exchange
     self.tolerance = tolerance
     self.sampling = sampling
-    self.last_errors = []
+    self.last_errors = [ "" ] * sampling
     self.cost = { 'ask' : config._interest[repr(exchange)][unit]['bid']['rate'], 'bid' : config._interest[repr(exchange)][unit]['ask']['rate'] }
     self.rate = { 'ask' : config._interest[repr(exchange)][unit]['bid']['rate'], 'bid' : config._interest[repr(exchange)][unit]['ask']['rate'] }
     self.liquidity = { 'ask' : [[] for i in xrange(sampling)], 'bid' : [[] for i in xrange(sampling)] }
