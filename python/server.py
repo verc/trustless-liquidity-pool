@@ -289,7 +289,7 @@ def userstats(user):
           last_error = keys[user][unit].last_errors[i]
         for side in ['bid', 'ask']:
           stats = config._interest[repr(keys[user][unit].exchange)][unit][side]
-          if credits[side][0]['cost'] < 0.0 and keys[user][unit].response[sample] == 'a':
+          if credits[side][0]['cost'] < 0.0 and keys[user][unit].response[i] == 'a':
             for j in xrange(3):
               credits[side][j]['amount'] = keys[user][unit].credits[side][i][j]['amount']
               credits[side][j]['cost'] = 0.0
