@@ -221,7 +221,7 @@ class PyBot(ConnectionThread):
     delay = 0.0
     while self.active:
       try:
-        sleep = 10 - time.time() + curtime
+        sleep = 15 - time.time() + curtime
         if sleep < 0:
           delay += abs(sleep)
           if delay > 1.0:
@@ -239,14 +239,13 @@ class PyBot(ConnectionThread):
             sleep -= step
         if not self.active: break
         curtime = time.time()
-        if curtime - lasttime < 10: continue
         lasttime = curtime
         if self.requester.errorflag:
           self.logger.error('server unresponsive for %s on %s', self.unit, repr(self.exchange))
           self.shutdown()
           efftime = curtime
         else:
-          response = self.conn.get('price/' + self.unit, trials = 3, timeout = 15)
+          response = self.conn.get('price/' + self.unit, trials = 3, timeout = 10)
           if not 'error' in response:
             self.serverprice = response['price']
             userprice = PyBot.pricefeed.price(self.unit)
