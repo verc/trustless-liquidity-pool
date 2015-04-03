@@ -194,7 +194,7 @@ while True: # print some info every minute until program terminates
         logger.info('%s - balance: %.8f rate %.2f%% efficiency: %.2f%% rejects: %d missing: %d%s - %s', repr(users[user].values()[0]['request'].exchange),
           response['balance'], effective_rate * 100, response['efficiency'] * 100, response['rejects'], response['missing'], orderstring, user)
         if curtime - starttime > 90:
-          if response['efficiency'] < 0.8:
+          if response['efficiency'] < 0.9:
             for unit in response['units']:
               if response['units'][unit]['rejects'] / float(basestatus['sampling']) >= 0.1: # look for valid error and adjust nonce shift
                 if response['units'][unit]['last_error'] != "":
@@ -215,10 +215,10 @@ while True: # print some info every minute until program terminates
                 else: # just wait a little bit
                   logger.warning('too many missing requests, sleeping a short while to synchronize')
                   curtime += 0.7
-          elif response['efficiency'] >= 0.9 and response['efficiency'] < 1.0:
+          elif response['efficiency'] < 1.0:
             for unit in response['units']:
               if (response['units'][unit]['rejects'] + response['units'][unit]['missing']) / float(basestatus['sampling']) >= 0.05:
-                if users[user][unit]['request'].sampling < 100:  # send some more requests
+                if users[user][unit]['request'].sampling < 2 * sampling:  # send some more requests
                   users[user][unit]['request'].sampling = users[user][unit]['request'].sampling + 1
                   logger.warning('trying to optimize efficiency by increasing sampling of %s on %s to %d',
                     unit, repr(users[user][unit]['request'].exchange), users[user][unit]['request'].sampling)

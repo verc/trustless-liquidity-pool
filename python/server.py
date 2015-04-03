@@ -296,9 +296,6 @@ def userstats(user):
         stats = config._interest[repr(keys[user][unit].exchange)][unit][side]
         credits[side][0]['cost'] = stats['high']
         credits[side][1]['cost'] = stats['low']
-
-
-
       res['units'][unit] = { 'bid' : credits['bid'],
                              'ask' : credits['ask'],
                              'rate' : keys[user][unit].rate,
