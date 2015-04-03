@@ -286,7 +286,7 @@ def userstats(user):
       norm = max(1.0, float(keys[user][unit].sampling - missing - rejects))
       for i in xrange(keys[user][unit].sampling):
         if keys[user][unit].last_errors[i] != "":
-          last_error = keys[user][unit].last_error[i]
+          last_error = keys[user][unit].last_errors[i]
         for side in ['bid', 'ask']:
           stats = config._interest[repr(keys[user][unit].exchange)][unit][side]
           if keys[user][unit].credits[side][i][0]['cost'] == stats['high'] or keys[user][unit].credits[side][i][1]['cost'] == stats['low']:
