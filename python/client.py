@@ -132,12 +132,9 @@ for user in userdata:
     if len(user) >= 7 and float(user[6]) != 0.0:
       cost['ask'] = float(user[6]) / 100.0
     bot = 'pybot' if len(user) < 8 else user[7]
-
     users[key][unit] = { 'request' : RequestThread(conn, key, secret, exchange, unit, user[0], sampling, cost, logger) }
     users[key][unit]['request'].start()
-
     target = { 'bid': exchangeinfo[name][unit]['bid']['target'], 'ask': exchangeinfo[name][unit]['ask']['target'] }
-
     if bot == 'none':
       users[key][unit]['order'] = None
     elif bot == 'nubot':

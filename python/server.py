@@ -275,8 +275,8 @@ def userstats(user):
   res['units'] = {}
   for unit in keys[user]:
     if keys[user][unit].active:
-      credits = { 'bid' : [ { 'amount': 0.0, 'cost': 0.0 }, { 'amount': 0.0, 'cost': 0.0 }, { 'amount': 0.0, 'cost': 0.0 } ],
-                  'ask' : [ { 'amount': 0.0, 'cost': 0.0 }, { 'amount': 0.0, 'cost': 0.0 }, { 'amount': 0.0, 'cost': 0.0 } ] }
+      credits = { 'bid' : [ { 'amount': keys[user][unit].credits['bid'][-1][i]['amount'], 'cost': keys[user][unit].credits['bid'][-1][i]['cost'] } for i in xrange(3) ],
+                  'ask' : [ { 'amount': keys[user][unit].credits['ask'][-1][i]['amount'], 'cost': keys[user][unit].credits['ask'][-1][i]['cost'] } for i in xrange(3) ] }
       last_error = ""
       missing = keys[user][unit].response.count('m')
       rejects = keys[user][unit].response.count('r')
