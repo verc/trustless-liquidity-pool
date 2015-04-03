@@ -226,7 +226,6 @@ class PyBot(ConnectionThread):
           delay += abs(sleep)
           if delay > 1.0:
             self.logger.warning('need to resynchronize trading bot for %s on %s because the deviation reached %.2f', self.unit, repr(self.exchange), delay)
-            self.shutdown()
             self.sync()
             delay = 0.0
             if not self.requester.errorflag:
