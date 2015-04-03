@@ -285,7 +285,7 @@ def userstats(user):
       res['rejects'] += rejects
       norm = max(1.0, float(keys[user][unit].sampling - missing - rejects))
       for i in xrange(keys[user][unit].sampling):
-        if keys[user][unit].last_error[i] != "":
+        if keys[user][unit].last_errors[i] != "":
           last_error = keys[user][unit].last_error[i]
         for side in ['bid', 'ask']:
           stats = config._interest[repr(keys[user][unit].exchange)][unit][side]
