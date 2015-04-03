@@ -121,7 +121,7 @@ class User(threading.Thread):
     self.exchange = exchange
     self.tolerance = tolerance
     self.sampling = sampling
-    self.last_error = ""
+    self.last_errors = []
     self.cost = { 'ask' : config._interest[repr(exchange)][unit]['bid']['rate'], 'bid' : config._interest[repr(exchange)][unit]['ask']['rate'] }
     self.rate = { 'ask' : config._interest[repr(exchange)][unit]['bid']['rate'], 'bid' : config._interest[repr(exchange)][unit]['ask']['rate'] }
     self.liquidity = { 'ask' : [[] for i in xrange(sampling)], 'bid' : [[] for i in xrange(sampling)] }
@@ -134,7 +134,6 @@ class User(threading.Thread):
     self.logger = logger if logger else logging.getLogger('null')
     self.requests = []
     self.daemon = True
-    self.default_message = ""
 
   def set(self, request, bid, ask, sign):
     if len(self.requests) < 10: # don't accept more requests to avoid simple spamming
@@ -166,22 +165,22 @@ class User(threading.Thread):
                 if deviation <= self.tolerance:
                   valid[order['type']].append([order['id'], order['amount'], request[2][order['type']]])
                 else:
-                  last_error = 'unable to validate request: order of deviates too much from current price'
+                  self.last_errors.append('unable to validate request: order of deviates too much from current price')
               for side in [ 'bid', 'ask' ]:
                 del self.liquidity[side][0]
                 self.liquidity[side].append(valid[side])
               if last_error != "" and len(valid['bid'] + valid['ask']) == 0:
                 res = 'r'
-                self.last_error = last_error
+                self.last_errors.append(last_error)
                 self.logger.debug("unable to validate request %d/%d for user %s at exchange %s on unit %s: orders of deviate too much from current price",
                   rid + 1, len(self.requests), self.key, repr(self.exchange), self.unit)
               else:
                 res = 'a'
-                self.last_error = self.default_message
+                self.last_errors.append("")
                 break
             else:
               res = 'r'
-              self.last_error = "unable to validate request: " + orders['error']
+              self.last_errors.append("unable to validate request: " + orders['error'])
               if rid + 1 == len(self.requests):
                 self.logger.warning("unable to validate request %d/%d for user %s at exchange %s on unit %s: %s",
                   rid + 1, len(self.requests), self.key, repr(self.exchange), self.unit, orders['error'])
@@ -189,18 +188,19 @@ class User(threading.Thread):
                 del self.liquidity[side][0]
                 self.liquidity[side].append([])
         else:
-          self.last_error = "no request received"
+          self.last_errors.append("no request received")
           for side in [ 'bid', 'ask' ]:
             del self.liquidity[side][0]
             self.liquidity[side].append([])
         self.response.append(res)
         self.requests = []
       else:
-        self.last_error = "no request received"
+        self.last_errors.append("no request received")
         for side in [ 'bid', 'ask' ]:
           del self.liquidity[side][0]
           self.liquidity[side].append([])
       self.active = self.liquidity['bid'].count([]) + self.liquidity['ask'].count([]) < 2 * self.sampling
+      del self.last_errors[0]
       self.lock.release()
 
   def validate(self):
@@ -269,13 +269,15 @@ def liquidity(params):
 def poolstats():
   return { 'liquidity' : ([ (0,0) ] + _liquidity)[-1], 'sampling' : config._sampling, 'users' : _active_users }
 
+critical_message = ""
 def userstats(user):
-  res = { 'balance' : 0.0, 'efficiency' : 0.0, 'rejects': 0, 'missing' : 0 }
+  res = { 'balance' : 0.0, 'efficiency' : 0.0, 'rejects': 0, 'missing' : 0, 'message' : critical_message }
   res['units'] = {}
   for unit in keys[user]:
     if keys[user][unit].active:
       credits = { 'bid' : [ { 'amount': 0.0, 'cost': 0.0 }, { 'amount': 0.0, 'cost': 0.0 }, { 'amount': 0.0, 'cost': 0.0 } ],
                   'ask' : [ { 'amount': 0.0, 'cost': 0.0 }, { 'amount': 0.0, 'cost': 0.0 }, { 'amount': 0.0, 'cost': 0.0 } ] }
+      last_error = ""
       missing = keys[user][unit].response.count('m')
       rejects = keys[user][unit].response.count('r')
       res['balance'] += keys[user][unit].balance
@@ -283,6 +285,8 @@ def userstats(user):
       res['rejects'] += rejects
       norm = max(1.0, float(keys[user][unit].sampling - missing - rejects))
       for i in xrange(keys[user][unit].sampling):
+        if keys[user][unit].last_error[i] != "":
+          last_error = keys[user][unit].last_error[i]
         for side in ['bid', 'ask']:
           stats = config._interest[repr(keys[user][unit].exchange)][unit][side]
           if keys[user][unit].credits[side][i][0]['cost'] == stats['high'] or keys[user][unit].credits[side][i][1]['cost'] == stats['low']:
@@ -293,12 +297,14 @@ def userstats(user):
         credits[side][0]['cost'] = stats['high']
         credits[side][1]['cost'] = stats['low']
 
+
+
       res['units'][unit] = { 'bid' : credits['bid'],
                              'ask' : credits['ask'],
                              'rate' : keys[user][unit].rate,
                              'rejects' : rejects,
                              'missing' : missing,
-                             'last_error' :  keys[user][unit].last_error }
+                             'last_error' :  last_error }
   if len(res['units']) > 0:
     res['efficiency'] = 1.0 - (res['rejects'] + res['missing']) / float(config._sampling * len(res['units']))
   return res
@@ -534,8 +540,6 @@ lastcredit = time.time()
 lastpayout = time.time()
 lastsubmit = time.time()
 
-critical_message = ""
-
 while True:
   try:
     curtime = time.time()
@@ -570,7 +574,6 @@ while True:
     lock.acquire()
     for user in keys:
       for unit in keys[user]:
-        keys[user][unit].default_message = critical_message
         keys[user][unit].validate()
     lock.release()
 
