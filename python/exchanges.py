@@ -354,7 +354,7 @@ class BTER(Exchange):
       return response
     if not response['orders']: response['orders'] = []
     for order in response['orders']:
-      if side == 'all' or (side == 'ask' and order['buy_type'] == unit) or (side == 'bid' and order['buy_type'] != unit):
+      if side == 'all' or (side == 'ask' and order['sell_type'] != unit) or (side == 'bid' and order['buy_type'] != unit):
         if order['pair'] == 'nbt_' + unit.lower():
           params = { 'order_id' : order['oid'] }
           ret = self.post('cancelorder', params, key, secret)
