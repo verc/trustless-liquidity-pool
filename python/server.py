@@ -275,8 +275,8 @@ def userstats(user):
   res['units'] = {}
   for unit in keys[user]:
     if keys[user][unit].active:
-      credits = { 'bid' : [ { 'amount': keys[user][unit].credits['bid'][-1][i]['amount'], 'cost': keys[user][unit].credits['bid'][-1][i]['cost'] } for i in xrange(3) ],
-                  'ask' : [ { 'amount': keys[user][unit].credits['ask'][-1][i]['amount'], 'cost': keys[user][unit].credits['ask'][-1][i]['cost'] } for i in xrange(3) ] }
+      credits = { 'bid' : [ { 'amount': 0.0, 'cost': -1.0 }, { 'amount': 0.0, 'cost': -1.0 }, { 'amount': 0.0, 'cost': -1.0 } ],
+                  'ask' : [ { 'amount': 0.0, 'cost': -1.0 }, { 'amount': 0.0, 'cost': -1.0 }, { 'amount': 0.0, 'cost': -1.0 } ] }
       last_error = ""
       missing = keys[user][unit].response.count('m')
       rejects = keys[user][unit].response.count('r')
@@ -289,6 +289,10 @@ def userstats(user):
           last_error = keys[user][unit].last_errors[i]
         for side in ['bid', 'ask']:
           stats = config._interest[repr(keys[user][unit].exchange)][unit][side]
+          if credits[side][0]['cost'] < 0.0 and keys[user][unit].response[sample] == 'a':
+            for j in xrange(3):
+              credits[side][j]['amount'] = keys[user][unit].credits[side][i][j]['amount']
+              credits[side][j]['cost'] = 0.0
           if keys[user][unit].credits[side][i][0]['cost'] == stats['high'] or keys[user][unit].credits[side][i][1]['cost'] == stats['low']:
             for j in xrange(3):
               credits[side][j]['amount'] = keys[user][unit].credits[side][i][j]['amount']
