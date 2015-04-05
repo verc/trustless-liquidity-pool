@@ -22,7 +22,7 @@ class Exchange(object):
   def nonce(self, factor = 1000.0):
     n = int((time.time() + self._shift) * float(factor))
     if self._nonce >= n:
-      n = self._nonce + 10
+      n = self._nonce + 100
     self._nonce = n
     return n
 
