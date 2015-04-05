@@ -407,21 +407,23 @@ def pay(nud):
   txfee = 0.01 if not nud.rpc else nud.txfee
   txout = {k : v - nud.txfee for k,v in txout.items() if v - txfee > config._minpayout}
   if txout:
-    payed = False
+    sent = False
     if config._autopayout:
-      payed = nud.pay(txout)
+      sent = nud.pay(txout)
     try:
       filename = 'logs/%d.credit' % time.time()
       out = open(filename, 'w')
       out.write(json.dumps(txout))
       out.close()
-      if not payed:
+      if not sent:
         logger.info("successfully stored payout to %s: %s", filename, txout)
       lock.acquire()
       for user in keys:
         for unit in keys[user]:
-          if keys[user][unit].address in txout:
+          if keys[user][unit].address in txout and keys[user][unit].balance > 0.0:
+            creditor.info("[-] %.8f %s %s", keys[user][unit].balance, user, unit)
             keys[user][unit].balance = 0.0
+
       lock.release()
     except: logger.error("failed to store payout to %s: %s", filename, txout)
   else:

@@ -8,11 +8,11 @@ _interest = {
     'btc' : {
       'bid': {
         'rate' : 0.001,
-        'target' : 5.0
+        'target' : 500.0
         },
       'ask': {
         'rate' : 0.001,
-        'target' : 5.0
+        'target' : 500.0
         }
       }
   },
