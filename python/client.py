@@ -195,7 +195,7 @@ while True: # print some info every minute until program terminates
           effs = [ response['efficiency'] for i in xrange(5) ]
         if curtime - starttime > 90:
           effs = effs[1:] + [response['efficiency']]
-          if sum(effs) / 5.0 < 0.95:
+          if sorted(effs)[2] < 0.95:
             for unit in response['units']:
               if response['units'][unit]['rejects'] / float(basestatus['sampling']) >= 0.025: # look for valid error and adjust nonce shift
                 if response['units'][unit]['last_error'] != "":
