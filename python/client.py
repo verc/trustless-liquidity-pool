@@ -190,7 +190,7 @@ while True: # print some info every minute until program terminates
             orderstring += " - %s%s" % (unit, unitstring)
         # print user information
         logger.info('%s - balance: %.8f rate %.2f%% payout: %.8f efficiency: %.2f%% rejects: %d missing: %d%s - %s', repr(users[user].values()[0]['request'].exchange),
-          response['balance'], effective_rate * 100, effective_rate * total, response['efficiency'] * 100, response['rejects'], response['missing'], orderstring, user)
+          response['balance'], effective_rate * 100, effective_rate * total / (60 * 24 * sampling), response['efficiency'] * 100, response['rejects'], response['missing'], orderstring, user)
         if not effs:
           effs = [ response['efficiency'] for i in xrange(5) ]
         if curtime - starttime > 90:
