@@ -338,25 +338,34 @@ def credit():
             pricelevels = sorted(list(set( [ order[2] for _,order in orders if order[2] < maxrate ])) + [maxrate, maxrate])
             if len(pricelevels) < maxlevel + 2:
               pricelevels += [maxrate] * (2 + maxlevel - len(pricelevels))
-            lvl = len(pricelevels) - maxlevel - 1
+            # calculate level
+            levelvolume = [ 0.0 for p in pricelevels ]
+            for user,order in orders:
+              if order[2] <= maxrate:
+                levelvolume[pricelevels.index(order[2])] += order[1]
+            lvl = len(pricelevels) - 3
+            for i,v in enumerate(levelvolume):
+              if v >= config._interest[name][unit][side]['target']:
+                lvl = i
+                break
+            config._interest[name][unit][side]['low'] = pricelevels[lvl+1]
+            config._interest[name][unit][side]['high'] = pricelevels[lvl+2]
             # collect user contribution
             volume = [ { user : 0.0 for user in users }, { user : 0.0 for user in users }, { user : 0.0 for user in users } ]
             for user,order in orders:
               volume[2][user] += order[1]
               if order[2] <= maxrate:
                 ulvl = pricelevels.index(order[2])
-                if ulvl < lvl + 1:
+                if ulvl <= lvl:
+                  volume[0][user] += order[1]
+                if ulvl <= lvl + 1:
                   volume[1][user] += order[1]
-                  if ulvl < lvl:
-                    volume[0][user] += order[1]
-            config._interest[name][unit][side]['low'] = pricelevels[lvl]
-            config._interest[name][unit][side]['high'] = pricelevels[lvl+1]
             # credit higher payout level
             norm = float(sum(volume[1].values()))
             for user in volume[1]:
               if norm > 0 and volume[1][user] > 0:
-                price = pricelevels[lvl+1]
-                contrib = min(volume[1][user], (int((mass / target) + 1) * target - mass) * volume[1][user] / norm)
+                price = pricelevels[lvl+2]
+                contrib = (int((mass / target) + 1) * target - mass) * volume[1][user] / norm
                 payout = contrib * price
                 volume[0][user] -= contrib
                 volume[2][user] -= contrib
@@ -364,13 +373,13 @@ def credit():
                 keys[user][unit].credits[side][sample][0] = { 'amount' : contrib, 'cost' : price }
                 keys[user][unit].rate[side] += price * contrib / (volume[1][user] * config._sampling)
                 config._interest[name][unit][side]['orders'][sample].append({ 'amount' : contrib, 'cost' : price })
-                creditor.info("[%d/%d] %.8f %s %.8f %s %s %s %.2f", 
+                creditor.info("[%d/%d] %.8f %s %.8f %s %s %s %.2f",
                   sample + 1, config._sampling, payout / float(24 * 60  * config._sampling), user, contrib, side, name, unit, price * 100)
             # credit lower payout level
             norm = float(sum([ max(0,v) for v in volume[0].values()]))
             for user in volume[0]:
               if norm > 0 and volume[0][user] > 0:
-                price = pricelevels[lvl]
+                price = pricelevels[lvl+1]
                 contrib = min(volume[0][user], (mass - int(mass / target) * target) * volume[0][user] / norm)
                 payout = contrib * price
                 volume[2][user] -= contrib
@@ -515,17 +524,6 @@ class RequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
 
 class ThreadingServer(SocketServer.ThreadingMixIn, BaseHTTPServer.HTTPServer):
   pass
-#  def get_request(self):
-#    self.socket.settimeout(self.timeout)
-#    result = None
-#    while result is None:
-#      try:
-#        result = self.socket.accept()
-#      except socket.timeout:
-#        pass
-#    # Reset timeout on the new socket
-#    result[0].settimeout(None)
-#    return result
 
 nud = NuRPC(config._nuconfig, config._grantaddress, logger)
 if not nud.rpc:

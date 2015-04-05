@@ -80,6 +80,7 @@ class PyBot(ConnectionThread):
     self.exchange = exchange
     self.unit = unit
     self.orders = []
+    self.total = { 'bid' : 0.0, 'ask' : 0.0 }
     self.limit = target
     self.lastlimit = { 'bid' : 0, 'ask' : 0 }
     self.target = target.copy()
@@ -103,9 +104,9 @@ class PyBot(ConnectionThread):
       self.logger.info('successfully deleted %s orders for %s on %s', side, self.unit, repr(self.exchange))
       if reset:
         if side == 'all':
-          self.limit = self.target.copy()
+          self.limit = self.total.copy()
         else:
-          self.limit[side] = self.target[side]
+          self.limit[side] = self.total[side]
     return response
 
   def shutdown(self):
@@ -187,6 +188,7 @@ class PyBot(ConnectionThread):
         elif self.lastlimit['ask'] != self.limit['ask']:
           self.logger.error('unable to place ask %s order at %.8f on %s: matching order at %.8f detected', self.unit, askprice, repr(self.exchange), response['bid'])
       self.lastlimit = self.limit.copy()
+    self.requester.submit()
 
   def sync(self, trials = 3):
     ts = int(time.time() * 1000.0)
@@ -268,23 +270,23 @@ class PyBot(ConnectionThread):
                 else:
                   for side in [ 'bid', 'ask' ]:
                     effective_rate = 0.0
-                    total = 0.0
                     effective_rate = float(sum([ o['amount'] * o['cost'] for o in response['units'][self.unit][side] ]))
-                    total = float(sum([ o['amount'] for o in response['units'][self.unit][side] ]))
-                    if total == 0:
+                    self.total[side] = float(sum([ o['amount'] for o in response['units'][self.unit][side] ]))
+                    contrib = float(sum([ o['amount'] for o in response['units'][self.unit][side] if o['cost'] > 0.0 ]))
+                    if self.total[side] == 0:
                       self.limit[side] = self.target[side]
                     else:
-                      effective_rate /= total
+                      effective_rate /= self.total[side]
                       deviation = 1.0 - min(effective_rate, self.requester.cost[side]) / max(effective_rate, self.requester.cost[side])
                       if deviation > 0.02 and lastdev > 0.02:
-                        if self.limit[side] >= 0.5 and effective_rate < self.requester.cost[side]:
-                          funds = max(0.5, total * (1.0 - max(deviation, 0.1)))
-                          self.logger.info("decreasing tier 1 %s limit of %s on %s from %.8f to %.8f", side, self.unit, repr(self.exchange), total, funds)
+                        if self.limit[side] + self.total[side] >= 0.5 and effective_rate < self.requester.cost[side]:
+                          funds = max(0.5, self.total[side] * (1.0 - max(deviation, 0.1)))
+                          self.logger.info("decreasing tier 1 %s limit of %s on %s from %.8f to %.8f", side, self.unit, repr(self.exchange), self.total[side], funds)
                           self.cancel_orders(side)
                           self.limit[side] = funds
-                        elif self.limit[side] < total * deviation and effective_rate > self.requester.cost[side]:
-                          self.logger.info("increasing tier 1 %s limit of %s on %s from %.8f to %.8f", side, self.unit, repr(self.exchange), total, total * (1.0 + deviation))
-                          self.limit[side] = total * deviation
+                        elif self.limit[side] < self.total[side] * deviation and effective_rate > self.requester.cost[side] and contrib < self.target[side]:
+                          self.logger.info("increasing tier 1 %s limit of %s on %s from %.8f to %.8f", side, self.unit, repr(self.exchange), self.total[side], self.total[side] + contrib * deviation)
+                          self.limit[side] = contrib * deviation
                       lastdev = deviation
               self.place_orders()
           else:

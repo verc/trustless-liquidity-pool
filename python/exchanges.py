@@ -244,8 +244,9 @@ class BitcoinCoId(Exchange):
   def __init__(self):
     super(BitcoinCoId, self).__init__(0.0)
     try:
+      ping = time.time()
       response = json.loads(urllib2.urlopen(urllib2.Request('https://vip.bitcoin.co.id/api/summaries')).read())
-      self._shift = float(response['tickers']['btc_idr']['server_time']) - time.time()
+      self._shift = float(response['tickers']['btc_idr']['server_time']) - ping
     except:
       pass
 
@@ -253,7 +254,7 @@ class BitcoinCoId(Exchange):
 
   def adjust(self, error):
     if "Invalid nonce" in error: #(TODO: regex)
-      self._shift += 50
+      self._shift = min(self._shift + 100, 3600)
 
   def post(self, method, params, key, secret):
     request = { 'nonce' : self.nonce(), 'method' : method }
