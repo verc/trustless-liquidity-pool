@@ -192,35 +192,36 @@ while True: # print some info every minute until program terminates
         logger.info('%s - balance: %.8f rate %.2f%% payout: %.8f efficiency: %.2f%% rejects: %d missing: %d%s - %s', repr(users[user].values()[0]['request'].exchange),
           response['balance'], effective_rate * 100, effective_rate * total, response['efficiency'] * 100, response['rejects'], response['missing'], orderstring, user)
         if not effs:
-          effs = [ effective_rate for i in xrange(5) ]
-        effs = effs[1:] + [effective_rate]
-        if curtime - starttime > 90 and sum(effs) / 5.0 < 0.95:
-          for unit in response['units']:
-            if response['units'][unit]['rejects'] / float(basestatus['sampling']) >= 0.025: # look for valid error and adjust nonce shift
-              if response['units'][unit]['last_error'] != "":
-                if 'deviates too much from current price' in response['units'][unit]['last_error']:
-                  PyBot.pricefeed.price(unit, True) # force a price update
-                  if users[user][unit]['order']: users[user][unit]['order'].shutdown()
-                  logger.warning('price missmatch for %s on %s, forcing price update', unit, repr(users[user][unit]['request'].exchange))
+          effs = [ response['efficiency'] for i in xrange(5) ]
+        if curtime - starttime > 90:
+          effs = effs[1:] + [response['efficiency']]
+          if sum(effs) / 5.0 < 0.95:
+            for unit in response['units']:
+              if response['units'][unit]['rejects'] / float(basestatus['sampling']) >= 0.025: # look for valid error and adjust nonce shift
+                if response['units'][unit]['last_error'] != "":
+                  if 'deviates too much from current price' in response['units'][unit]['last_error']:
+                    PyBot.pricefeed.price(unit, True) # force a price update
+                    if users[user][unit]['order']: users[user][unit]['order'].shutdown()
+                    logger.warning('price missmatch for %s on %s, forcing price update', unit, repr(users[user][unit]['request'].exchange))
+                  else:
+                    shift = users[user][unit]['request'].exchange._shift
+                    users[user][unit]['request'].exchange.adjust(response['units'][unit]['last_error'])
+                    if shift != users[user][unit]['request'].exchange._shift:
+                      logger.warning('too many rejected requests for %s on %s, adjusting nonce shift to %d',
+                        unit, repr(users[user][unit]['request'].exchange), users[user][unit]['request'].exchange._shift)
                 else:
-                  shift = users[user][unit]['request'].exchange._shift
-                  users[user][unit]['request'].exchange.adjust(response['units'][unit]['last_error'])
-                  if shift != users[user][unit]['request'].exchange._shift:
-                    logger.warning('too many rejected requests for %s on %s, adjusting nonce shift to %d',
-                      unit, repr(users[user][unit]['request'].exchange), users[user][unit]['request'].exchange._shift)
-              else:
+                  if users[user][unit]['request'].sampling < 2 * sampling: # just send more requests
+                    users[user][unit]['request'].sampling = users[user][unit]['request'].sampling + 1
+                    logger.warning('increasing sampling to %d',
+                      unit, repr(users[user][unit]['request'].exchange), users[user][unit]['request'].sampling)
+              if response['units'][unit]['missing'] / float(basestatus['sampling']) >= 0.025: # look for missing error and adjust sampling
                 if users[user][unit]['request'].sampling < 2 * sampling: # just send more requests
                   users[user][unit]['request'].sampling = users[user][unit]['request'].sampling + 1
-                  logger.warning('increasing sampling to %d',
+                  logger.warning('too many missing requests for %s on %s, increasing sampling to %d',
                     unit, repr(users[user][unit]['request'].exchange), users[user][unit]['request'].sampling)
-            if response['units'][unit]['missing'] / float(basestatus['sampling']) >= 0.025: # look for missing error and adjust sampling
-              if users[user][unit]['request'].sampling < 2 * sampling: # just send more requests
-                users[user][unit]['request'].sampling = users[user][unit]['request'].sampling + 1
-                logger.warning('too many missing requests for %s on %s, increasing sampling to %d',
-                  unit, repr(users[user][unit]['request'].exchange), users[user][unit]['request'].sampling)
-              else: # just wait a little bit
-                logger.warning('too many missing requests, sleeping a short while to synchronize')
-                curtime += 0.7
+                else: # just wait a little bit
+                  logger.warning('too many missing requests, sleeping a short while to synchronize')
+                  curtime += 0.7
 
   except KeyboardInterrupt: break
   except Exception as e:
