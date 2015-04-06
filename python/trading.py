@@ -263,6 +263,7 @@ class PyBot(ConnectionThread):
                 self.price = self.serverprice
                 self.cancel_orders()
                 efftime = curtime
+                continue
               elif curtime - efftime > 120:
                 efftime = curtime
                 response = self.conn.get(self.key, trials = 1)
