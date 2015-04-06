@@ -108,7 +108,6 @@ class CCEDK(Exchange):
     self.pair_id = {}
     self.currency_id = {}
     failed = False
-    self.adjustcontrol = True
     while not self.pair_id or not self.currency_id:
       try:
         response = None
@@ -150,18 +149,13 @@ class CCEDK(Exchange):
       except:
         super(CCEDK, self).adjust(error)
       else:
-        if self.adjustcontrol:
-          current = int(time.time()) #int(error.split()[2].split('`')[3])
-          if current < maximum:
-            newshift = (minimum + 2 * maximum) / 3  - current
-          else:
-            newshift = (2 * minimum + maximum) / 3 - current
-          if self._shift == newshift:
-            self._shift += random.randrange(-10, 10)
-            #self.adjustcontrol = False
-            #super(CCEDK, self).adjust(error)
-          else:
-            self._shift = newshift
+        current = int(time.time())
+        if current < maximum:
+          newshift = (minimum + 2 * maximum) / 3  - current
+        else:
+          newshift = (2 * minimum + maximum) / 3 - current
+        if newshift != 0:
+          self._shift += newshift
         else:
           self._shift += random.randrange(-10, 10)
     else:
