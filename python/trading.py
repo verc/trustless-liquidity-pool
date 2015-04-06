@@ -253,7 +253,7 @@ class PyBot(ConnectionThread):
             if 1.0 - min(self.serverprice, userprice) / max(self.serverprice, userprice) > 0.005: # validate server price
               self.logger.error('server price %.8f for %s deviates too much from price %.8f received from ticker, will try to delete orders on %s',
                 self.serverprice, self.unit, userprice, repr(self.exchange))
-              self.shutdown()
+              self.cancel_orders()
               self.price = self.serverprice
               efftime = curtime
             else:
