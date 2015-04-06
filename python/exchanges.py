@@ -4,6 +4,7 @@ import hmac
 import time
 import urllib
 import urllib2
+import random
 import hashlib
 import httplib
 import threading
@@ -156,14 +157,15 @@ class CCEDK(Exchange):
           else:
             newshift = (2 * minimum + maximum) / 3 - current
           if self._shift == newshift:
-            self.adjustcontrol = False
-            super(CCEDK, self).adjust(error)
+            self._shift += random.randrange(-10, 10)
+            #self.adjustcontrol = False
+            #super(CCEDK, self).adjust(error)
           else:
             self._shift = newshift
         else:
-          super(CCEDK, self).adjust(error)
+          self._shift += random.randrange(-10, 10)
     else:
-        super(CCEDK, self).adjust(error)
+        self._shift += random.randrange(-10, 10)
 
   def post(self, method, params, key, secret):
     request = { 'nonce' : self.nonce() } # TODO: check for unique nonce

@@ -148,7 +148,6 @@ class User(threading.Thread):
       self.trigger.acquire()
       self.lock.acquire()
       if self.active:
-        del self.response[0]
         res = 'm'
         if self.requests:
           for rid, request in enumerate(self.requests):
@@ -198,7 +197,7 @@ class User(threading.Thread):
         for side in [ 'bid', 'ask' ]:
           del self.liquidity[side][0]
           self.liquidity[side].append([])
-      self.response.append(res)
+      response = response[1:] + [res]
       self.active = self.liquidity['bid'].count([]) + self.liquidity['ask'].count([]) < 2 * self.sampling
       del self.last_errors[0]
       self.lock.release()
