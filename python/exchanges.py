@@ -22,7 +22,7 @@ class Exchange(object):
   def nonce(self, factor = 1000.0):
     n = int((time.time() + self._shift) * float(factor))
     if self._nonce >= n:
-      n = self._nonce + 100
+      n = self._nonce + 10
     self._nonce = n
     return n
 
@@ -251,6 +251,14 @@ class BitcoinCoId(Exchange):
       pass
 
   def __repr__(self): return "bitcoincoid"
+
+  def nonce(self, factor = 1000.0):
+    n = int((time.time() + self._shift) * float(factor))
+    if self._nonce >= n:
+      time.sleep(0.1)
+      return self.nonce(factor)
+    self._nonce = n
+    return n
 
   def adjust(self, error):
     if "Invalid nonce" in error: #(TODO: regex)

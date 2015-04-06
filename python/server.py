@@ -468,8 +468,8 @@ class RequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
       self.end_headers()
 
   def do_GET(self):
-    if len(self.path) == 0:
-      self.send_response(404)
+    if len(self.path.replace('/', '')) == 0:
+      self.send_response(200)
       return
     method = self.path[1:]
     if 'loaderio' in method: # evil hack to support load tester (TODO)

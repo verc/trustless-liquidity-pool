@@ -167,8 +167,8 @@ class PyBot(ConnectionThread):
       self.logger.error('unable to retrieve order book for %s on %s: %s', self.unit, repr(self.exchange), response['error'])
     else:
       spread = max(self.exchange.fee, 0.002)
-      bidprice = ceil(self.serverprice * (1.0 - spread) * 10**8) / float(10**8) # truncate floating point precision after 8th position
-      askprice = ceil(self.serverprice * (1.0 + spread) * 10**8) / float(10**8)
+      bidprice = ceil(self.price * (1.0 - spread) * 10**8) / float(10**8) # truncate floating point precision after 8th position
+      askprice = ceil(self.price * (1.0 + spread) * 10**8) / float(10**8)
       if response['ask'] == None or response['ask'] > bidprice:
         self.place('bid', bidprice)
       else:
@@ -208,6 +208,7 @@ class PyBot(ConnectionThread):
   def run(self):
     self.logger.info("starting PyBot for %s on %s", self.unit, repr(self.exchange))
     self.serverprice = self.conn.get('price/' + self.unit, trials = 3, timeout = 15)['price']
+    self.price = self.serverprice
     trials = 0
     while trials < 10:
       response = self.cancel_orders(reset = False)
@@ -215,7 +216,6 @@ class PyBot(ConnectionThread):
       trials = trials + 1
     self.sync()
     self.place_orders()
-    prevprice = self.serverprice
     curtime = time.time()
     efftime = curtime
     lasttime = curtime
@@ -254,12 +254,13 @@ class PyBot(ConnectionThread):
               self.logger.error('server price %.8f for %s deviates too much from price %.8f received from ticker, will try to delete orders on %s',
                 self.serverprice, self.unit, userprice, repr(self.exchange))
               self.shutdown()
+              self.price = self.serverprice
               efftime = curtime
             else:
               deviation = 1.0 - min(prevprice, self.serverprice) / max(prevprice, self.serverprice)
               if deviation > 0.00375:
-                self.logger.info('price of %s moved from %.8f to %.8f, will try to delete orders on %s', self.unit, prevprice, self.serverprice, repr(self.exchange))
-                prevprice = self.serverprice
+                self.logger.info('price of %s moved from %.8f to %.8f, will try to delete orders on %s', self.unit, self.price, self.serverprice, repr(self.exchange))
+                self.price = self.serverprice
                 self.cancel_orders()
                 efftime = curtime
               elif curtime - efftime > 120:

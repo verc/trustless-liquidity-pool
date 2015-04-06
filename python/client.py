@@ -197,7 +197,7 @@ while True: # print some info every minute until program terminates
           effs = effs[1:] + [response['efficiency']]
           if sorted(effs)[2] < 0.95:
             for unit in response['units']:
-              if response['units'][unit]['rejects'] / float(basestatus['sampling']) >= 0.025: # look for valid error and adjust nonce shift
+              if response['units'][unit]['rejects'] > 1 and response['units'][unit]['rejects'] / float(users[user][unit]['request'].sampling) >= 0.05: # look for valid error and adjust nonce shift
                 if response['units'][unit]['last_error'] != "":
                   if 'deviates too much from current price' in response['units'][unit]['last_error']:
                     PyBot.pricefeed.price(unit, True) # force a price update
@@ -214,7 +214,7 @@ while True: # print some info every minute until program terminates
                     users[user][unit]['request'].sampling = users[user][unit]['request'].sampling + 1
                     logger.warning('increasing sampling to %d',
                       unit, repr(users[user][unit]['request'].exchange), users[user][unit]['request'].sampling)
-              if response['units'][unit]['missing'] / float(basestatus['sampling']) >= 0.025: # look for missing error and adjust sampling
+              if response['units'][unit]['missing'] / float(users[user][unit]['request'].sampling) >= 0.05: # look for missing error and adjust sampling
                 if users[user][unit]['request'].sampling < 2 * sampling: # just send more requests
                   users[user][unit]['request'].sampling = users[user][unit]['request'].sampling + 1
                   logger.warning('too many missing requests for %s on %s, increasing sampling to %d',
