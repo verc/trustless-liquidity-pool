@@ -275,8 +275,8 @@ class PyBot(ConnectionThread):
                     effective_rate = float(sum([ o['amount'] * o['cost'] for o in response['units'][self.unit][side] ]))
                     self.total[side] = float(sum([ o['amount'] for o in response['units'][self.unit][side] ]))
                     contrib = float(sum([ o['amount'] for o in response['units'][self.unit][side] if o['cost'] > 0.0 ]))
-                    if self.total[side] == 0:
-                      self.limit[side] = self.target[side]
+                    if self.total[side] < 0.5:
+                      self.limit[side] = min(self.limit[side] + 0.5, self.target[side])
                     else:
                       effective_rate /= self.total[side]
                       deviation = 1.0 - min(effective_rate, self.requester.cost[side]) / max(effective_rate, self.requester.cost[side])
