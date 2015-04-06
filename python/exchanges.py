@@ -146,10 +146,10 @@ class CCEDK(Exchange):
       try:
         minimum = int(error.strip().split()[-3].replace('`', ''))
         maximum = int(error.strip().split()[-1].replace('`', ''))
+        current = int(error.strip().split()[-7].split('`')[3])
       except:
         super(CCEDK, self).adjust(error)
       else:
-        current = int(time.time())
         if current < maximum:
           newshift = (minimum + 2 * maximum) / 3  - current
         else:
@@ -159,7 +159,7 @@ class CCEDK(Exchange):
         else:
           self._shift += random.randrange(-10, 10)
     else:
-        self._shift += random.randrange(-10, 10)
+      self._shift += random.randrange(-10, 10)
 
   def post(self, method, params, key, secret):
     request = { 'nonce' : self.nonce() } # TODO: check for unique nonce
