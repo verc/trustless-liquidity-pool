@@ -49,6 +49,11 @@ else:
     logger.error("%s could not be read", userfile)
     sys.exit(1)
 
+if not userdata:
+  logger.error('no valid users could be found')
+  sys.exit(1)
+
+
 _server = sys.argv[1]
 _wrappers = { 'poloniex' : Poloniex(), 'ccedk' : CCEDK(), 'bitcoincoid' : BitcoinCoId(), 'bter' : BTER(), 'testing' : Peatio() }
 
