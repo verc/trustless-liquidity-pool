@@ -197,7 +197,7 @@ class User(threading.Thread):
         for side in [ 'bid', 'ask' ]:
           del self.liquidity[side][0]
           self.liquidity[side].append([])
-      self.response = response[1:] + [res]
+      self.response = self.response[1:] + [res]
       self.active = self.liquidity['bid'].count([]) + self.liquidity['ask'].count([]) < 2 * self.sampling
       del self.last_errors[0]
       self.lock.release()
