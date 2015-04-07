@@ -368,7 +368,8 @@ def collect():
                 if checkpoint[user][unit]['response'][i] == 'a':
                   for side in [ 'bid', 'ask' ]:
                     keys[user][unit].liquidity[side][i] = checkpoint[user][unit]['liquidity'][side][i]
-                  keys[user][unit].active = keys[user][unit].active or sum(checkpoint[user][unit]['liquidity'][i].values()) > 0
+                    if checkpoint[user][unit]['liquidity'][side][i] > 0:
+                      keys[user][unit].active = True
 
 def credit():
   for name in config._interest:
