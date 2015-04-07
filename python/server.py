@@ -228,7 +228,7 @@ class User(threading.Thread):
           del self.liquidity[side][0]
           self.liquidity[side].append([])
       self.response = self.response[1:] + [res]
-      self.active = self.liquidity['bid'].count([]) + self.liquidity['ask'].count([]) < 2 * self.sampling
+      self.active = self.active and self.liquidity['bid'].count([]) + self.liquidity['ask'].count([]) == 2 * self.sampling
       del self.last_errors[0]
       self.lock.release()
 
@@ -255,6 +255,8 @@ def register(params):
     address = params['address'][0]
     if address[0] == 'B': # this is certainly not a proper check
       if name in _wrappers:
+        for slave in slaves:
+          slave.register(address, user, name)
         if not user in keys:
           lock.acquire()
           keys[user] = {}
@@ -263,8 +265,6 @@ def register(params):
             keys[user][unit].start()
           lock.release()
           logger.info("new user %s on %s: %s" % (user, name, address))
-          for slave in slaves:
-            slave.register(address, user, name)
         else:
           if keys[user].values()[0].address != address:
             ret = response(9, "user already exists with different address: %s" % user)
@@ -294,18 +294,6 @@ def liquidity(params):
         ret = response(11, "user not found: %s" % user)
     except ValueError:
       ret = response(10, "invalid cost information received: %s" % str(params))
-  elif set(params.keys() + ['user', 'unit', 'liquidity']) == set(params.keys()):
-    user = params.pop('user')[0]
-    unit = params.pop('unit')[0]
-    if user in keys:
-      if unit in keys[user]:
-        keys[user][unit].liquidity = params.pop('liquidity')[0]
-      else:
-        ret = response(12, "unit for user %s not found: %s" % (user, unit))
-    else:
-      ret = response(11, "user not found: %s" % user)
-  else:
-    ret = response(9, "invalid liquidity data received: %s" % str(params))
   return ret
 
 def poolstats():
@@ -316,22 +304,23 @@ def userstats(user):
   res = { 'balance' : 0.0, 'efficiency' : 1.0, 'rejects': 0, 'missing' : 0, 'message' : critical_message }
   res['units'] = {}
   for unit in keys[user]:
-    if keys[user][unit].active:
+    checkpoint = keys[user][unit].checkpoint
+    if checkpoint['liquidity']['bid'].count([]) + checkpoint['liquidity']['ask'].count([]) < 2 * config._sampling:
       credits = { 'bid' : [ { 'amount': 0.0, 'cost': -1.0 }, { 'amount': 0.0, 'cost': -1.0 }, { 'amount': 0.0, 'cost': -1.0 } ],
                   'ask' : [ { 'amount': 0.0, 'cost': -1.0 }, { 'amount': 0.0, 'cost': -1.0 }, { 'amount': 0.0, 'cost': -1.0 } ] }
       last_error = ""
-      missing = keys[user][unit].response.count('m')
-      rejects = keys[user][unit].response.count('r')
+      missing = checkpoint['response'].count('m')
+      rejects = checkpoint['response'].count('r')
       res['balance'] += keys[user][unit].balance
       res['missing'] += missing
       res['rejects'] += rejects
       norm = max(1.0, float(keys[user][unit].sampling - missing - rejects))
       for i in xrange(keys[user][unit].sampling):
-        if keys[user][unit].last_errors[i] != "":
-          last_error = keys[user][unit].last_errors[i]
+        if checkpoint['last_errors'][i] != "":
+          last_error = checkpoint['last_errors'][i]
         for side in ['bid', 'ask']:
           stats = config._interest[repr(keys[user][unit].exchange)][unit][side]
-          if credits[side][0]['cost'] < 0.0 and keys[user][unit].response[i] == 'a':
+          if credits[side][0]['cost'] < 0.0 and checkpoint['response'][i] == 'a':
             for j in xrange(3):
               credits[side][j]['amount'] = keys[user][unit].credits[side][i][j]['amount']
               credits[side][j]['cost'] = 0.0
@@ -368,8 +357,9 @@ def collect():
                 if checkpoint[user][unit]['response'][i] == 'a':
                   for side in [ 'bid', 'ask' ]:
                     keys[user][unit].liquidity[side][i] = checkpoint[user][unit]['liquidity'][side][i]
-                    if checkpoint[user][unit]['liquidity'][side][i] > 0:
-                      keys[user][unit].active = True
+  for user in keys:
+    for unit in keys[user]:
+      keys[user][unit].bundle()
 
 def credit():
   for name in config._interest:
@@ -654,7 +644,7 @@ elif slaves:
 
 lastcredit = time.time()
 lastpayout = time.time()
-lastsubmit = time.time() 
+lastsubmit = time.time()
 
 while True:
   try:
@@ -671,26 +661,20 @@ while True:
       if active: _active_users += 1
     lock.release()
 
-    if master:
-      if curtime - lastcredit >= 60:
-        collect()
-        # create checkpoints
-        for user in keys:
-          for unit in keys[user]:
-            keys[user][unit].bundle()
-        lastcredit = curtime
-    else:
+    # create checkpoints
+    if curtime - lastcredit >= 60:
+      collect()
+
+    if not master:
       # send liquidity
       if curtime - lastsubmit >= 60:
         submit(nud)
         lastsubmit = curtime
-
       # credit requests
       if curtime - lastcredit >= 60:
         collect()
         credit()
         lastcredit = curtime
-
       # make payout
       if curtime - lastpayout >= 21600: #3600: #43200:
         pay(nud)
