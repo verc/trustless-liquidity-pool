@@ -352,7 +352,7 @@ def userstats(user):
     res['efficiency'] = 1.0 - (res['rejects'] + res['missing']) / float(config._sampling * len(res['units']))
   return res
 
-def credit():
+def collect():
   for slave in slaves:
     slave.collect()
   for slave in slaves:
@@ -368,6 +368,7 @@ def credit():
                 if checkpoint[user][unit]['response'][i] == 'a':
                   keys[user][unit].liquidity[i] = checkpoint[user][unit]['liquidity'][i]
 
+def credit():
   for name in config._interest:
     for unit in config._interest[name]:
       users = [ k for k in keys if unit in keys[k] and repr(keys[k][unit].exchange) == name ]
@@ -669,6 +670,7 @@ while True:
 
     if master:
       if curtime - lastcredit >= 60:
+        collect()
         # create checkpoints
         for user in keys:
           for unit in keys[user]:
@@ -682,6 +684,7 @@ while True:
 
       # credit requests
       if curtime - lastcredit >= 60:
+        collect()
         credit()
         lastcredit = curtime
 
