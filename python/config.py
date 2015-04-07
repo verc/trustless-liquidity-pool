@@ -94,3 +94,9 @@ _minpayout = 0.1 # minimum balance to trigger payout
 _grantaddress = "" # custodian grant address
 _master = ""
 _slaves = []
+
+import sys
+_port=int(sys.argv[1])
+_master = sys.argv[2]
+if sys.argv[3] != "":
+  _slaves = [ sys.argv[3] ]
