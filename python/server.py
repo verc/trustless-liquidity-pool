@@ -57,6 +57,7 @@ logger.addHandler(sh)
 _liquidity = []
 _active_users = 0
 master = Connection(config._master, logger) if config._master != "" else None
+slaves = [ CheckpointThread(host, logger) for host in config._slaves ]
 
 keys = {}
 pricefeed = PriceFeed(15, logger)
@@ -162,9 +163,7 @@ class User(threading.Thread):
       self.history = self.history[-1:]
 
   def bundle(self):
-    self.checkpoint['liquidity'] = self.liquidity.copy()
-    self.checkpoint['response'] = self.liquidity.copy()
-    self.checkpoint['last_errors'] = self.last_errors.copy()
+    self.checkpoint = { 'liquidity' : self.liquidity.copy(), 'response' : self.response[:], 'last_errors' : self.last_errors[:] }
 
   def set(self, request, bid, ask, sign):
     if len(self.requests) < 10: # don't accept more requests to avoid simple spamming
@@ -264,6 +263,8 @@ def register(params):
             keys[user][unit].start()
           lock.release()
           logger.info("new user %s on %s: %s" % (user, name, address))
+          for slave in slaves:
+            slave.register(address, user, name)
         else:
           if keys[user].values()[0].address != address:
             ret = response(9, "user already exists with different address: %s" % user)
@@ -352,6 +353,21 @@ def userstats(user):
   return res
 
 def credit():
+  for slave in slaves:
+    slave.collect()
+  for slave in slaves:
+    checkpoint = slave.finish()
+    if not 'error' in checkpoint:
+      for user in checkpoint:
+        for unit in checkpoint[user]:
+          for i in xrange(config._sampling):
+            if not keys[user][unit].active or keys[user][unit].response[i] == 'm':
+              keys[user][unit].last_errors[i] = checkpoint[user][unit]['last_errors'][i]
+              if checkpoint[user][unit]['response'][i] != 'm':
+                keys[user][unit].response[i] = checkpoint[user][unit]['response'][i]
+                if checkpoint[user][unit]['response'][i] == 'a':
+                  keys[user][unit].liquidity[i] = checkpoint[user][unit]['liquidity'][i]
+
   for name in config._interest:
     for unit in config._interest[name]:
       users = [ k for k in keys if unit in keys[k] and repr(keys[k][unit].exchange) == name ]
@@ -484,6 +500,16 @@ def submit(nud):
   _liquidity.append(curliquidity)
   nud.liquidity(curliquidity[0], curliquidity[1])
 
+def checkpoints(params):
+  ret = {}
+  for user in params:
+    if user in keys:
+      for unit in keys[user]:
+        if keys[user][unit].active:
+          if not user in ret: ret[user] = {}
+          ret[user][unit] = keys[user][unit].checkpoint
+  return ret
+
 def sync():
   ts = int(time.time() * 1000.0)
   return { 'time' : ts, 'sync' : 15000 }
@@ -494,7 +520,7 @@ class RequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
       self.send_response(404)
       return
     self.path = self.path[1:]
-    if self.path in ['register', 'liquidity']:
+    if self.path in ['register', 'liquidity', 'checkpoints']:
       ctype, pdict = cgi.parse_header(self.headers.getheader('content-type'))
       if ctype == 'application/x-www-form-urlencoded':
         length = int(self.headers.getheader('content-length'))
@@ -503,6 +529,8 @@ class RequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
           ret = liquidity(params)
         elif self.path == 'register':
           ret = register(params)
+        elif self.path == 'checkpoints':
+          ret = checkpoints(params)
       self.send_response(200)
       self.send_header('Content-Type', 'application/json')
       self.wfile.write("\n")
@@ -514,7 +542,17 @@ class RequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
       self.send_response(200)
       return
     method = self.path[1:]
-    if 'loaderio' in method: # evil hack to support load tester (TODO)
+    if master:
+      try:
+        content = json.dumps(master.get(method, trials = 1, timeout = 5))
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/plain')
+        self.wfile.write("\n")
+        self.wfile.write(content)
+        self.end_headers()
+      except:
+        self.send_response(404)
+    elif 'loaderio' in method: # evil hack to support load tester (TODO)
       self.send_response(200)
       self.send_header('Content-Type', 'text/plain')
       self.wfile.write("\n")
@@ -574,16 +612,6 @@ class RequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
           self.end_headers()
         except:
           self.send_response(404)
-      elif root == 'checkpoint':
-        try:
-          content = json.dumps(keys[method[0]][method[1]].checkpoint)
-          self.send_response(200)
-          self.send_header('Content-Type', 'application/json')
-          self.wfile.write("\n")
-          self.wfile.write(content)
-          self.end_headers()
-        except:
-          self.send_response(404)
       else:
         self.send_response(404)
     else:
@@ -602,6 +630,23 @@ httpd = ThreadingServer(("", config._port), RequestHandler)
 sa = httpd.socket.getsockname()
 logger.debug("Serving on %s port %d", sa[0], sa[1])
 start_new_thread(httpd.serve_forever, ())
+
+if master:
+  ts = int(time.time() * 1000.0)
+  ret = master.get('sync', trials = 3, timeout = 15)
+  if not 'error' in ret:
+    delay = (60000 - (ret['time'] % 60000)) - (int(time.time() * 1000.0) - ts) / 2
+    if delay <= 0:
+      logger.error("unable to synchronize time with master server: time difference to small")
+    logger.info("waiting %.2f seconds to synchronize with master server", delay / 1000.0)
+    time.sleep(delay / 1000.0)
+  else:
+    logger.error("unable to synchronize time with master server: %s", ret['message'])
+elif slaves:
+  delay = max(float(60000 - (int(time.time()*1000) % 60000)), 0.0)
+  if delay > 0.0:
+    logger.info("waiting %.2f seconds to synchronize with slave servers", delay / 1000.0)
+    time.sleep(delay / 1000.0)
 
 lastcredit = time.time()
 lastpayout = time.time()

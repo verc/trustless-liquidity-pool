@@ -192,9 +192,9 @@ class PyBot(ConnectionThread):
 
   def sync(self, trials = 3):
     ts = int(time.time() * 1000.0)
-    response = self.conn.get('sync', trials = 1, timeout = 30)
+    response = self.conn.get('sync', trials = 1, timeout = 15)
     if not 'error' in response:
-      delay = (response['sync'] - (ts % response['sync'])) - (int(time.time() * 1000.0) - ts) / 2
+      delay = (response['sync'] - (response['time'] % response['sync'])) - (int(time.time() * 1000.0) - ts) / 2
       if delay <= 0:
         self.logger.error("unable to synchronize time with server for %s on %s: time difference to small", self.unit, repr(self.exchange))
         if trials > 0:
@@ -204,6 +204,9 @@ class PyBot(ConnectionThread):
     elif trials > 0:
       self.logger.error("unable to synchronize time with server for %s on %s: %s", self.unit, repr(self.exchange), response['message'])
       return self.sync(trials - 1)
+    else:
+      return False
+    return True
 
   def run(self):
     self.logger.info("starting PyBot for %s on %s", self.unit, repr(self.exchange))
@@ -228,10 +231,10 @@ class PyBot(ConnectionThread):
           delay += abs(sleep)
           if delay > 1.0:
             self.logger.warning('need to resynchronize trading bot for %s on %s because the deviation reached %.2f', self.unit, repr(self.exchange), delay)
-            self.sync()
-            delay = 0.0
-            if not self.requester.errorflag:
-              self.place_orders()
+            if self.sync():
+              delay = 0.0
+              if not self.requester.errorflag:
+                self.place_orders()
         else:
           while sleep > 0:
             step = min(sleep, 0.5)

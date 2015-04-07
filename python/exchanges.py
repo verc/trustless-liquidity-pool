@@ -148,10 +148,11 @@ class CCEDK(Exchange):
         maximum = int(error.strip().split()[-1].replace('`', ''))
         current = int(error.strip().split()[-7].split('`')[3])
       except:
-        super(CCEDK, self).adjust(error)
+        self._shift += random.randrange(-10, 10)
       else:
         if current < maximum:
           newshift = (minimum + 2 * maximum) / 3  - current
+          if newshift < 0: newshift = 10
         else:
           newshift = (2 * minimum + maximum) / 3 - current
         if newshift != 0:

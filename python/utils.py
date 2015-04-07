@@ -4,6 +4,7 @@ import urllib
 import json
 import logging
 import httplib
+import thread
 import socket
 import time
 
@@ -72,22 +73,40 @@ class ConnectionThread(threading.Thread):
   def release_lock(self): pass
 
 
-class SlaveThread(ConnectionThread):
-  def __init__(self, key, unit, host, logger = None):
-    super(SlaveThread, self).__init__(Connection(server, logger), logger)
-    self.key = key
-    self.unit = unit
+class CheckpointThread(ConnectionThread):
+  def __init__(self, host, logger = None):
+    super(CheckpointThread, self).__init__(Connection(host, logger), logger)
+    self.users = []
+    self.lock = threading.Lock()
+    self.trigger = threading.Lock()
+    self.trigger.acquire()
+    self.checkpoint = { 'error' : 'no checkpoint received' }
+    self.start()
+
+  def collect(self):
+    self.lock.acquire()
+    try: self.trigger.release()
+    except thread.error: pass
+
+  def finish(self):
+    try:
+      self.lock.acquire()
+      self.lock.release()
+    except KeyboardInterrupt:
+      raise
+    return self.checkpoint
+
+  def register(self, address, key, name):
+    self.users.append(key)
+    self.conn.post('register', { 'address' : address, 'key' : key, 'name' : name }, trials = 3, timeout = 10)
 
   def run(self):
     while self.active:
-      curtime = time.time()
-      self.response = self.conn.get('liquidity/%s/%s' % (self.key, self.unit), timeout = 15)
-      sleep = 60 - time.time() + curtime
-      while sleep > 0:
-        step = min(sleep, 0.1)
-        time.sleep(step)
-        sleep -= 0.1
-        if not self.active: break
+      self.trigger.acquire()
+      self.checkpoint = self.conn.post('checkpoints', { u : 1 for u in self.users }, trials = 1, timeout = 15)
+      if 'error' in self.checkpoint:
+        self.logger.error('unable to retrieve checkpoint from %s: %s', self.conn.server, self.checkpoint['message'])
+      self.lock.release()
 
 
 class PriceFeed():
