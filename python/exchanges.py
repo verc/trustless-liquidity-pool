@@ -250,7 +250,7 @@ class BitcoinCoId(Exchange):
 
   def nonce(self, factor = 1000.0):
     n = int((time.time() + self._shift) * float(factor))
-    if self._nonce >= n:
+    if n - self._nonce <= 100:
       time.sleep(0.1)
       return self.nonce(factor)
     self._nonce = n

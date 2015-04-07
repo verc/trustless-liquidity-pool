@@ -74,7 +74,7 @@ class RequestThread(ConnectionThread):
     self.cost = cost.copy()
 
   def register(self):
-    response = self.conn.post('register', { 'address' : self.address, 'key' : self.key, 'name' : repr(self.exchange) })
+    response = self.conn.post('register', { 'address' : self.address, 'key' : self.key, 'name' : repr(self.exchange) }, trials = 3, timeout = 10)
     if response['code'] == 0: # reset sampling in case of server restart
       self.sampling = self.initsampling
     return response
@@ -166,7 +166,7 @@ while True: # print some info every minute until program terminates
       response = conn.get(user, trials = 1)
       if 'error' in response:
         logger.error('unable to receive statistics for user %s: %s', user, response['message'])
-        users[user].values()[0]['request'].register() # reassure to be registered if 
+        users[user].values()[0]['request'].register() # reassure to be registered
         newstatus = conn.get('status', trials = 3)
         if not 'error' in newstatus:
           basestatus = newstatus

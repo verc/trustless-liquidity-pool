@@ -28,6 +28,8 @@ for e in config._interest:
 
 try: os.makedirs('logs')
 except: pass
+try: os.makedirs('stats')
+except: pass
 
 dummylogger = logging.getLogger('null')
 dummylogger.addHandler(logging.NullHandler())
@@ -54,6 +56,7 @@ logger.addHandler(fh)
 logger.addHandler(sh)
 _liquidity = []
 _active_users = 0
+master = Connection(config._master, logger) if config._master != "" else None
 
 keys = {}
 pricefeed = PriceFeed(15, logger)
@@ -134,6 +137,34 @@ class User(threading.Thread):
     self.logger = logger if logger else logging.getLogger('null')
     self.requests = []
     self.daemon = True
+    self.history = []
+    self.page = 1
+    self.record()
+    self.bundle()
+
+  def record(self):
+    missings = self.response.count('m')
+    rejects = self.response.count('r')
+    amount = { 'bid' : [], 'ask': [] }
+    norm = max(1.0, float(len(self.response) - missings - rejects))
+    for i in xrange(len(self.response)):
+      for side in ['bid', 'ask']:
+        stats = config._interest[repr(self.exchange)][self.unit][side]
+        if not amount[side] and self.response[i] == 'a':
+          amount[side] = [ self.credits[side][i][j]['amount'] for j in xrange(3) ]
+        if self.credits[side][i][0]['cost'] == stats['high'] or self.credits[side][i][1]['cost'] == stats['low']:
+          amount[side] = [ self.credits[side][i][j]['amount'] for j in xrange(3) ]
+    self.history.append({ 'time': int(time.time()), 'balance' : self.balance, 'missings' : missings, 'rejects' : rejects, 'bid': amount['bid'], 'ask' : amount['ask'], 'rate' : self.rate})
+    if len(self.history) == 60 * 24 + 1:
+      with open('stats/%s.%s.%s.%d' % (logname, self.key, self.unit, self.page), 'w') as fo:
+        fo.write(json.dumps(self.history))
+        self.page += 1
+      self.history = self.history[-1:]
+
+  def bundle(self):
+    self.checkpoint['liquidity'] = self.liquidity.copy()
+    self.checkpoint['response'] = self.liquidity.copy()
+    self.checkpoint['last_errors'] = self.last_errors.copy()
 
   def set(self, request, bid, ask, sign):
     if len(self.requests) < 10: # don't accept more requests to avoid simple spamming
@@ -233,8 +264,9 @@ def register(params):
             keys[user][unit].start()
           lock.release()
           logger.info("new user %s on %s: %s" % (user, name, address))
-        elif keys[user].values()[0].address != address:
-          ret = response(9, "user already exists with different address: %s" % user)
+        else:
+          if keys[user].values()[0].address != address:
+            ret = response(9, "user already exists with different address: %s" % user)
       else:
         ret = response(8, "unknown exchange requested: %s" % name)
     else:
@@ -258,9 +290,19 @@ def liquidity(params):
         else:
           ret = response(12, "unit for user %s not found: %s" % (user, unit))
       else:
-          ret = response(11, "user not found: %s" % user)
+        ret = response(11, "user not found: %s" % user)
     except ValueError:
       ret = response(10, "invalid cost information received: %s" % str(params))
+  elif set(params.keys() + ['user', 'unit', 'liquidity']) == set(params.keys()):
+    user = params.pop('user')[0]
+    unit = params.pop('unit')[0]
+    if user in keys:
+      if unit in keys[user]:
+        keys[user][unit].liquidity = params.pop('liquidity')[0]
+      else:
+        ret = response(12, "unit for user %s not found: %s" % (user, unit))
+    else:
+      ret = response(11, "user not found: %s" % user)
   else:
     ret = response(9, "invalid liquidity data received: %s" % str(params))
   return ret
@@ -314,6 +356,7 @@ def credit():
     for unit in config._interest[name]:
       users = [ k for k in keys if unit in keys[k] and repr(keys[k][unit].exchange) == name ]
       for user in users:
+        keys[user][unit].record()
         keys[user][unit].rate['bid'] = 0.0
         keys[user][unit].rate['ask'] = 0.0
       for side in [ 'bid', 'ask' ]:
@@ -516,6 +559,31 @@ class RequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
           self.end_headers()
         else:
           self.send_response(404)
+      elif root == 'history':
+        try:
+          page = int(method[2])
+          if page == 0:
+            content = json.dumps(keys[method[0]][method[1]].history)
+          else:
+            content = open('stats/%s.%s.%s.%d' % (logname, method[0], method[1], page)).read()
+          content = fin.read()
+          self.send_response(200)
+          self.send_header('Content-Type', 'application/json')
+          self.wfile.write("\n")
+          self.wfile.write(content)
+          self.end_headers()
+        except:
+          self.send_response(404)
+      elif root == 'checkpoint':
+        try:
+          content = json.dumps(keys[method[0]][method[1]].checkpoint)
+          self.send_response(200)
+          self.send_header('Content-Type', 'application/json')
+          self.wfile.write("\n")
+          self.wfile.write(content)
+          self.end_headers()
+        except:
+          self.send_response(404)
       else:
         self.send_response(404)
     else:
@@ -533,12 +601,11 @@ if not nud.rpc:
 httpd = ThreadingServer(("", config._port), RequestHandler)
 sa = httpd.socket.getsockname()
 logger.debug("Serving on %s port %d", sa[0], sa[1])
-#httpd.timeout = 5
 start_new_thread(httpd.serve_forever, ())
 
 lastcredit = time.time()
 lastpayout = time.time()
-lastsubmit = time.time()
+lastsubmit = time.time() 
 
 while True:
   try:
@@ -555,20 +622,28 @@ while True:
       if active: _active_users += 1
     lock.release()
 
-    # send liquidity
-    if curtime - lastsubmit >= 60:
-      submit(nud)
-      lastsubmit = curtime
+    if master:
+      if curtime - lastcredit >= 60:
+        # create checkpoints
+        for user in keys:
+          for unit in keys[user]:
+            keys[user][unit].bundle()
+        lastcredit = curtime
+    else:
+      # send liquidity
+      if curtime - lastsubmit >= 60:
+        submit(nud)
+        lastsubmit = curtime
 
-    # credit requests
-    if curtime - lastcredit >= 60:
-      credit()
-      lastcredit = curtime
+      # credit requests
+      if curtime - lastcredit >= 60:
+        credit()
+        lastcredit = curtime
 
-    # make payout
-    if curtime - lastpayout >= 21600: #3600: #43200:
-      pay(nud)
-      lastpayout = curtime
+      # make payout
+      if curtime - lastpayout >= 21600: #3600: #43200:
+        pay(nud)
+        lastpayout = curtime
 
     # start new validation round
     lock.acquire()

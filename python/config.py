@@ -92,3 +92,5 @@ _sampling = 30 # number of requests validated per minute
 _autopayout = True # try to send payouts automatically
 _minpayout = 0.1 # minimum balance to trigger payout
 _grantaddress = "" # custodian grant address
+_master = ""
+_slaves = []

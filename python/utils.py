@@ -72,6 +72,24 @@ class ConnectionThread(threading.Thread):
   def release_lock(self): pass
 
 
+class SlaveThread(ConnectionThread):
+  def __init__(self, key, unit, host, logger = None):
+    super(SlaveThread, self).__init__(Connection(server, logger), logger)
+    self.key = key
+    self.unit = unit
+
+  def run(self):
+    while self.active:
+      curtime = time.time()
+      self.response = self.conn.get('liquidity/%s/%s' % (self.key, self.unit), timeout = 15)
+      sleep = 60 - time.time() + curtime
+      while sleep > 0:
+        step = min(sleep, 0.1)
+        time.sleep(step)
+        sleep -= 0.1
+        if not self.active: break
+
+
 class PriceFeed():
   def __init__(self, update_interval, logger):
     self.update_interval = update_interval
