@@ -103,7 +103,10 @@ class Bittrex(Exchange):
   def get_balance(self, unit, key, secret):
     response = self.post('/account/getbalance', {'currency' : unit.upper()}, key, secret)
     if response['success']:
-      response['balance'] = float(response['result']['Available'])
+      try:
+        response['balance'] = float(response['result']['Available'])
+      except:
+        response['balance'] = 0.0
     else:
       response['error'] = response['message']
     return response
