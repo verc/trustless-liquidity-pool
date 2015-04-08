@@ -230,7 +230,7 @@ class User(threading.Thread):
           del self.liquidity[side][0]
           self.liquidity[side].append([])
       self.response = self.response[1:] + [res]
-      self.active = self.active and self.liquidity['bid'].count([]) + self.liquidity['ask'].count([]) == 2 * self.sampling
+      self.active = self.active or self.liquidity['bid'].count([]) + self.liquidity['ask'].count([]) == 2 * self.sampling
       del self.last_errors[0]
       self.lock.release()
 

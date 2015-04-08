@@ -144,9 +144,9 @@ class Bittrex(Exchange):
       connection.request('GET', data, headers = headers)
       response = json.loads(connection.getresponse().read())
       if response['success']:
-        try: opened = int(datetime.datetime.strptime(response['result']['Opened'], '%Y-%m-%dT%H:%M:%S.%U').strftime("%s"))
+        try: opened = int(datetime.datetime.strptime(response['result']['Opened'], '%Y-%m-%dT%H:%M:%S.%f').strftime("%s"))
         except: opened = 0
-        try: closed = int(datetime.datetime.strptime(response['result']['Closed'], '%Y-%m-%dT%H:%M:%S.%U').strftime("%s"))
+        try: closed = int(datetime.datetime.strptime(response['result']['Closed'], '%Y-%m-%dT%H:%M:%S.%f').strftime("%s"))
         except: closed = sys.maxint
         orders.append({
           'id' : response['result']['OrderUuid'],
