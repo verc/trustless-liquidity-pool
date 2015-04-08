@@ -419,7 +419,7 @@ def credit():
             for user in volume[1]:
               if norm > 0 and volume[1][user] > 0:
                 price = pricelevels[lvl+2]
-                contrib = (int((mass / target) + 1) * target - mass) * volume[1][user] / norm
+                contrib = min(volume[1][user], (int((mass / target) + 1) * target - mass) * volume[1][user] / norm)
                 payout = contrib * price
                 volume[0][user] -= contrib
                 volume[2][user] -= contrib

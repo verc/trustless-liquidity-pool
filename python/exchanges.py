@@ -155,7 +155,7 @@ class Bittrex(Exchange):
           'id' : response['result']['OrderUuid'],
           'price' : response['result']['Limit'],
           'type' : 'ask' if 'SELL' in response['result']['Type'] else 'bid',
-          'amount' : response['result']['QuantityRemaining'] if not response['result']['Closed'] else response['result']['Quantity'],
+          'amount' : response['result']['QuantityRemaining'] if not closed == sys.maxint else response['result']['Quantity'],
           'opened' : opened,
           'closed' : closed,
           })
