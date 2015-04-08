@@ -30,7 +30,7 @@ class Exchange(object):
 
 class Bittrex(Exchange):
   def __init__(self):
-    super(Bittrex, self).__init__(0.002)
+    super(Bittrex, self).__init__(0.0025)
     self.placed = {}
     self.remove = []
 
@@ -39,13 +39,36 @@ class Bittrex(Exchange):
   def adjust(self, error):
     print error
 
+  def urlencode(self, params): # from https://github.com/JohnnyZhao/peatio-client-python/blob/master/lib/auth.py#L11
+    keys = sorted(params.keys())
+    query = ''
+    for key in keys:
+      value = params[key]
+      if key != "orders":
+        query = "%s&%s=%s" % (query, key, value) if len(query) else "%s=%s" % (key, value)
+      else:
+        d = {key: params[key]}
+        for v in value:
+          ks = v.keys()
+          ks.sort()
+          for k in ks:
+            item = "orders[][%s]=%s" % (k, v[k])
+            query = "%s&%s" % (query, item) if len(query) else "%s" % item
+    return query
+
   def post(self, method, params, key, secret):
-    request = { 'nonce' : self.nonce(), 'apikey' : key }
-    request.update(params)
-    data = urllib.urlencode(request)
+    data = 'https://bittrex.com/api/v1.1' + method + '?apikey=%s&nonce=%d&' % (key, self.nonce()) + urllib.urlencode(params)
     sign = hmac.new(secret, data, hashlib.sha512).hexdigest()
     headers = { 'apisign' : sign }
-    return json.loads(urllib2.urlopen(urllib2.Request('https://bittrex.com/api/v1.1' + method, data, headers)).read())
+    connection = httplib.HTTPSConnection('bittrex.com', timeout = 10)
+    connection.request('GET', data, headers = headers)
+    return json.loads(connection.getresponse().read())
+
+  def get(self, method, params):
+    data = 'https://bittrex.com/api/v1.1' + method + '?' + urllib.urlencode(params)
+    connection = httplib.HTTPSConnection('bittrex.com', timeout = 10)
+    connection.request('GET', data, headers = {})
+    return json.loads(connection.getresponse().read())
 
   def cancel_orders(self, unit, side, key, secret):
     response = self.post('/market/getopenorders', { 'market' : "%s-NBT"%unit.upper() }, key, secret)
@@ -56,17 +79,18 @@ class Bittrex(Exchange):
       response['result'] = []
     for order in response['result']:
       if side == 'all' or (side == 'bid' and 'SELL' in order['OrderType']) or (side == 'ask' and 'BUY' in order['OrderType']):
-        ret = self.post('/market/cancel', { 'uuid' : order['Uuid'] }, key, secret)
-        if not ret['success']:
-          if isinstance(response,list): response = { 'error': "" }
+        ret = self.post('/market/cancel', { 'uuid' : order['OrderUuid'] }, key, secret)
+        if not ret['success'] and ret['message'] != "ORDER_NOT_OPEN":
+          if not 'error' in response: response = { 'error': "" }
           response['error'] += "," + ret['message']
     return response
 
   def place_order(self, unit, side, key, secret, amount, price):
+    if side == 'bid': amount *= (1.0 - self.fee)
     params = { 'market' : "%s-NBT"%unit.upper(), "rate" : price, "quantity" : amount }
-    response = self.post('/market/buymarket' if side == 'bid' else '/market/sellmarket', params, key, secret)
+    response = self.post('/market/buylimit' if side == 'bid' else '/market/selllimit', params, key, secret)
     if response['success']:
-      response['id'] = response['uuid']
+      response['id'] = response['result']['uuid']
       if not key in self.placed:
         self.placed[key] = {}
       if not unit in self.placed[key]:
@@ -77,15 +101,15 @@ class Bittrex(Exchange):
     return response
 
   def get_balance(self, unit, key, secret):
-    response = self.post('/account/getbalance', {'currency' : unit}, key, secret)
+    response = self.post('/account/getbalance', {'currency' : unit.upper()}, key, secret)
     if response['success']:
-      response['balance'] = float(response['Available'])
+      response['balance'] = float(response['result']['Available'])
     else:
       response['error'] = response['message']
     return response
 
   def get_price(self, unit):
-    response = json.loads(urllib2.urlopen(urllib2.Request('https://bittrex.com/api/v1.1/public/getticker', urllib.urlencode({'market' : '%s-NBT' % unit}))).read())
+    response = self.get('/public/getticker', {'market' : '%s-NBT' % unit})
     if response['success']:
       response.update({'bid': response['result']['Bid'], 'ask': response['result']['Ask']})
     else:
@@ -99,31 +123,35 @@ class Bittrex(Exchange):
       uuids = []
     else:
       uuids = self.placed[key][unit]
-    request = []
-    sign = []
+    requests = []
+    signatures = []
     for uuid in uuids:
-      request.append({ 'uuid' : uuid, 'nonce' : self.nonce() })
-      data = urllib.urlencode(request[-1])
-      sign.append(hmac.new(secret, data, hashlib.sha512).hexdigest())
-    return { 'requests' : request }, sign
+      data = 'https://bittrex.com/api/v1.1/account/getorder?apikey=%s&nonce=%d&' % (key, self.nonce()) + urllib.urlencode({'uuid' : uuid})
+      requests.append(data)
+      signatures.append(hmac.new(secret, data, hashlib.sha512).hexdigest())
+    return { 'requests' : json.dumps(requests), 'signs' : json.dumps(signatures) }, None
 
   def validate_request(self, key, unit, data, signs):
     orders = []
     last_error = ""
+    requests = json.loads(data['requests'])
+    signs = json.loads(data['signs'])
     if len(requests) != len(signs):
-      return orders
-    for data, sign in zip(data['requests'], signs):
+      return { 'error' : 'missmatch between requests and signatures (%d vs %d)' % (len(data['requests']), len(signs)) }
+    for data, sign in zip(requests, signs):
       headers = { 'apisign' : sign }
-      response = json.loads(urllib2.urlopen(urllib2.Request('https://bittrex.com/api/v1.1/account/getorder', data, headers)).read())
+      connection = httplib.HTTPSConnection('bittrex.com', timeout = 5)
+      connection.request('GET', data, headers = headers)
+      response = json.loads(connection.getresponse().read())
       if response['success']:
         try: opened = int(datetime.datetime.strptime(response['result']['Opened'], '%Y-%m-%dT%H:%M:%S.%U').strftime("%s"))
         except: opened = 0
         try: closed = int(datetime.datetime.strptime(response['result']['Closed'], '%Y-%m-%dT%H:%M:%S.%U').strftime("%s"))
         except: closed = sys.maxint
         orders.append({
-          'id' : data['uuid'],
-          'price' : response['result']['Price'],
-          'type' : 'ask' if 'SELL' in order['Type'] else 'bid',
+          'id' : response['result']['OrderUuid'],
+          'price' : response['result']['Limit'],
+          'type' : 'ask' if 'SELL' in response['result']['Type'] else 'bid',
           'amount' : response['result']['QuantityRemaining'] if not response['result']['Closed'] else response['result']['Quantity'],
           'opened' : opened,
           'closed' : closed,

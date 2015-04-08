@@ -192,7 +192,7 @@ class User(threading.Thread):
               for order in orders:
                 deviation = 1.0 - min(order['price'], price) / max(order['price'], price)
                 if deviation <= self.tolerance:
-                  if 'closed' in order:
+                  if 'closed' in order and order['closed'] < int(time.time()):
                     order['amount'] *= 1.0 - min(1.0, config._sampling * float(int(time.time()) - order['closed']) / 60.0)
                   valid[order['type']].append([order['id'], order['amount'], request[2][order['type']]])
                 else:
@@ -381,7 +381,7 @@ def credit():
           maxrate = config._interest[name][unit][side]['rate'] 
           submitted = []
           for user in users:
-            keys[user][unit].credits[side][sample] = [ {'amount' : 0.0, 'cost' : 0.0}, {'amount' : 0.0, 'cost' : 0.0}, {'amount' : 0.0, 'cost' : 0.0} ]
+            keys[user][unit].credits[side][sample] = [ { 'amount' : 0.0, 'cost' : 0.0 }, { 'amount' : 0.0, 'cost' : 0.0 }, { 'amount' : 0.0, 'cost' : 0.0 } ]
             submitted.extend([ (user, order) for order in keys[user][unit].liquidity[side][sample] ])
           submitted.sort(key = lambda x: (x[1][2], x[1][0]))
           orders = [ submitted[i] for i in xrange(len(submitted)) if i == 0 or submitted[i][1][0] != submitted[i - 1][1][0] ]
@@ -477,7 +477,6 @@ def pay(nud):
           if keys[user][unit].address in txout and keys[user][unit].balance > 0.0:
             creditor.info("[-] %.8f %s %s", keys[user][unit].balance, user, unit)
             keys[user][unit].balance = 0.0
-
       lock.release()
     except: logger.error("failed to store payout to %s: %s", filename, txout)
   else:

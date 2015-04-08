@@ -7,11 +7,11 @@ _interest = {
   'bittrex' : {
     'btc' : {
       'bid': {
-        'rate' : 0.00025,
+        'rate' : 0.0025,
         'target' : 10000.0
         },
       'ask': {
-        'rate' : 0.00025,
+        'rate' : 0.0025,
         'target' : 10000.0
         }
       }
