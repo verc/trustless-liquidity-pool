@@ -55,7 +55,7 @@ if not userdata:
 
 
 _server = sys.argv[1]
-_wrappers = { 'poloniex' : Poloniex(), 'ccedk' : CCEDK(), 'bitcoincoid' : BitcoinCoId(), 'bter' : BTER(), 'testing' : Peatio() }
+_wrappers = { 'bittrex' : Bittrex(), 'poloniex' : Poloniex(), 'ccedk' : CCEDK(), 'bitcoincoid' : BitcoinCoId(), 'bter' : BTER(), 'testing' : Peatio() }
 
 # one request signer thread for each key and unit
 class RequestThread(ConnectionThread):

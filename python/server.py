@@ -17,7 +17,7 @@ from exchanges import *
 from utils import *
 import config
 
-_wrappers = { 'poloniex' : Poloniex, 'ccedk' : CCEDK, 'bitcoincoid' : BitcoinCoId, 'bter' : BTER, 'testing' : Peatio }
+_wrappers = { 'bittrex' : Bittrex, 'poloniex' : Poloniex, 'ccedk' : CCEDK, 'bitcoincoid' : BitcoinCoId, 'bter' : BTER, 'testing' : Peatio }
 for e in config._interest:
   _wrappers[e] = _wrappers[e]()
   for u in config._interest[e]:
@@ -192,6 +192,8 @@ class User(threading.Thread):
               for order in orders:
                 deviation = 1.0 - min(order['price'], price) / max(order['price'], price)
                 if deviation <= self.tolerance:
+                  if 'closed' in order:
+                    order['amount'] *= 1.0 - min(1.0, config._sampling * float(int(time.time()) - order['closed']) / 60.0)
                   valid[order['type']].append([order['id'], order['amount'], request[2][order['type']]])
                 else:
                   self.last_errors.append('unable to validate request: order of deviates too much from current price')

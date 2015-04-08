@@ -105,21 +105,21 @@ class Bittrex(Exchange):
       request.append({ 'uuid' : uuid, 'nonce' : self.nonce() })
       data = urllib.urlencode(request[-1])
       sign.append(hmac.new(secret, data, hashlib.sha512).hexdigest())
-    return request, sign
+    return { 'requests' : request }, sign
 
-  def validate_request(self, key, unit, requests, signs):
+  def validate_request(self, key, unit, data, signs):
     orders = []
     last_error = ""
     if len(requests) != len(signs):
       return orders
-    for data, sign in zip(requests, signs):
+    for data, sign in zip(data['requests'], signs):
       headers = { 'apisign' : sign }
       response = json.loads(urllib2.urlopen(urllib2.Request('https://bittrex.com/api/v1.1/account/getorder', data, headers)).read())
       if response['success']:
         try: opened = int(datetime.datetime.strptime(response['result']['Opened'], '%Y-%m-%dT%H:%M:%S.%U').strftime("%s"))
-        except: opened = None
+        except: opened = 0
         try: closed = int(datetime.datetime.strptime(response['result']['Closed'], '%Y-%m-%dT%H:%M:%S.%U').strftime("%s"))
-        except: closed = None
+        except: closed = sys.maxint
         orders.append({
           'id' : data['uuid'],
           'price' : response['result']['Price'],
