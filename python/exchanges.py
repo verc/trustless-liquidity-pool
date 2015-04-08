@@ -27,6 +27,114 @@ class Exchange(object):
     self._nonce = n
     return n
 
+
+class Bittrex(Exchange):
+  def __init__(self):
+    super(Bittrex, self).__init__(0.002)
+    self.placed = {}
+    self.remove = []
+
+  def __repr__(self): return "bittrex"
+
+  def adjust(self, error):
+    print error
+
+  def post(self, method, params, key, secret):
+    request = { 'nonce' : self.nonce(), 'apikey' : key }
+    request.update(params)
+    data = urllib.urlencode(request)
+    sign = hmac.new(secret, data, hashlib.sha512).hexdigest()
+    headers = { 'apisign' : sign }
+    return json.loads(urllib2.urlopen(urllib2.Request('https://bittrex.com/api/v1.1' + method, data, headers)).read())
+
+  def cancel_orders(self, unit, side, key, secret):
+    response = self.post('/market/getopenorders', { 'market' : "%s-NBT"%unit.upper() }, key, secret)
+    if not response['success']:
+      response['error'] = response['message']
+      return response
+    if not response['result']:
+      response['result'] = []
+    for order in response['result']:
+      if side == 'all' or (side == 'bid' and 'SELL' in order['OrderType']) or (side == 'ask' and 'BUY' in order['OrderType']):
+        ret = self.post('/market/cancel', { 'uuid' : order['Uuid'] }, key, secret)
+        if not ret['success']:
+          if isinstance(response,list): response = { 'error': "" }
+          response['error'] += "," + ret['message']
+    return response
+
+  def place_order(self, unit, side, key, secret, amount, price):
+    params = { 'market' : "%s-NBT"%unit.upper(), "rate" : price, "quantity" : amount }
+    response = self.post('/market/buymarket' if side == 'bid' else '/market/sellmarket', params, key, secret)
+    if response['success']:
+      response['id'] = response['uuid']
+      if not key in self.placed:
+        self.placed[key] = {}
+      if not unit in self.placed[key]:
+        self.placed[key][unit] = []
+      self.placed[key][unit].append(response['id'])
+    else:
+      response['error'] = response['message']
+    return response
+
+  def get_balance(self, unit, key, secret):
+    response = self.post('/account/getbalance', {'currency' : unit}, key, secret)
+    if response['success']:
+      response['balance'] = float(response['Available'])
+    else:
+      response['error'] = response['message']
+    return response
+
+  def get_price(self, unit):
+    response = json.loads(urllib2.urlopen(urllib2.Request('https://bittrex.com/api/v1.1/public/getticker', urllib.urlencode({'market' : '%s-NBT' % unit}))).read())
+    if response['success']:
+      response.update({'bid': response['result']['Bid'], 'ask': response['result']['Ask']})
+    else:
+      response['error'] = response['message']
+    return response
+
+  def create_request(self, unit, key = None, secret = None):
+    if not secret or not key:
+      return None, None
+    if not key in self.placed or not unit in self.placed[key]:
+      uuids = []
+    else:
+      uuids = self.placed[key][unit]
+    request = []
+    sign = []
+    for uuid in uuids:
+      request.append({ 'uuid' : uuid, 'nonce' : self.nonce() })
+      data = urllib.urlencode(request[-1])
+      sign.append(hmac.new(secret, data, hashlib.sha512).hexdigest())
+    return request, sign
+
+  def validate_request(self, key, unit, requests, signs):
+    orders = []
+    last_error = ""
+    if len(requests) != len(signs):
+      return orders
+    for data, sign in zip(requests, signs):
+      headers = { 'apisign' : sign }
+      response = json.loads(urllib2.urlopen(urllib2.Request('https://bittrex.com/api/v1.1/account/getorder', data, headers)).read())
+      if response['success']:
+        try: opened = int(datetime.datetime.strptime(response['result']['Opened'], '%Y-%m-%dT%H:%M:%S.%U').strftime("%s"))
+        except: opened = None
+        try: closed = int(datetime.datetime.strptime(response['result']['Closed'], '%Y-%m-%dT%H:%M:%S.%U').strftime("%s"))
+        except: closed = None
+        orders.append({
+          'id' : data['uuid'],
+          'price' : response['result']['Price'],
+          'type' : 'ask' if 'SELL' in order['Type'] else 'bid',
+          'amount' : response['result']['QuantityRemaining'] if not response['result']['Closed'] else response['result']['Quantity'],
+          'opened' : opened,
+          'closed' : closed,
+          })
+      else:
+        last_error = response['message']
+    if not orders and last_error != "":
+      return { 'error' : last_error }
+    return orders
+
+
 class Poloniex(Exchange):
   def __init__(self):
     super(Poloniex, self).__init__(0.002)

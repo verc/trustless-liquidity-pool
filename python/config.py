@@ -4,6 +4,18 @@ import os
 _port = 3333
 # daily interest rates
 _interest = {
+  'bittrex' : {
+    'btc' : {
+      'bid': {
+        'rate' : 0.00025,
+        'target' : 10000.0
+        },
+      'ask': {
+        'rate' : 0.00025,
+        'target' : 10000.0
+        }
+      }
+  },
   'poloniex' : {
     'btc' : {
       'bid': {
