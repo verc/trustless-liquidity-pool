@@ -451,7 +451,7 @@ def credit():
                   sample + 1, config._sampling, payout / float(24 * 60  * config._sampling), user, contrib, side, name, unit, price * 100)
             # mark zero payout level
             for user in volume[2]:
-              if volume[2][user] > 10**(-8):
+              if volume[2][user] > float(10**(-8)):
                 keys[user][unit].credits[side][sample][2] = { 'amount' : volume[2][user], 'cost' : 0.0 }
                 config._interest[name][unit][side]['orders'][sample].append({ 'amount' : volume[2][user], 'cost' : 0.0 })
 
