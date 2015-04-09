@@ -477,7 +477,7 @@ class BTER(Exchange):
   def __repr__(self): return "bter"
 
   def adjust(self, error):
-    print error
+    pass
 
   def https_request(self, method, params, headers = None, timeout = None):
     if not headers: headers = {}

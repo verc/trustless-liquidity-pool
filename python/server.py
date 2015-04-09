@@ -192,8 +192,14 @@ class User(threading.Thread):
               for order in orders:
                 deviation = 1.0 - min(order['price'], price) / max(order['price'], price)
                 if deviation <= self.tolerance:
-                  if 'closed' in order and order['closed'] < int(time.time()):
-                    order['amount'] *= 1.0 - min(1.0, config._sampling * float(int(time.time()) - order['closed']) / 60.0)
+                  span = 60.0 / config._sampling
+                  et = int(time.time())
+                  st = et - span
+                  if 'closed' in order and order['closed'] < et:
+                    et = order['closed']
+                  if 'opened' in order and order['opened'] > st:
+                    st = order['opened']
+                  order['amount'] *= max(0.0, float(et - st) / span)
                   valid[order['type']].append([order['id'], order['amount'], request[2][order['type']]])
                 else:
                   self.last_errors.append('unable to validate request: order of deviates too much from current price')
