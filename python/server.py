@@ -521,14 +521,21 @@ class RequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
       self.send_response(404)
       return
     self.path = self.path[1:]
-    if self.path in ['register', 'liquidity', 'checkpoints']:
+    if self.path == 'liquidity': # respond as fast as possible to avoid timeout errors
+      self.send_response(200)
+      self.send_header('Content-Type', 'application/json')
+      self.wfile.write("\n")
+      self.wfile.write(json.dumps(response()))
+      self.end_headers()
+      length = int(self.headers.getheader('content-length'))
+      params = cgi.parse_qs(self.rfile.read(length), keep_blank_values = 1)
+      liquidity(params)
+    elif self.path in ['register', 'checkpoints']:
       ctype, pdict = cgi.parse_header(self.headers.getheader('content-type'))
       if ctype == 'application/x-www-form-urlencoded':
         length = int(self.headers.getheader('content-length'))
         params = cgi.parse_qs(self.rfile.read(length), keep_blank_values = 1)
-        if self.path == 'liquidity':
-          ret = liquidity(params)
-        elif self.path == 'register':
+        if self.path == 'register':
           ret = register(params)
         elif self.path == 'checkpoints':
           ret = checkpoints(params)
