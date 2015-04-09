@@ -295,7 +295,7 @@ def liquidity(params):
       ask = float(params.pop('ask')[0])
       if user in keys:
         if unit in keys[user]:
-          keys[user][unit].set(params, bid, ask, sign)
+          start_new_thread(keys[user][unit].set, (params, bid, ask, sign))
         else:
           ret = response(12, "unit for user %s not found: %s" % (user, unit))
       else:
@@ -521,22 +521,15 @@ class RequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
       self.send_response(404)
       return
     self.path = self.path[1:]
-    if self.path == 'liquidity': # respond as fast as possible to avoid timeout errors
-      self.send_response(200)
-      self.send_header('Content-Type', 'application/json')
-      self.wfile.write("\n")
-      self.wfile.write(json.dumps(response()))
-      self.end_headers()
-      length = int(self.headers.getheader('content-length'))
-      params = cgi.parse_qs(self.rfile.read(length), keep_blank_values = 1)
-      start_new_thread(liquidity, (params,))
-    elif self.path in ['register', 'checkpoints']:
+    if self.path in ['register', 'liquidity', 'checkpoints']:
       ctype, pdict = cgi.parse_header(self.headers.getheader('content-type'))
       if ctype == 'application/x-www-form-urlencoded':
         length = int(self.headers.getheader('content-length'))
         params = cgi.parse_qs(self.rfile.read(length), keep_blank_values = 1)
         if self.path == 'register':
           ret = register(params)
+        elif self.path == 'liquidity':
+          ret = liquidity(params)
         elif self.path == 'checkpoints':
           ret = checkpoints(params)
       self.send_response(200)
