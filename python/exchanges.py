@@ -141,9 +141,9 @@ class Bittrex(Exchange):
     signs = json.loads(data['signs'])
     if len(requests) != len(signs):
       return { 'error' : 'missmatch between requests and signatures (%d vs %d)' % (len(data['requests']), len(signs)) }
+    connection = httplib.HTTPSConnection('bittrex.com', timeout = 5)
     for data, sign in zip(requests, signs):
       headers = { 'apisign' : sign }
-      connection = httplib.HTTPSConnection('bittrex.com', timeout = 5)
       connection.request('GET', data, headers = headers)
       response = json.loads(connection.getresponse().read())
       if response['success']:
