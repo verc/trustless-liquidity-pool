@@ -14,7 +14,7 @@ from utils import *
 
 
 class NuBot(ConnectionThread):
-  def __init__(self, conn, requester, key, secret, exchange, unit, target, logger = None):
+  def __init__(self, conn, requester, key, secret, exchange, unit, target, logger = None, ordermatch = False):
     super(NuBot, self).__init__(conn, logger)
     self.requester = requester
     self.process = None
@@ -30,7 +30,7 @@ class NuBot(ConnectionThread):
       'submit-liquidity' : False,
       'dualside' : True,
       'multiple-custodians' : True,
-      'executeorders' : True,
+      'executeorders' : ordermatch,
       'mail-notifications' : False,
       'hipchat' : False
     }
@@ -72,9 +72,10 @@ class NuBot(ConnectionThread):
 
 
 class PyBot(ConnectionThread):
-  def __init__(self, conn, requester, key, secret, exchange, unit, target, logger = None):
+  def __init__(self, conn, requester, key, secret, exchange, unit, target, logger = None, ordermatch = False):
     super(PyBot, self).__init__(conn, logger)
     self.requester = requester
+    self.ordermatch = ordermatch
     self.key = key
     self.secret = secret
     self.exchange = exchange
@@ -159,10 +160,13 @@ class PyBot(ConnectionThread):
     return response
 
   def place_orders(self):
-    try:
-      response = self.exchange.get_price(self.unit)
-    except:
-      response = { 'error': 'exception caught: %s' % sys.exc_info()[1] }
+    if self.ordermatch:
+      response = { 'bid' : None, 'ask' : None }
+    else:
+      try:
+        response = self.exchange.get_price(self.unit)
+      except:
+        response = { 'error': 'exception caught: %s' % sys.exc_info()[1] }
     if 'error' in response:
       self.logger.error('unable to retrieve order book for %s on %s: %s', self.unit, repr(self.exchange), response['error'])
     else:

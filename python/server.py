@@ -163,7 +163,7 @@ class User(threading.Thread):
       self.history = self.history[-1:]
 
   def bundle(self):
-    self.checkpoint = { 'liquidity' : self.liquidity.copy(), 'response' : self.response[:], 'last_errors' : self.last_errors[:] }
+    self.checkpoint = { 'liquidity' : self.liquidity.copy(), 'response' : self.response[:], 'last_errors' : self.last_errors[:], 'balance' : self.balance }
 
   def set(self, request, bid, ask, sign):
     if len(self.requests) < 10: # don't accept more requests to avoid simple spamming
@@ -319,7 +319,7 @@ def userstats(user):
       last_error = ""
       missing = checkpoint['response'].count('m')
       rejects = checkpoint['response'].count('r')
-      res['balance'] += keys[user][unit].balance
+      res['balance'] += checkpoint['balance']
       res['missing'] += missing
       res['rejects'] += rejects
       norm = max(1.0, float(keys[user][unit].sampling - missing - rejects))
@@ -396,6 +396,8 @@ def credit():
             target = min(mass, config._interest[name][unit][side]['target'])
             maxlevel = int(ceil(mass / target))
             pricelevels = sorted(list(set( [ order[2] for _,order in orders if order[2] < maxrate ])) + [maxrate, maxrate])
+            if sample == 0:
+              logger.debug('pricelevels: %s', " ".join(pricelevels))
             if len(pricelevels) < maxlevel + 2:
               pricelevels += [maxrate] * (2 + maxlevel - len(pricelevels))
             # calculate level
