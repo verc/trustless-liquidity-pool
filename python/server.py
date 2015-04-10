@@ -371,7 +371,7 @@ def collect():
       keys[user][unit].bundle()
 
 def checkpoints(params):
-  ret = { 'round' : _round }
+  ret = {}
   for user in params:
     if user in keys:
       for unit in keys[user]:

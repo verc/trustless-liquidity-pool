@@ -1,0 +1,30 @@
+#! /bin/bash
+
+client=../python/client.py
+
+config=`mktemp`
+options=`getopt -o x:a:k:s:i:ou:e: --long server:,address:,key:,secret:,interest:,ordermatch,unit:,exchange: -- "$@"`
+eval set -- "$options"
+
+if [ -e pool.conf ];then
+  cp pool.conf $config
+fi
+
+while [ $# -gt 0 ]; do
+  case $1 in
+  -x|--server) echo "server=$2";shift;;
+  -a|--address) echo "address=$2";shift;;
+  -k|--key) echo "apikey=$2";shift;;
+  -s|--secret) echo "apisecret=$2";shift;;
+  -i|--interest) echo "interest=$2";shift;;
+  -o|--ordermatch) echo "ordermatch=True";shift;;
+  -u|--unit) echo "unit=$2";shift;;
+  -e|--exchange) echo "exchange=$2";shift;;
+  (--) shift; break;;
+  (-*) break;;
+  (*) break;;
+  esac
+  shift
+done >> $config
+$client $config
+rm $config

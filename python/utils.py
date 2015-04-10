@@ -107,7 +107,7 @@ class CheckpointThread(ConnectionThread):
       if 'error' in self.checkpoint:
         self.logger.error('unable to retrieve checkpoint from %s: %s', self.conn.server, self.checkpoint['message'])
       self.lock.release()
-      
+
 
 class PriceFeed():
   def __init__(self, update_interval, logger):
