@@ -262,7 +262,7 @@ def register(params):
     name = params['name'][0]
     address = params['address'][0]
     if address[0] == 'B': # this is certainly not a proper check
-      if name in _wrappers:
+      if name in config._interest:
         for slave in slaves:
           slave.register(address, user, name)
         if not user in keys:
