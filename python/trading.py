@@ -98,7 +98,7 @@ class PyBot(ConnectionThread):
     except:
       response = {'error' : 'exception caught: %s' % sys.exc_info()[1]}
     if 'error' in response:
-      self.logger.error('unable to cancel %s orders for %s on %s: %s', side, self.unit, repr(self.exchange), response['error'])
+      self.logger.error('unable to delete %s orders for %s on %s: %s', side, self.unit, repr(self.exchange), response['error'])
       self.exchange.adjust(response['error'])
       self.logger.info('adjusting nonce of %s to %d', repr(self.exchange), self.exchange._shift)
     else:

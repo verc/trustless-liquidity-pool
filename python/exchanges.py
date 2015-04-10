@@ -39,23 +39,6 @@ class Bittrex(Exchange):
   def adjust(self, error):
     print error
 
-  def urlencode(self, params): # from https://github.com/JohnnyZhao/peatio-client-python/blob/master/lib/auth.py#L11
-    keys = sorted(params.keys())
-    query = ''
-    for key in keys:
-      value = params[key]
-      if key != "orders":
-        query = "%s&%s=%s" % (query, key, value) if len(query) else "%s=%s" % (key, value)
-      else:
-        d = {key: params[key]}
-        for v in value:
-          ks = v.keys()
-          ks.sort()
-          for k in ks:
-            item = "orders[][%s]=%s" % (k, v[k])
-            query = "%s&%s" % (query, item) if len(query) else "%s" % item
-    return query
-
   def post(self, method, params, key, secret):
     data = 'https://bittrex.com/api/v1.1' + method + '?apikey=%s&nonce=%d&' % (key, self.nonce()) + urllib.urlencode(params)
     sign = hmac.new(secret, data, hashlib.sha512).hexdigest()

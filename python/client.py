@@ -104,6 +104,8 @@ class Client(ConnectionThread):
   def set(self, key, secret, address, name, unit, bid = None, ask = None, bot = 'pybot', ordermatch = False):
     if not name in self.exchangeinfo or not unit in self.exchangeinfo[name]:
       return False
+    key = str(key)
+    secret = str(secret)
     exchange = _wrappers[name]
     cost = { 'bid' : bid if bid else self.exchangeinfo[name][unit]['bid']['rate'],
              'ask' : ask if ask else self.exchangeinfo[name][unit]['ask']['rate'] }
@@ -128,6 +130,7 @@ class Client(ConnectionThread):
       if self.users[key][unit]['order']:
         self.users[key][unit]['order'].start()
     self.lock.release()
+    print locals()
     return True
 
   def shutdown(self, key = None, unit = None, join = True):
@@ -293,7 +296,7 @@ if __name__ == "__main__":
             bid = None
             ask = None
           bot = 'pybot' if not 'trading' in configdata else configdata['trading']
-          ordermatch = False if not 'ordermatch' in configdata else configdata['ordermatch']
+          ordermatch = False if not 'ordermatch' in configdata else (configdata['ordermatch'] in ['True', 'true', '1'])
           if 'server' in configdata:
             if 'apikey' in configdata:
               if 'apisecret' in configdata:
