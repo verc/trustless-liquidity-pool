@@ -237,9 +237,6 @@ class Client(ConnectionThread):
                       self.users[user][unit]['request'].sampling = self.users[user][unit]['request'].sampling + 1
                       self.logger.warning('too many missing requests for %s on %s, increasing sampling to %d',
                         unit, repr(self.users[user][unit]['request'].exchange), self.users[user][unit]['request'].sampling)
-                    else: # just wait a little bit
-                      self.logger.warning('too many missing requests, sleeping a short while to synchronize')
-                      curtime += 0.7
       except KeyboardInterrupt: break
       except Exception as e:
         self.logger.error('exception caught in main loop: %s', sys.exc_info()[1])
