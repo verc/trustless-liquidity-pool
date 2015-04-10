@@ -130,7 +130,6 @@ class Client(ConnectionThread):
       if self.users[key][unit]['order']:
         self.users[key][unit]['order'].start()
     self.lock.release()
-    print locals()
     return True
 
   def shutdown(self, key = None, unit = None, join = True):
