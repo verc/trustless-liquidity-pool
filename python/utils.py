@@ -84,7 +84,6 @@ class CheckpointThread(ConnectionThread):
     self.start()
 
   def collect(self):
-    self.lock.acquire()
     try: self.trigger.release()
     except thread.error: pass
 
@@ -102,12 +101,13 @@ class CheckpointThread(ConnectionThread):
 
   def run(self):
     while self.active:
+      self.lock.acquire()
       self.trigger.acquire()
-      self.checkpoint = self.conn.post('checkpoints', { u : 1 for u in self.users }, trials = 1, timeout = 15)
+      self.checkpoint = self.conn.post('checkpoints', { u : 1 for u in self.users }, trials = 1, timeout = 3)
       if 'error' in self.checkpoint:
         self.logger.error('unable to retrieve checkpoint from %s: %s', self.conn.server, self.checkpoint['message'])
       self.lock.release()
-
+      
 
 class PriceFeed():
   def __init__(self, update_interval, logger):

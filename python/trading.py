@@ -143,7 +143,7 @@ class PyBot(ConnectionThread):
       self.logger.info('adjusting nonce of %s to %d', repr(self.exchange), self.exchange._shift)
     elif response['balance'] > 0.1:
       amount = min(self.limit[side], response['balance'])
-      if amount > 0.1:
+      if amount >= 0.5:
         try:
           response = self.exchange.place_order(self.unit, side, self.key, self.secret, amount, price)
         except KeyboardInterrupt: raise

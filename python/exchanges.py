@@ -37,7 +37,7 @@ class Bittrex(Exchange):
   def __repr__(self): return "bittrex"
 
   def adjust(self, error):
-    print error
+    pass
 
   def post(self, method, params, key, secret):
     data = 'https://bittrex.com/api/v1.1' + method + '?apikey=%s&nonce=%d&' % (key, self.nonce()) + urllib.urlencode(params)

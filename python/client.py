@@ -227,12 +227,12 @@ class Client(ConnectionThread):
                           self.logger.warning('too many rejected requests for %s on %s, adjusting nonce shift to %d',
                             unit, repr(self.users[user][unit]['request'].exchange), self.users[user][unit]['request'].exchange._shift)
                     else:
-                      if self.users[user][unit]['request'].sampling < 2 * sampling: # just send more requests
+                      if self.users[user][unit]['request'].sampling < 3 * sampling: # just send more requests
                         self.users[user][unit]['request'].sampling = self.users[user][unit]['request'].sampling + 1
                         self.logger.warning('increasing sampling to %d',
                           unit, repr(self.users[user][unit]['request'].exchange), self.users[user][unit]['request'].sampling)
                   if response['units'][unit]['missing'] / float(self.basestatus['sampling']) >= 0.05: # look for missing error and adjust sampling
-                    if self.users[user][unit]['request'].sampling < 2 * self.sampling: # just send more requests
+                    if self.users[user][unit]['request'].sampling < 3 * self.sampling: # just send more requests
                       self.users[user][unit]['request'].sampling = self.users[user][unit]['request'].sampling + 1
                       self.logger.warning('too many missing requests for %s on %s, increasing sampling to %d',
                         unit, repr(self.users[user][unit]['request'].exchange), self.users[user][unit]['request'].sampling)

@@ -56,6 +56,7 @@ logger.addHandler(fh)
 logger.addHandler(sh)
 _liquidity = []
 _active_users = 0
+_round = 0
 master = Connection(config._master, logger) if config._master != "" else None
 slaves = [ CheckpointThread(host, logger) for host in config._slaves ]
 
@@ -369,6 +370,16 @@ def collect():
     for unit in keys[user]:
       keys[user][unit].bundle()
 
+def checkpoints(params):
+  ret = { 'round' : _round }
+  for user in params:
+    if user in keys:
+      for unit in keys[user]:
+        if keys[user][unit].active:
+          if not user in ret: ret[user] = {}
+          ret[user][unit] = keys[user][unit].checkpoint
+  return ret
+
 def credit():
   for name in config._interest:
     for unit in config._interest[name]:
@@ -503,19 +514,9 @@ def submit(nud):
   _liquidity.append(curliquidity)
   nud.liquidity(curliquidity[0], curliquidity[1])
 
-def checkpoints(params):
-  ret = {}
-  for user in params:
-    if user in keys:
-      for unit in keys[user]:
-        if keys[user][unit].active:
-          if not user in ret: ret[user] = {}
-          ret[user][unit] = keys[user][unit].checkpoint
-  return ret
-
 def sync():
   ts = int(time.time() * 1000.0)
-  return { 'time' : ts, 'sync' : 15000 }
+  return { 'time' : ts, 'sync' : 15000, 'round' : _round }
 
 class RequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
   def do_POST(self):
@@ -638,6 +639,7 @@ if master:
   ts = int(time.time() * 1000.0)
   ret = master.get('sync', trials = 3, timeout = 15)
   if not 'error' in ret:
+    _round = ret['round']
     delay = (60000 - (ret['time'] % 60000)) - (int(time.time() * 1000.0) - ts) / 2
     if delay <= 0:
       logger.error("unable to synchronize time with master server: time difference to small")
@@ -688,6 +690,15 @@ while True:
       if curtime - lastpayout >= 21600: #3600: #43200:
         pay(nud)
         lastpayout = curtime
+      _round += 1
+    else:
+      while True:
+        ret = master.get('sync', trials = 1, timeout = 1)
+        if 'error' in ret or ret['round'] == _round:
+          time.sleep(0.1)
+          continue
+        _round = ret['round']
+        break
 
     # start new validation round
     lock.acquire()
