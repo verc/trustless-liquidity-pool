@@ -18,14 +18,14 @@ from utils import *
 
 _wrappers = { 'bittrex' : Bittrex() } #, 'poloniex' : Poloniex(), 'ccedk' : CCEDK(), 'bitcoincoid' : BitcoinCoId(), 'bter' : BTER(), 'testing' : Peatio() }
 
-logger = None
+_mainlogger = None
 def getlogger():
-  global logger
-  if not logger: # initialize logger
+  global _mainlogger
+  if not _mainlogger: # initialize logger
     if not os.path.isdir('logs'):
       os.makedirs('logs')
-    logger = logging.getLogger()
-    logger.setLevel(logging.DEBUG)
+    _mainlogger = logging.getLogger('Client')
+    _mainlogger.setLevel(logging.DEBUG)
     sh = logging.handlers.SocketHandler('', logging.handlers.DEFAULT_TCP_LOGGING_PORT)
     sh.setLevel(logging.DEBUG)
     fh = logging.FileHandler('logs/%d.log' % time.time())
@@ -36,10 +36,10 @@ def getlogger():
     sh.setFormatter(formatter)
     fh.setFormatter(formatter)
     ch.setFormatter(formatter)
-    logger.addHandler(sh)
-    logger.addHandler(fh)
-    logger.addHandler(ch)
-  return logger
+    _mainlogger.addHandler(sh)
+    _mainlogger.addHandler(fh)
+    _mainlogger.addHandler(ch)
+  return _mainlogger
 
 
 # one request signer thread for each key and unit
