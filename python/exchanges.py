@@ -32,7 +32,7 @@ class Bittrex(Exchange):
   def __init__(self):
     super(Bittrex, self).__init__(0.0025)
     self.placed = {}
-    self.closed = {}
+    self.closed = []
 
   def __repr__(self): return "bittrex"
 
