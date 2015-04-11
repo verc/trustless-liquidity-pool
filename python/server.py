@@ -358,7 +358,7 @@ def collect():
       for user in checkpoint:
         for unit in checkpoint[user]:
           for i in xrange(config._sampling):
-            if keys[user][unit].response[i] == 'm':
+            if not keys[user][unit].active or keys[user][unit].response[i] == 'm':
               keys[user][unit].last_errors[i] = checkpoint[user][unit]['last_errors'][i]
               if checkpoint[user][unit]['response'][i] != 'm':
                 keys[user][unit].response[i] = checkpoint[user][unit]['response'][i]
