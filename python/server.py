@@ -408,7 +408,7 @@ def credit():
             maxlevel = int(ceil(mass / target))
             pricelevels = sorted(list(set( [ order[2] for _,order in orders if order[2] < maxrate ])) + [maxrate, maxrate])
             if sample == 0:
-              logger.debug('pricelevels: %s', " ".join([str(s) for s in pricelevels]))
+              logger.debug('%s pricelevels: %s', side, " ".join([str(s) for s in pricelevels]))
             if len(pricelevels) < maxlevel + 2:
               pricelevels += [maxrate] * (2 + maxlevel - len(pricelevels))
             # calculate level
