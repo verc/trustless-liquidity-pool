@@ -57,6 +57,7 @@ logger.addHandler(sh)
 _liquidity = []
 _active_users = 0
 _round = 0
+_valflag = False
 master = Connection(config._master, logger) if config._master != "" else None
 slaves = [ CheckpointThread(host, logger) for host in config._slaves ]
 
@@ -528,7 +529,8 @@ class RequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         elif self.path == 'liquidity':
           ret = liquidity(params)
         elif self.path == 'checkpoints':
-          ret = checkpoints(params)
+          if _valflag: ret = { 'error' : "validation in progress"}
+          else: ret = checkpoints(params)
       self.send_response(200)
       self.send_header('Content-Type', 'application/json')
       self.wfile.write("\n")
@@ -673,6 +675,7 @@ while True:
     if curtime - lastcheckp >= 60:
       collect()
       lastcheckp = curtime
+    _valflag = False
 
     if not master:
       _round += 1
@@ -692,12 +695,13 @@ while True:
       while True:
         ret = master.get('sync', trials = 1, timeout = 1)
         if 'error' in ret or ret['round'] == _round:
-          time.sleep(0.5)
+          time.sleep(0.1)
           continue
         _round = ret['round']
         break
 
     # start new validation round
+    _valflag = True
     lock.acquire()
     for user in keys:
       for unit in keys[user]:

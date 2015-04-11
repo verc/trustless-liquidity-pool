@@ -210,7 +210,7 @@ class Client(ConnectionThread):
               response['balance'], effective_rate * 100, effective_rate * total / float(60 * 24), response['efficiency'] * 100, response['rejects'], response['missing'], orderstring, user)
             if not efficiencies:
               efficiencies = [ response['efficiency'] for i in xrange(5) ]
-            if curtime - starttime > 90:
+            if curtime - starttime > 150:
               efficiencies = efficiencies[1:] + [response['efficiency']]
               if sorted(efficiencies)[2] < 0.95:
                 for unit in response['units']:
