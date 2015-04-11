@@ -694,6 +694,7 @@ while True:
     else:
       while True:
         ret = master.get('sync', trials = 1, timeout = 1)
+        logger.debug("%s", str(ret))
         if 'error' in ret or ret['round'] == _round:
           time.sleep(0.1)
           continue
