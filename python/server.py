@@ -702,7 +702,8 @@ while True:
         keys[user][unit].validate()
     lock.release()
 
-    time.sleep(max(float(60 / config._sampling) - time.time() + curtime, 0))
+    if not master:
+      time.sleep(max(float(60 / config._sampling) - time.time() + curtime, 0))
   except Exception as e:
     logger.error('exception caught in main loop: %s', sys.exc_info()[1])
     httpd.socket.close()
