@@ -237,7 +237,6 @@ class User(threading.Thread):
           del self.liquidity[side][0]
           self.liquidity[side].append([])
       self.response = self.response[1:] + [res]
-      self.active = self.active or self.liquidity['bid'].count([]) + self.liquidity['ask'].count([]) == 2 * self.sampling
       del self.last_errors[0]
       self.lock.release()
 
@@ -359,7 +358,7 @@ def collect():
       for user in checkpoint:
         for unit in checkpoint[user]:
           for i in xrange(config._sampling):
-            if not keys[user][unit].active or keys[user][unit].response[i] == 'm':
+            if keys[user][unit].response[i] == 'm':
               keys[user][unit].last_errors[i] = checkpoint[user][unit]['last_errors'][i]
               if checkpoint[user][unit]['response'][i] != 'm':
                 keys[user][unit].response[i] = checkpoint[user][unit]['response'][i]
@@ -369,6 +368,7 @@ def collect():
   for user in keys:
     for unit in keys[user]:
       keys[user][unit].bundle()
+      keys[user][unit].active = keys[user][unit].active and keys[user][unit].liquidity['bid'].count([]) + keys[user][unit].liquidity['ask'].count([]) == 2 * keys[user][unit].sampling
 
 def checkpoints(params):
   ret = {}
