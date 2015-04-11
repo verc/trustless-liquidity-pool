@@ -178,66 +178,61 @@ class User(threading.Thread):
     while True:
       self.trigger.acquire()
       self.lock.acquire()
-      if self.active:
-        res = 'm'
-        if self.requests:
-          for rid, request in enumerate(self.requests):
-            try:
-              orders = self.exchange.validate_request(self.key, self.unit, request[0], request[1])
-            except:
-              orders = { 'error' : 'exception caught: %s' % sys.exc_info()[1]}
-            if not 'error' in orders:
-              valid = { 'bid': [], 'ask' : [] }
-              price = self.pricefeed.price(self.unit)
-              last_error = ''
-              for order in orders:
-                deviation = 1.0 - min(order['price'], price) / max(order['price'], price)
-                if deviation <= self.tolerance:
-                  span = 60.0 / config._sampling
-                  et = int(time.time())
-                  st = et - span
-                  if 'closed' in order and order['closed'] < et:
-                    et = order['closed']
-                  if 'opened' in order and order['opened'] > st:
-                    st = order['opened']
-                  order['amount'] *= max(0.0, float(et - st) / span)
-                  valid[order['type']].append([order['id'], order['amount'], request[2][order['type']]])
-                else:
-                  self.last_errors.append('unable to validate request: order of deviates too much from current price')
-              for side in [ 'bid', 'ask' ]:
-                del self.liquidity[side][0]
-                self.liquidity[side].append(valid[side])
-              if last_error != "" and len(valid['bid'] + valid['ask']) == 0:
-                res = 'r'
-                self.last_errors.append(last_error)
-                self.logger.debug("unable to validate request %d/%d for user %s at exchange %s on unit %s: orders of deviate too much from current price",
-                  rid + 1, len(self.requests), self.key, repr(self.exchange), self.unit)
+      res = 'm'
+      if self.requests:
+        for rid, request in enumerate(self.requests):
+          try:
+            orders = self.exchange.validate_request(self.key, self.unit, request[0], request[1])
+          except:
+            orders = { 'error' : 'exception caught: %s' % sys.exc_info()[1]}
+          if not 'error' in orders:
+            valid = { 'bid': [], 'ask' : [] }
+            price = self.pricefeed.price(self.unit)
+            last_error = ''
+            for order in orders:
+              deviation = 1.0 - min(order['price'], price) / max(order['price'], price)
+              if deviation <= self.tolerance:
+                span = 60.0 / config._sampling
+                et = int(time.time())
+                st = et - span
+                if 'closed' in order and order['closed'] < et:
+                  et = order['closed']
+                if 'opened' in order and order['opened'] > st:
+                  st = order['opened']
+                order['amount'] *= max(0.0, float(et - st) / span)
+                valid[order['type']].append([order['id'], order['amount'], request[2][order['type']]])
               else:
-                res = 'a'
-                self.last_errors.append("")
-                break
-            else:
+                self.last_errors.append('unable to validate request: order of deviates too much from current price')
+            for side in [ 'bid', 'ask' ]:
+              del self.liquidity[side][0]
+              self.liquidity[side].append(valid[side])
+            if last_error != "" and len(valid['bid'] + valid['ask']) == 0:
               res = 'r'
-              self.last_errors.append("unable to validate request: " + orders['error'])
-              if rid + 1 == len(self.requests):
-                self.logger.warning("unable to validate request %d/%d for user %s at exchange %s on unit %s: %s",
-                  rid + 1, len(self.requests), self.key, repr(self.exchange), self.unit, orders['error'])
-              for side in [ 'bid', 'ask' ]:
-                del self.liquidity[side][0]
-                self.liquidity[side].append([])
-        else:
-          self.last_errors.append("no request received")
-          for side in [ 'bid', 'ask' ]:
-            del self.liquidity[side][0]
-            self.liquidity[side].append([])
-        self.requests = []
+              self.last_errors.append(last_error)
+              self.logger.debug("unable to validate request %d/%d for user %s at exchange %s on unit %s: orders of deviate too much from current price",
+                rid + 1, len(self.requests), self.key, repr(self.exchange), self.unit)
+            else:
+              res = 'a'
+              self.last_errors.append("")
+              break
+          else:
+            res = 'r'
+            self.last_errors.append("unable to validate request: " + orders['error'])
+            if rid + 1 == len(self.requests):
+              self.logger.warning("unable to validate request %d/%d for user %s at exchange %s on unit %s: %s",
+                rid + 1, len(self.requests), self.key, repr(self.exchange), self.unit, orders['error'])
+            for side in [ 'bid', 'ask' ]:
+              del self.liquidity[side][0]
+              self.liquidity[side].append([])
       else:
         self.last_errors.append("no request received")
         for side in [ 'bid', 'ask' ]:
           del self.liquidity[side][0]
           self.liquidity[side].append([])
+      self.requests = []
       self.response = self.response[1:] + [res]
       del self.last_errors[0]
+      self.logger.debug('%s: %s %s', self.key, res, self.liquidity[side][-1])
       self.lock.release()
 
   def validate(self):
@@ -309,7 +304,7 @@ def poolstats():
 
 critical_message = ""
 def userstats(user):
-  res = { 'balance' : 0.0, 'efficiency' : 1.0, 'rejects': 0, 'missing' : 0, 'message' : critical_message }
+  res = { 'balance' : 0.0, 'efficiency' : 0.0, 'rejects': 0, 'missing' : 0, 'message' : critical_message }
   res['units'] = {}
   for unit in keys[user]:
     checkpoint = keys[user][unit].checkpoint
