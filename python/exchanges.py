@@ -32,7 +32,7 @@ class Bittrex(Exchange):
   def __init__(self):
     super(Bittrex, self).__init__(0.0025)
     self.placed = {}
-    self.remove = []
+    self.closed = {}
 
   def __repr__(self): return "bittrex"
 
@@ -60,12 +60,19 @@ class Bittrex(Exchange):
       return response
     if not response['result']:
       response['result'] = []
+    response['removed'] = []
     for order in response['result']:
       if side == 'all' or (side == 'bid' and 'SELL' in order['OrderType']) or (side == 'ask' and 'BUY' in order['OrderType']):
         ret = self.post('/market/cancel', { 'uuid' : order['OrderUuid'] }, key, secret)
         if not ret['success'] and ret['message'] != "ORDER_NOT_OPEN":
           if not 'error' in response: response = { 'error': "" }
           response['error'] += "," + ret['message']
+        else:
+          response['removed'].append(order['OrderUuid'])
+    if key in self.placed and unit in self.placed[key]:
+      for uuid in response['removed']:
+        if uuid in self.placed[key][unit]:
+          del self.placed[key][unit][self.placed[key][unit].index(uuid)]
     return response
 
   def place_order(self, unit, side, key, secret, amount, price):
@@ -112,7 +119,7 @@ class Bittrex(Exchange):
     requests = []
     signatures = []
     for uuid in uuids:
-      data = 'https://bittrex.com/api/v1.1/account/getorder?apikey=%s&nonce=%d&' % (key, self.nonce()) + urllib.urlencode({'uuid' : uuid})
+      data = 'https://bittrex.com/api/v1.1/account/getorder?apikey=%s&nonce=%d&uuid=%s' % (key, self.nonce(), uuid)
       requests.append(data)
       signatures.append(hmac.new(secret, data, hashlib.sha512).hexdigest())
     return { 'requests' : json.dumps(requests), 'signs' : json.dumps(signatures) }, None
@@ -126,24 +133,28 @@ class Bittrex(Exchange):
       return { 'error' : 'missmatch between requests and signatures (%d vs %d)' % (len(data['requests']), len(signs)) }
     connection = httplib.HTTPSConnection('bittrex.com', timeout = 5)
     for data, sign in zip(requests, signs):
-      headers = { 'apisign' : sign }
-      connection.request('GET', data, headers = headers)
-      response = json.loads(connection.getresponse().read())
-      if response['success']:
-        try: opened = int(datetime.datetime.strptime(response['result']['Opened'], '%Y-%m-%dT%H:%M:%S.%f').strftime("%s"))
-        except: opened = 0
-        try: closed = int(datetime.datetime.strptime(response['result']['Closed'], '%Y-%m-%dT%H:%M:%S.%f').strftime("%s"))
-        except: closed = sys.maxint
-        orders.append({
-          'id' : response['result']['OrderUuid'],
-          'price' : response['result']['Limit'],
-          'type' : 'ask' if 'SELL' in response['result']['Type'] else 'bid',
-          'amount' : response['result']['QuantityRemaining'] if not closed == sys.maxint else response['result']['Quantity'],
-          'opened' : opened,
-          'closed' : closed,
-          })
-      else:
-        last_error = response['message']
+      uuid = data.split('=')[-1]
+      if not uuid in self.closed:
+        headers = { 'apisign' : sign }
+        connection.request('GET', data, headers = headers)
+        response = json.loads(connection.getresponse().read())
+        if response['success']:
+          try: opened = int(datetime.datetime.strptime(response['result']['Opened'], '%Y-%m-%dT%H:%M:%S.%f').strftime("%s"))
+          except: opened = 0
+          try: closed = int(datetime.datetime.strptime(response['result']['Closed'], '%Y-%m-%dT%H:%M:%S.%f').strftime("%s"))
+          except: closed = sys.maxint
+          if closed < time.time() - 60:
+            self.closed.append(response['result']['OrderUuid'])
+          orders.append({
+            'id' : response['result']['OrderUuid'],
+            'price' : response['result']['Limit'],
+            'type' : 'ask' if 'SELL' in response['result']['Type'] else 'bid',
+            'amount' : response['result']['QuantityRemaining'] if not closed == sys.maxint else response['result']['Quantity'],
+            'opened' : opened,
+            'closed' : closed,
+            })
+        else:
+          last_error = response['message']
     if not orders and last_error != "":
       return { 'error' : last_error }
     return orders

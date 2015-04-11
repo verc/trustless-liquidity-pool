@@ -232,7 +232,6 @@ class User(threading.Thread):
       self.requests = []
       self.response = self.response[1:] + [res]
       del self.last_errors[0]
-      self.logger.debug('%s: %s %s', self.key, res, self.liquidity[side][-1])
       self.lock.release()
 
   def validate(self):
@@ -628,7 +627,7 @@ if not nud.rpc:
   config._autopayout = False
 httpd = ThreadingServer(("", config._port), RequestHandler)
 sa = httpd.socket.getsockname()
-logger.debug("Serving on %s port %d", sa[0], sa[1])
+logger.debug("serving on %s port %d", sa[0], sa[1])
 start_new_thread(httpd.serve_forever, ())
 
 if master:

@@ -324,8 +324,12 @@ if __name__ == "__main__":
     if not client: sys.exit(1)
     logger.debug('starting liquidity operation with sampling %d' % client.sampling)
     client.start()
+    stop = False
     while True:
-      try: time.sleep(60)
-      except KeyboardInterrupt: break
-    client.stop()
-    client.join()
+      try:
+        if stop:
+          client.stop()
+          client.join()
+          break
+        time.sleep(60)
+      except KeyboardInterrupt: stop = True
