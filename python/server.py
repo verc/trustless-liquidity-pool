@@ -687,6 +687,12 @@ while True:
         pay(nud)
         lastpayout = curtime
     else:
+      lock.acquire()
+      for user in keys:
+        for unit in keys[user]:
+          keys[user][unit].bundle()
+          keys[user][unit].active = keys[user][unit].liquidity['bid'].count([]) + keys[user][unit].liquidity['ask'].count([]) < 2 * keys[user][unit].sampling
+      lock.release()
       while True:
         ret = master.get('sync', trials = 1, timeout = 1)
         if 'error' in ret or ret['round'] == _round:
