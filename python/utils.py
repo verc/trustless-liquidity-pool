@@ -101,8 +101,8 @@ class CheckpointThread(ConnectionThread):
 
   def run(self):
     while self.active:
-      self.lock.acquire()
       self.trigger.acquire()
+      self.lock.acquire()
       self.checkpoint = self.conn.post('checkpoints', { u : 1 for u in self.users }, trials = 1, timeout = 3)
       if 'error' in self.checkpoint:
         self.logger.error('unable to retrieve checkpoint from %s: %s', self.conn.server, self.checkpoint['message'])
