@@ -299,7 +299,7 @@ def liquidity(params):
   return ret
 
 def poolstats():
-  return { 'liquidity' : ([ (0,0) ] + _liquidity)[-1], 'sampling' : config._sampling, 'users' : _active_users, 'credits' : _round / config._sampling, 'validations' : _round - 1 }
+  return { 'liquidity' : ([ (0,0) ] + _liquidity)[-1], 'sampling' : config._sampling, 'users' : _active_users, 'credits' : _round / config._sampling, 'validations' : _round }
 
 critical_message = ""
 def userstats(user):
