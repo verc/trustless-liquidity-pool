@@ -105,9 +105,10 @@ class PyBot(ConnectionThread):
       self.logger.info('successfully deleted %s orders for %s on %s', side, self.unit, repr(self.exchange))
       if reset:
         if side == 'all':
-          self.limit = self.total.copy()
+          self.limit['bid'] = max(self.total['bid'], 0.5)
+          self.limit['ask'] = max(self.total['ask'], 0.5)
         else:
-          self.limit[side] = self.total[side]
+          self.limit[side] = max(self.total[side], 0.5)
     return response
 
   def shutdown(self):
