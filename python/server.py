@@ -673,7 +673,7 @@ while True:
 
     # create checkpoints
     if curtime - lastcheckp >= 60:
-      collect(max(float(60 / config._sampling) - time.time() + curtime))
+      collect(max(float(60 / config._sampling) - time.time() + curtime, 0.01))
       lastcheckp = curtime
     _valflag = False
 
