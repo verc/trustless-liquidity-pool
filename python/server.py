@@ -56,7 +56,7 @@ logger.addHandler(fh)
 logger.addHandler(sh)
 _liquidity = []
 _active_users = 0
-_round = 0
+_round = 1
 master = Connection(config._master, logger) if config._master != "" else None
 slaves = [ CheckpointThread(host, logger) for host in config._slaves ]
 
@@ -305,7 +305,7 @@ def liquidity(params):
   return ret
 
 def poolstats():
-  return { 'liquidity' : ([ (0,0) ] + _liquidity)[-1], 'sampling' : config._sampling, 'users' : _active_users, 'round' : _round / config._sampling }
+  return { 'liquidity' : ([ (0,0) ] + _liquidity)[-1], 'sampling' : config._sampling, 'users' : _active_users, 'credits' : _round / config._sampling, 'validations' : _round }
 
 critical_message = ""
 def userstats(user):
