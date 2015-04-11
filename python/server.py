@@ -345,9 +345,9 @@ def userstats(user):
     res['efficiency'] = 1.0 - (res['rejects'] + res['missing']) / float(config._sampling * len(res['units']))
   return res
 
-def collect():
+def collect(timeout):
   for slave in slaves:
-    slave.collect()
+    slave.collect(timeout)
   for slave in slaves:
     checkpoint = slave.finish()
     if not 'error' in checkpoint:
@@ -673,7 +673,7 @@ while True:
 
     # create checkpoints
     if curtime - lastcheckp >= 60:
-      collect()
+      collect(max(float(60 / config._sampling) - time.time() + curtime))
       lastcheckp = curtime
     _valflag = False
 

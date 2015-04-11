@@ -83,7 +83,8 @@ class CheckpointThread(ConnectionThread):
     self.checkpoint = { 'error' : 'no checkpoint received' }
     self.start()
 
-  def collect(self):
+  def collect(self, timeout):
+    self.timeout = timeout
     try: self.trigger.release()
     except thread.error: pass
 
@@ -103,9 +104,11 @@ class CheckpointThread(ConnectionThread):
     while self.active:
       self.trigger.acquire()
       self.lock.acquire()
-      for i in xrange(5):
+      starttime = time.time()
+      while time.time() < starttime + self.timeout > 0:
         self.checkpoint = self.conn.post('checkpoints', { u : 1 for u in self.users }, trials = 1, timeout = 1)
         if 'error' in self.checkpoint:
+          time.sleep(0.1)
           self.logger.error('unable to retrieve checkpoint from %s: %s', self.conn.server, self.checkpoint['error'])
         else:
           break
