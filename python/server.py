@@ -56,7 +56,7 @@ logger.addHandler(fh)
 logger.addHandler(sh)
 _liquidity = []
 _active_users = 0
-_round = 1
+_round = 0
 master = Connection(config._master, logger) if config._master != "" else None
 slaves = [ CheckpointThread(host, logger) for host in config._slaves ]
 
@@ -299,7 +299,7 @@ def liquidity(params):
   return ret
 
 def poolstats():
-  return { 'liquidity' : ([ (0,0) ] + _liquidity)[-1], 'sampling' : config._sampling, 'users' : _active_users, 'credits' : _round / config._sampling, 'validations' : _round }
+  return { 'liquidity' : ([ (0,0) ] + _liquidity)[-1], 'sampling' : config._sampling, 'users' : _active_users, 'credits' : _round / config._sampling, 'validations' : _round - 1 }
 
 critical_message = ""
 def userstats(user):
@@ -631,6 +631,7 @@ logger.debug("serving on %s port %d", sa[0], sa[1])
 start_new_thread(httpd.serve_forever, ())
 
 if master:
+  _round = 1
   ts = int(time.time() * 1000.0)
   ret = master.get('sync', trials = 3, timeout = 15)
   if not 'error' in ret:
@@ -679,7 +680,6 @@ while True:
         lastsubmit = curtime
       # credit requests
       if curtime - lastcredit >= 60:
-        collect()
         credit()
         lastcredit = curtime
       # make payout
