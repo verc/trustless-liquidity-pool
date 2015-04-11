@@ -368,7 +368,7 @@ def collect():
   for user in keys:
     for unit in keys[user]:
       keys[user][unit].bundle()
-      keys[user][unit].active = keys[user][unit].active and keys[user][unit].liquidity['bid'].count([]) + keys[user][unit].liquidity['ask'].count([]) == 2 * keys[user][unit].sampling
+      keys[user][unit].active = keys[user][unit].liquidity['bid'].count([]) + keys[user][unit].liquidity['ask'].count([]) < 2 * keys[user][unit].sampling
 
 def checkpoints(params):
   ret = {}
