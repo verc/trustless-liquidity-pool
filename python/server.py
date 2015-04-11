@@ -305,11 +305,11 @@ def liquidity(params):
   return ret
 
 def poolstats():
-  return { 'liquidity' : ([ (0,0) ] + _liquidity)[-1], 'sampling' : config._sampling, 'users' : _active_users }
+  return { 'liquidity' : ([ (0,0) ] + _liquidity)[-1], 'sampling' : config._sampling, 'users' : _active_users, 'round' : _round / config._sampling }
 
 critical_message = ""
 def userstats(user):
-  res = { 'balance' : 0.0, 'efficiency' : 1.0, 'rejects': 0, 'missing' : 0, 'message' : critical_message }
+  res = { 'balance' : 0.0, 'efficiency' : 1.0, 'rejects': 0, 'missing' : 0, 'message' : critical_message , 'active' : keys[user][unit].active }
   res['units'] = {}
   for unit in keys[user]:
     checkpoint = keys[user][unit].checkpoint
@@ -358,7 +358,7 @@ def collect():
       for user in checkpoint:
         for unit in checkpoint[user]:
           for i in xrange(config._sampling):
-            if not keys[user][unit].active or keys[user][unit].response[i] == 'm':
+            if keys[user][unit].response[i] == 'm':
               keys[user][unit].last_errors[i] = checkpoint[user][unit]['last_errors'][i]
               if checkpoint[user][unit]['response'][i] != 'm':
                 keys[user][unit].response[i] = checkpoint[user][unit]['response'][i]
