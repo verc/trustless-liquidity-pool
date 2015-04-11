@@ -309,7 +309,7 @@ def poolstats():
 
 critical_message = ""
 def userstats(user):
-  res = { 'balance' : 0.0, 'efficiency' : 1.0, 'rejects': 0, 'missing' : 0, 'message' : critical_message , 'active' : keys[user][unit].active }
+  res = { 'balance' : 0.0, 'efficiency' : 1.0, 'rejects': 0, 'missing' : 0, 'message' : critical_message }
   res['units'] = {}
   for unit in keys[user]:
     checkpoint = keys[user][unit].checkpoint
@@ -344,6 +344,7 @@ def userstats(user):
                              'rate' : keys[user][unit].rate,
                              'rejects' : rejects,
                              'missing' : missing,
+                             'active' : keys[user][unit].active,
                              'last_error' :  last_error }
   if len(res['units']) > 0:
     res['efficiency'] = 1.0 - (res['rejects'] + res['missing']) / float(config._sampling * len(res['units']))
