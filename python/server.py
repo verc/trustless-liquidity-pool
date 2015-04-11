@@ -678,7 +678,6 @@ while True:
 
     if not master:
       _round += 1
-      logger.debug("round %s", _round)
       # send liquidity
       if curtime - lastsubmit >= 60:
         submit(nud)
@@ -695,7 +694,6 @@ while True:
     else:
       while True:
         ret = master.get('sync', trials = 1, timeout = 1)
-        logger.debug("%s", str(ret))
         if 'error' in ret or ret['round'] == _round:
           time.sleep(0.5)
           continue
