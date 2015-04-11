@@ -363,6 +363,7 @@ def collect(timeout):
                     keys[user][unit].liquidity[side][i] = checkpoint[user][unit]['liquidity'][side][i]
   for user in keys:
     for unit in keys[user]:
+      keys[user][unit].bundle()
       keys[user][unit].active = keys[user][unit].liquidity['bid'].count([]) + keys[user][unit].liquidity['ask'].count([]) < 2 * keys[user][unit].sampling
 
 def checkpoints(params):
@@ -666,14 +667,13 @@ while True:
       active = False
       for unit in keys[user]:
         keys[user][unit].finish()
-        keys[user][unit].bundle()
         active = active or keys[user][unit].active
       if active: _active_users += 1
     lock.release()
 
     # create checkpoints
     if curtime - lastcheckp >= 60:
-      collect(max(float(60 / config._sampling) - time.time() + curtime, 0.01))
+      collect(max(float(60 / config._sampling) - time.time() + curtime, 0.01) / 2.0)
       lastcheckp = curtime
     _valflag = False
 
