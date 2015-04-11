@@ -362,7 +362,6 @@ def collect():
                     keys[user][unit].liquidity[side][i] = checkpoint[user][unit]['liquidity'][side][i]
   for user in keys:
     for unit in keys[user]:
-      keys[user][unit].bundle()
       keys[user][unit].active = keys[user][unit].liquidity['bid'].count([]) + keys[user][unit].liquidity['ask'].count([]) < 2 * keys[user][unit].sampling
 
 def checkpoints(params):
@@ -649,6 +648,7 @@ elif slaves:
     logger.info("waiting %.2f seconds to synchronize with slave servers", delay / 1000.0)
     time.sleep(delay / 1000.0)
 
+lastcheckp = time.time()
 lastcredit = time.time()
 lastpayout = time.time()
 lastsubmit = time.time()
@@ -664,13 +664,15 @@ while True:
       active = False
       for unit in keys[user]:
         keys[user][unit].finish()
+        keys[user][unit].bundle()
         active = active or keys[user][unit].active
       if active: _active_users += 1
     lock.release()
 
     # create checkpoints
-    if curtime - lastcredit >= 60:
+    if curtime - lastcheckp >= 60:
       collect()
+      lastcheckp = curtime
 
     if not master:
       _round += 1
@@ -687,12 +689,6 @@ while True:
         pay(nud)
         lastpayout = curtime
     else:
-      lock.acquire()
-      for user in keys:
-        for unit in keys[user]:
-          keys[user][unit].bundle()
-          keys[user][unit].active = keys[user][unit].liquidity['bid'].count([]) + keys[user][unit].liquidity['ask'].count([]) < 2 * keys[user][unit].sampling
-      lock.release()
       while True:
         ret = master.get('sync', trials = 1, timeout = 1)
         if 'error' in ret or ret['round'] == _round:
