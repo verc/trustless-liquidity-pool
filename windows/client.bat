@@ -11,4 +11,4 @@ if not exist pool.conf (
   )
 )
 @echo on
-client.py %users%
+..\python\client.py %users%
