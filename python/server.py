@@ -672,7 +672,7 @@ while True:
     lock.release()
 
     # create checkpoints
-    if curtime - lastcheckp >= 60:
+    if master or curtime - lastcheckp >= 60:
       collect(max(float(60 / config._sampling) - time.time() + curtime, 0.01) / 2.0)
       lastcheckp = curtime
     _valflag = False
