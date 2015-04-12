@@ -1,3 +1,6 @@
+In a nutshell: You run a program that places NBT and BTC orders on an exchange at 1 USD with a very small spread. The program will send proofs of those orders to a server which in turn pays you interest in the form of NuBits.
+
+
 Participating in the NuPool has several risks:
 
 - **Hedging:** Traders might be able to successfully hedge against you. This means that people speculate an the BTC price movement and buy NBT from you at a low price and sell them back to you when the price is high (or vice versa).
