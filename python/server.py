@@ -631,6 +631,7 @@ logger.debug("serving on %s port %d", sa[0], sa[1])
 start_new_thread(httpd.serve_forever, ())
 
 if master:
+  _round = -1
   ts = int(time.time() * 1000.0)
   ret = master.get('sync', trials = 3, timeout = 15)
   if not 'error' in ret:
@@ -643,7 +644,6 @@ if master:
   else:
     logger.error("unable to synchronize time with master server: %s", ret['message'])
 elif slaves:
-  _round = 1
   delay = max(float(60000 - (int(time.time()*1000) % 60000)), 0.0)
   if delay > 0.0:
     logger.info("waiting %.2f seconds to synchronize with slave servers", delay / 1000.0)
