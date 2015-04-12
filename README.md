@@ -1,16 +1,17 @@
-# nu-pool
-Basic implementation of a proof-of-liquidity pool concept to in order to provide distributed NuBit liquidity.
+Participating in the NuPool has several risks:
 
-**Participants**
+- **Hedging:** Traders might be able to successfully hedge against you. This means that people speculate an the BTC price movement and buy NBT from you at a low price and sell them back to you when the price is high (or vice versa).
 
-1. Register at the pool operator (bitmessage/website/whatever) by providing your API key and an NBT payout address
-2. Run the NuBot (with multiple-custodians=true to sync the walls)
-3. Create requests to show your orders on the exchange, sign them with the API secret, and send them to the pool operator
+- **Exchange Default:** This means that the exchange itself might cease the operation and won't return the customers funds. A situation like this has happened many times in the past (most prominently on BTER a while ago). 
 
-**Pool Operator**
+- **Connection Issues:** If you are running an automated trading bot then it requires a stable internet connection to perform actions. If your internet is suddenly broken, or your computer restarts without closing the client software correctly, then there might be open orders left on the exchange which won't get closed until the connection is reestablished.
 
-1. Get a custodial grant
-2. Run a server that receives requests from users
-3. Validate incoming orders by calling the exchange API
-4. Send a payout to the NBT address given in the registration of the corresponding API key
-5. Submit sum of orders as liquidity
+**Important:** The pool operators are never in control of your funds and are not responsible for any financial loss that might occur because of any reason whatsoever. Taking these risks is what you are getting compensated for. Please make sure that you understand what kind of service you are providing during participation and don't use any money you can not afford to lose.
+
+**Trading Bot**:
+
+PLEASE BE AWARE THAT AUTOMATED TRADING WITH THIS SOFTWARE MAY BE RISKY, ADDICTIVE, UNETHICAL OR ILLEGAL. ITS MISUSE MAY ALSO CAUSE FINANCIAL LOSS. NONE OF THE AUTHORS, CONTRIBUTORS, ADMINISTRATORS, OR ANYONE ELSE CONNECTED WITH NUBITS, IN ANY WAY WHATSOEVER, CAN BE RESPONSIBLE FOR THE USE YOU MAKE OF THIS SOFTWARE
+
+By using any software in this package you declare to have accepted the afore-mentioned risks.
+
+And to repeat: Neither the developer of this software, nor the liquidity operation on NuPool.net is in any way related to the official Nu core-team.
