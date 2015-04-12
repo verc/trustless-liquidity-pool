@@ -1,3 +1,5 @@
+## Trustless Liquidity Pool ##
+
 In a nutshell: You run a program that places NBT and BTC orders on an exchange at 1 USD with a very small spread. The program will send proofs of those orders to a server which in turn pays you interest in the form of NuBits.
 
 
