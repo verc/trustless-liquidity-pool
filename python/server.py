@@ -169,10 +169,7 @@ class User(threading.Thread):
 
   def set(self, request, bid, ask, sign):
     if len(self.requests) < 10: # don't accept more requests to avoid simple spamming
-      self.lock.acquire()
-      if len(self.requests) < 10: # double check to allow lock acquire above
-        self.requests.append(({ p : v[0] for p,v in request.items() }, sign, { 'bid': bid, 'ask': ask }))
-      self.lock.release()
+      self.requests.append(({ p : v[0] for p,v in request.items() }, sign, { 'bid': bid, 'ask': ask }))
     self.active = True
 
   def run(self):
@@ -181,7 +178,9 @@ class User(threading.Thread):
       self.lock.acquire()
       res = 'm'
       if self.requests:
-        for rid, request in enumerate(self.requests):
+        requests = self.requests[:]
+        self.requests = []
+        for rid, request in enumerate(requests):
           try:
             orders = self.exchange.validate_request(self.key, self.unit, request[0], request[1])
           except:
@@ -230,7 +229,6 @@ class User(threading.Thread):
         for side in [ 'bid', 'ask' ]:
           del self.liquidity[side][0]
           self.liquidity[side].append([])
-      self.requests = []
       self.response = self.response[1:] + [res]
       del self.last_errors[0]
       self.lock.release()
@@ -672,7 +670,7 @@ while True:
     lock.release()
 
     # create checkpoints
-    if master or curtime - lastcheckp >= 60:
+    if not slaves or curtime - lastcheckp >= 60:
       collect(max(float(60 / config._sampling) - time.time() + curtime, 0.01) / 2.0)
       lastcheckp = curtime
     _valflag = False
