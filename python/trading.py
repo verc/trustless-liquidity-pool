@@ -106,7 +106,7 @@ class PyBot(ConnectionThread):
     self.unit = unit
     self.orders = []
     self.total = target.copy()
-    self.limit = target
+    self.limit = target.copy()
     self.lastlimit = { 'bid' : 0, 'ask' : 0 }
     self.target = target.copy()
     if not hasattr(PyBot, 'lock'):
