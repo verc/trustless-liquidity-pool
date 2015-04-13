@@ -105,7 +105,7 @@ class PyBot(ConnectionThread):
     self.exchange = exchange
     self.unit = unit
     self.orders = []
-    self.total = { 'bid' : 0.5, 'ask' : 0.5 }
+    self.total = target.copy()
     self.limit = target
     self.lastlimit = { 'bid' : 0, 'ask' : 0 }
     self.target = target.copy()
