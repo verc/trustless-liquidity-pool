@@ -105,7 +105,7 @@ class PyBot(ConnectionThread):
     self.exchange = exchange
     self.unit = unit
     self.orders = []
-    self.total = { 'bid' : 0.0, 'ask' : 0.0 }
+    self.total = { 'bid' : 0.5, 'ask' : 0.5 }
     self.limit = target
     self.lastlimit = { 'bid' : 0, 'ask' : 0 }
     self.target = target.copy()
@@ -181,7 +181,7 @@ class PyBot(ConnectionThread):
           self.logger.info('successfully placed %s %s order of %.4f nbt at %.8f on %s',
             side, self.unit, amount, price, repr(self.exchange))
           self.orders.append(response['id'])
-          self.limit[side] = max(self.limit[side] - amount, 0.5)
+          self.limit[side] -= amount
     return response
 
   def place_orders(self):
