@@ -185,13 +185,10 @@ class PyBot(ConnectionThread):
     return response
 
   def place_orders(self):
-    if self.ordermatch:
-      response = { 'bid' : None, 'ask' : None }
-    else:
-      try:
-        response = self.exchange.get_price(self.unit)
-      except:
-        response = { 'error': 'exception caught: %s' % sys.exc_info()[1] }
+    try:
+      response = self.exchange.get_price(self.unit)
+    except:
+      response = { 'error': 'exception caught: %s' % sys.exc_info()[1] }
     if 'error' in response:
       self.logger.error('unable to retrieve order book for %s on %s: %s', self.unit, repr(self.exchange), response['error'])
     else:
@@ -207,6 +204,9 @@ class PyBot(ConnectionThread):
           self.place('bid', devprice)
         elif self.lastlimit['bid'] != self.limit['bid']:
           self.logger.error('unable to place bid %s order at %.8f on %s: matching order at %.8f detected', self.unit, bidprice, repr(self.exchange), response['ask'])
+        elif self.ordermatch:
+          self.logger.warning('matching ask %s order at %.8f on %s', self.unit, response['ask'], repr(self.exchange))
+          self.place('bid', bidprice)
       if response['bid'] == None or response['bid'] < askprice:
         self.place('ask', askprice)
       else:
@@ -216,6 +216,9 @@ class PyBot(ConnectionThread):
           self.place('ask', devprice)
         elif self.lastlimit['ask'] != self.limit['ask']:
           self.logger.error('unable to place ask %s order at %.8f on %s: matching order at %.8f detected', self.unit, askprice, repr(self.exchange), response['bid'])
+        elif self.ordermatch:
+          self.logger.warning('matching bid %s order at %.8f on %s', self.unit, response['bid'], repr(self.exchange))
+          self.place('ask', askprice)
       self.lastlimit = self.limit.copy()
     self.requester.submit()
 
