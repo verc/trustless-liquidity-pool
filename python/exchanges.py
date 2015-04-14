@@ -85,6 +85,7 @@ class Bittrex(Exchange):
     if not response['result']:
       response['result'] = []
     response['removed'] = []
+    response['amount'] = 0.0
     for order in response['result']:
       if side == 'all' or (side == 'bid' and 'SELL' in order['OrderType']) or (side == 'ask' and 'BUY' in order['OrderType']):
         ret = self.post('/market/cancel', { 'uuid' : order['OrderUuid'] }, key, secret)
@@ -93,6 +94,7 @@ class Bittrex(Exchange):
           response['error'] += "," + ret['message']
         else:
           response['removed'].append(order['OrderUuid'])
+          response['amount'] += order['QuantityRemaining']
     if key in self.placed and unit in self.placed[key]:
       for uuid in response['removed']:
         if uuid in self.placed[key][unit]:
@@ -100,6 +102,9 @@ class Bittrex(Exchange):
     return response
 
   def place_order(self, unit, side, key, secret, amount, price):
+    response = self.cancel_orders(unit, side, key, secret)
+    if 'error' in response: return response
+    amount += response['amount']
     if side == 'bid': amount *= (1.0 - self.fee)
     params = { 'market' : "%s-NBT"%unit.upper(), "rate" : price, "quantity" : amount }
     response = self.post('/market/buylimit' if side == 'bid' else '/market/selllimit', params, key, secret)
@@ -155,7 +160,9 @@ class Bittrex(Exchange):
     signs = json.loads(data['signs'])
     if len(requests) != len(signs):
       return { 'error' : 'missmatch between requests and signatures (%d vs %d)' % (len(data['requests']), len(signs)) }
-    connection = httplib.HTTPSConnection('bittrex.com', timeout = 5)
+    if len(requests) > 2:
+      return { 'error' : 'too many requests received: %d' % len(requests) }
+    connection = httplib.HTTPSConnection('bittrex.com', timeout = 3)
     for data, sign in zip(requests, signs):
       uuid = data.split('=')[-1]
       if not uuid in self.closed:
@@ -168,7 +175,7 @@ class Bittrex(Exchange):
           try: closed = int(datetime.datetime.strptime(response['result']['Closed'], '%Y-%m-%dT%H:%M:%S.%f').strftime("%s"))
           except: closed = sys.maxint
           if closed < time.time() - 60:
-            self.closed.append(response['result']['OrderUuid'])
+            self.closed.append(uuid)
           orders.append({
             'id' : response['result']['OrderUuid'],
             'price' : response['result']['Limit'],
