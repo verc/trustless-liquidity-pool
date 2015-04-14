@@ -1,5 +1,8 @@
 import sys
 
+if len(sys.argv[1]) == 1:
+  print "usage:", sys.argv[0],'log credit'
+
 try:
   users = { line.strip().split()[4] : line.strip().split()[7] for line in open(sys.argv[1]).readlines() if line.strip().split()[2] == "new" }
   credits = {}
