@@ -94,7 +94,7 @@ class Bittrex(Exchange):
           response['error'] += "," + ret['message']
         else:
           response['removed'].append(order['OrderUuid'])
-          response['amount'] += order['QuantityRemaining']
+          response['amount'] += order['Quantity']
     if not 'error' in response and key in self.placed and unit in self.placed[key]:
       self.placed[key][unit][side] = False
     return response
@@ -105,7 +105,8 @@ class Bittrex(Exchange):
     time.sleep(3)
     if ret['amount'] * (1.0 - self.fee) > 0.001:
       amount += ret['amount'] * (1.0 - self.fee) - 0.001
-    if side == 'bid': amount *= (1.0 - self.fee)
+    if side == 'bid':
+      amount *= (1.0 - self.fee)
     params = { 'market' : "%s-NBT"%unit.upper(), "rate" : price, "quantity" : amount }
     response = self.post('/market/buylimit' if side == 'bid' else '/market/selllimit', params, key, secret)
     if response['success']:
