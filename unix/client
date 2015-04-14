@@ -3,7 +3,7 @@
 client=../python/client.py
 
 config=`mktemp`
-options=`getopt -o x:a:k:s:i:ou:e: --long server:,address:,key:,secret:,interest:,ordermatch,unit:,exchange: -- "$@"`
+options=`getopt -o x:a:k:s:i:ou:e:b: --long server:,address:,key:,secret:,interest:,ordermatch,unit:,exchange:bot: -- "$@"`
 eval set -- "$options"
 
 if [ -e pool.conf ];then
@@ -14,6 +14,7 @@ while [ $# -gt 0 ]; do
   case $1 in
   -x|--server) echo "server=$2";shift;;
   -a|--address) echo "address=$2";shift;;
+  -b|--bot) echo "bot=$2";shift;;
   -k|--key) echo "apikey=$2";shift;;
   -s|--secret) echo "apisecret=$2";shift;;
   -i|--interest) echo "interest=$2";shift;;
