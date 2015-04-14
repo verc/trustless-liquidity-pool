@@ -3,7 +3,7 @@ import sys
 add = {}
 for line in open(sys.argv[1]).readlines():
   line = line.strip().split()
-  if line[1] in add:
+  if not line[1] in add:
     add[line[1]] = []
   add[line[1]].append(line[0])
 
