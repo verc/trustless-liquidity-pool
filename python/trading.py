@@ -303,7 +303,7 @@ class PyBot(ConnectionThread):
                 self.place_orders()
                 efftime = curtime
                 continue
-              elif curtime - efftime > 120:
+              elif curtime - efftime > 180:
                 efftime = curtime
                 response = self.conn.get(self.key, trials = 1)
                 if 'error' in response:
