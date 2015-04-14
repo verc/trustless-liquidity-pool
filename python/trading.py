@@ -261,7 +261,7 @@ class PyBot(ConnectionThread):
     delay = 0.0
     while self.active:
       try:
-        sleep = 15 - time.time() + curtime
+        sleep = 30 - time.time() + curtime
         if sleep < 0:
           delay += abs(sleep)
           if delay > 1.0:
