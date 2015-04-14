@@ -23,6 +23,7 @@ OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
 import sys
+import json
 
 if len(sys.argv[1]) == 1:
   print "usage:", sys.argv[0],'timestemp'
@@ -41,5 +42,5 @@ except:
 
 out = {}
 for addr in users:
-  out[addr] = float("%.8f" % max(sum([credits[k] for k in users[addr] if k in credits]), 0.015))
-print out
+  out[addr] = float("%.8f" % max(sum([credits[k] for k in users[addr] if k in credits]), 0.01))
+print json.dumps(out).replace(' ', '')
