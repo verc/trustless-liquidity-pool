@@ -16,5 +16,5 @@ for line in open(sys.argv[2]).readlines():
 
 out = {}
 for addr in add:
-  out[addr] = "%.8f" % max(sum([credits[k] for k in add[addr] if k in credits]), 0.015)
+  out[addr] = float("%.8f" % max(sum([credits[k] for k in add[addr] if k in credits]), 0.015))
 print out
