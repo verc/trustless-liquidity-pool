@@ -25,8 +25,8 @@ OR OTHER DEALINGS IN THE SOFTWARE.
 import sys
 import json
 
-if len(sys.argv[1]) == 1:
-  print "usage:", sys.argv[0],'timestemp'
+if len(sys.argv) == 1:
+  print "usage:", sys.argv[0], 'timestemp'
 
 try:
   users = { line.strip().split()[4] : line.strip().split()[7] for line in open('logs/%s.log'%sys.argv[1]).readlines() if line.strip().split()[2] == "new" }
