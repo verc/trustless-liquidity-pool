@@ -104,6 +104,7 @@ class Bittrex(Exchange):
   def place_order(self, unit, side, key, secret, amount, price):
     response = self.cancel_orders(unit, side, key, secret)
     if 'error' in response: return response
+    time.sleep(0.2)
     amount += response['amount']
     if side == 'bid': amount *= (1.0 - self.fee)
     params = { 'market' : "%s-NBT"%unit.upper(), "rate" : price, "quantity" : amount }
