@@ -94,7 +94,7 @@ class Bittrex(Exchange):
           response['error'] += "," + ret['message']
         else:
           response['removed'].append(order['OrderUuid'])
-          response['amount'] += order['QuantityRemaining']
+          response['amount'] += order['Quantity']
     if key in self.placed and unit in self.placed[key]:
       for uuid in response['removed']:
         if uuid in self.placed[key][unit]:
