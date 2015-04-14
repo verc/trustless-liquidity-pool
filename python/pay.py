@@ -44,3 +44,5 @@ out = {}
 for addr in users:
   out[addr] = float("%.8f" % max(sum([credits[k] for k in users[addr] if k in credits]), 0.01))
 print json.dumps(out).replace(' ', '')
+
+print users, credits
