@@ -102,11 +102,11 @@ class Bittrex(Exchange):
     return response
 
   def place_order(self, unit, side, key, secret, amount, price):
-    response = self.cancel_orders(unit, side, key, secret)
-    if 'error' in response: return response
+    ret = self.cancel_orders(unit, side, key, secret)
+    if 'error' in ret: return ret
     time.sleep(0.35)
-    if response['amount'] * (1.0 - self.fee) > 0.001:
-      amount += response['amount'] * (1.0 - self.fee) - 0.001
+    if ret['amount'] * (1.0 - self.fee) > 0.001:
+      amount += ret['amount'] * (1.0 - self.fee) - 0.001
     if side == 'bid': amount *= (1.0 - self.fee)
     params = { 'market' : "%s-NBT"%unit.upper(), "rate" : price, "quantity" : amount }
     response = self.post('/market/buylimit' if side == 'bid' else '/market/selllimit', params, key, secret)
@@ -119,6 +119,7 @@ class Bittrex(Exchange):
       self.placed[key][unit].append(response['id'])
     else:
       response['error'] = response['message']
+      response['residual'] = ret['amount']
     return response
 
   def get_balance(self, unit, key, secret):

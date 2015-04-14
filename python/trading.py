@@ -174,6 +174,9 @@ class PyBot(ConnectionThread):
         except KeyboardInterrupt: raise
         except: response = { 'error' : 'exception caught: %s' % sys.exc_info()[1] }
         if 'error' in response:
+          if 'residual' in response and response['residual'] > 0:
+            self.limit[side] += response['residual']
+            return self.place(side, price)
           self.logger.error('unable to place %s %s order of %.4f nbt at %.8f on %s: %s',
             side, self.unit, amount, price, repr(self.exchange), response['error'])
           self.exchange.adjust(response['error'])
