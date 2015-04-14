@@ -87,7 +87,7 @@ class Bittrex(Exchange):
     response['removed'] = []
     response['amount'] = 0.0
     for order in response['result']:
-      if side == 'all' or (side == 'bid' and 'SELL' in order['OrderType']) or (side == 'ask' and 'BUY' in order['OrderType']):
+      if side == 'all' or (side == 'bid' and 'BUY' in order['OrderType']) or (side == 'ask' and 'SELL' in order['OrderType']):
         ret = self.post('/market/cancel', { 'uuid' : order['OrderUuid'] }, key, secret)
         if not ret['success'] and ret['message'] != "ORDER_NOT_OPEN":
           if not 'error' in response: response = { 'error': "" }
@@ -188,7 +188,7 @@ class Bittrex(Exchange):
             'id' : response['result']['OrderUuid'],
             'price' : response['result']['Limit'],
             'type' : 'ask' if 'SELL' in response['result']['Type'] else 'bid',
-            'amount' : response['result']['QuantityRemaining'] if not closed == sys.maxint else response['result']['Quantity'],
+            'amount' : response['result']['QuantityRemaining'], # if not closed == sys.maxint else response['result']['Quantity'],
             'opened' : opened,
             'closed' : closed,
             })
