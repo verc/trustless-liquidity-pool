@@ -96,7 +96,11 @@ class Bittrex(Exchange):
           response['removed'].append(order['OrderUuid'])
           response['amount'] += order['Quantity']
     if not 'error' in response and key in self.placed and unit in self.placed[key]:
-      self.placed[key][unit][side] = False
+      if side == 'all':
+        self.placed[key][unit]['bid'] = False
+        self.placed[key][unit]['ask'] = False
+      else:
+        self.placed[key][unit][side] = False
     return response
 
   def place_order(self, unit, side, key, secret, amount, price):
