@@ -261,7 +261,7 @@ class PyBot(ConnectionThread):
     delay = 0.0
     while self.active:
       try:
-        sleep = 30 - time.time() + curtime
+        sleep = 15 - time.time() + curtime
         if sleep < 0:
           delay += abs(sleep)
           if delay > 1.0:
@@ -303,7 +303,7 @@ class PyBot(ConnectionThread):
                 self.place_orders()
                 efftime = curtime
                 continue
-              elif curtime - efftime > 180:
+              elif curtime - efftime > 120:
                 efftime = curtime
                 response = self.conn.get(self.key, trials = 1)
                 if 'error' in response:
