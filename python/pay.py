@@ -15,4 +15,4 @@ for line in open(sys.argv[2]).readlines():
   credits[line[3]] += float(line[2])
 
 for addr in add:
-  print addr, sum([credits[k] for k in add[addr]])
+  print addr, sum([credits[k] for k in add[addr] if k in credits])
