@@ -14,5 +14,7 @@ for line in open(sys.argv[2]).readlines():
     credits[line[3]] = 0.0
   credits[line[3]] += float(line[2])
 
+out = {}
 for addr in add:
-  print addr, sum([credits[k] for k in add[addr] if k in credits])
+  out[addr] = min(sum([credits[k] for k in add[addr] if k in credits]), 0.01)
+print out
