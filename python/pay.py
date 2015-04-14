@@ -31,7 +31,7 @@ if len(sys.argv) == 1:
 users = {}
 credits = {}
 
-try:
+#try:
   for line in open('logs/%s.log'%sys.argv[1]).readlines():
     line = line.strip().split()
     if not line[4] in users:
@@ -42,9 +42,9 @@ try:
     if not line[3] in credits:
       credits[line[3]] = 0.0
     credits[line[3]] += float(line[2])
-except:
-  print >> sys.stderr, "could not read data"
-  sys.exit(1)
+#except:
+#  print >> sys.stderr, "could not read data"
+#  sys.exit(1)
 
 out = {}
 for addr in users:
