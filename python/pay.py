@@ -37,7 +37,7 @@ for line in open('logs/%s.log'%sys.argv[1]).readlines():
   if line[2] == 'new':
     if not line[7] in users:
       users[line[7]] = []
-    users[line[7]] = line[4]
+    users[line[7]].append(line[4])
 for line in open('logs/%s.credits'%sys.argv[1]).readlines():
   line = line.strip().split()
   if not line[3] in credits:
