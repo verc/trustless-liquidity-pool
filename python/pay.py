@@ -32,16 +32,16 @@ users = {}
 credits = {}
 
 #try:
-  for line in open('logs/%s.log'%sys.argv[1]).readlines():
-    line = line.strip().split()
-    if not line[4] in users:
-      users[line[4]] = []
-    users[line[4]] = line[7]
-  for line in open('logs/%s.credits'%sys.argv[1]).readlines():
-    line = line.strip().split()
-    if not line[3] in credits:
-      credits[line[3]] = 0.0
-    credits[line[3]] += float(line[2])
+for line in open('logs/%s.log'%sys.argv[1]).readlines():
+  line = line.strip().split()
+  if not line[4] in users:
+    users[line[4]] = []
+  users[line[4]] = line[7]
+for line in open('logs/%s.credits'%sys.argv[1]).readlines():
+  line = line.strip().split()
+  if not line[3] in credits:
+    credits[line[3]] = 0.0
+  credits[line[3]] += float(line[2])
 #except:
 #  print >> sys.stderr, "could not read data"
 #  sys.exit(1)
