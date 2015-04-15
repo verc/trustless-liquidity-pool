@@ -107,8 +107,6 @@ class Bittrex(Exchange):
     ret = self.cancel_orders(unit, side, key, secret)
     if 'error' in ret: return ret
     amount += ret['amount']
-    if side == 'bid':
-      amount *= (1.0 - self.fee)
     params = { 'market' : "%s-NBT"%unit.upper(), "rate" : price, "quantity" : amount }
     response = self.post('/market/buylimit' if side == 'bid' else '/market/selllimit', params, key, secret)
     if response['success']:
