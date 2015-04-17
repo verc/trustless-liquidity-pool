@@ -437,10 +437,10 @@ def credit():
             lvl = len(pricelevels) - 3
             for i in xrange(1, len(levelvolume) - 1):
               if levelvolume[i - 1] >= lower and levelvolume[i] >= target:
-                lvl = i - 1
+                lvl = i - 2
                 break
             if sample == config._sampling - 1:
-              logger.debug('%s pricelevels: %s', side, " ".join([str(s) for s in pricelevels]))
+              logger.debug('%s pricelevel %d: %s', side, lvl, " ".join([str(s) for s in pricelevels]))
               logger.debug('%s pricevolumes: %s', side, " ".join([str(s) for s in levelvolume]))
             config._interest[name][unit][side]['low'] = pricelevels[lvl+1]
             config._interest[name][unit][side]['high'] = pricelevels[lvl+2]
