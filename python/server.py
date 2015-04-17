@@ -429,7 +429,10 @@ def credit():
             levelvolume = [ 0.0 for p in pricelevels ]
             for user,order in orders:
               if order[2] <= maxrate:
-                levelvolume[pricelevels.index(order[2])] += order[1]
+                for i,p in enumerate(pricelevels):
+                  if p >= order[2]:
+                    levelvolume[i] += order[1]
+                    break
             lvl = len(pricelevels) - 3
             for i,v in enumerate(levelvolume):
               if v >= config._interest[name][unit][side]['target']:
