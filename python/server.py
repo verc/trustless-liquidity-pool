@@ -80,6 +80,7 @@ _liquidity = []
 _active_users = 0
 _round = 0
 _valflag = False
+critical_message = {}
 master = Connection(config._master, logger) if config._master != "" else None
 slaves = [ CheckpointThread(host, logger) for host in config._slaves ]
 
