@@ -432,7 +432,6 @@ def credit():
                 for i,p in enumerate(pricelevels):
                   if p >= order[2]:
                     levelvolume[i] += order[1]
-                    break
             lvl = len(pricelevels) - 3
             for i,v in enumerate(levelvolume):
               if v >= config._interest[name][unit][side]['target']:
@@ -681,59 +680,60 @@ lastpayout = time.time()
 lastsubmit = time.time()
 
 while True:
-  curtime = time.time()
+  try:
+    curtime = time.time()
 
-  # wait for validation round to end:
-  lock.acquire()
-  _active_users = 0
-  for user in keys:
-    active = False
-    for unit in keys[user]:
-      keys[user][unit].finish()
-      active = active or keys[user][unit].active
-    if active: _active_users += 1
-  lock.release()
+    # wait for validation round to end:
+    lock.acquire()
+    _active_users = 0
+    for user in keys:
+      active = False
+      for unit in keys[user]:
+        keys[user][unit].finish()
+        active = active or keys[user][unit].active
+      if active: _active_users += 1
+    lock.release()
 
-  # create checkpoints
-  if not slaves or curtime - lastcheckp >= 60:
-    collect(max(float(60 / config._sampling) - time.time() + curtime, 0.01) / 2.0)
-    lastcheckp = curtime
-  _valflag = False
+    # create checkpoints
+    if not slaves or curtime - lastcheckp >= 60:
+      collect(max(float(60 / config._sampling) - time.time() + curtime, 0.01) / 2.0)
+      lastcheckp = curtime
+    _valflag = False
 
-  if not master:
-    _round += 1
-    # send liquidity
-    if curtime - lastsubmit >= 60:
-      submit(nud)
-      lastsubmit = curtime
-    # credit requests
-    if curtime - lastcredit >= 60:
-      credit()
-      lastcredit = curtime
-    # make payout
-    if curtime - lastpayout >= 86400:
-      pay(nud)
-      lastpayout = curtime
-  else:
-    while True:
-      ret = master.get('sync', trials = 1, timeout = 1)
-      if 'error' in ret or ret['round'] == _round:
-        time.sleep(0.1)
-        continue
-      _round = ret['round']
-      break
+    if not master:
+      _round += 1
+      # send liquidity
+      if curtime - lastsubmit >= 60:
+        submit(nud)
+        lastsubmit = curtime
+      # credit requests
+      if curtime - lastcredit >= 60:
+        credit()
+        lastcredit = curtime
+      # make payout
+      if curtime - lastpayout >= 86400:
+        pay(nud)
+        lastpayout = curtime
+    else:
+      while True:
+        ret = master.get('sync', trials = 1, timeout = 1)
+        if 'error' in ret or ret['round'] == _round:
+          time.sleep(0.1)
+          continue
+        _round = ret['round']
+        break
 
-  # start new validation round
-  _valflag = True
-  lock.acquire()
-  for user in keys:
-    for unit in keys[user]:
-      keys[user][unit].validate()
-  lock.release()
+    # start new validation round
+    _valflag = True
+    lock.acquire()
+    for user in keys:
+      for unit in keys[user]:
+        keys[user][unit].validate()
+    lock.release()
 
-  if not master:
-    time.sleep(max(float(60 / config._sampling) - time.time() + curtime, 0))
-#  except Exception as e:
-#    logger.error('exception caught in main loop: %s', sys.exc_info()[1])
-#    httpd.socket.close()
-#    raise
+    if not master:
+      time.sleep(max(float(60 / config._sampling) - time.time() + curtime, 0))
+  except Exception as e:
+    logger.error('exception caught in main loop: %s', sys.exc_info()[1])
+    httpd.socket.close()
+    raise
