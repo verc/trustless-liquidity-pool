@@ -80,7 +80,6 @@ _liquidity = []
 _active_users = 0
 _round = 0
 _valflag = False
-critical_message = {}
 master = Connection(config._master, logger) if config._master != "" else None
 slaves = [ CheckpointThread(host, logger) for host in config._slaves ]
 
@@ -426,8 +425,8 @@ def credit():
             pricelevels = sorted(list(set( [ order[2] for _,order in orders if order[2] < maxrate ])) + [maxrate, maxrate])
             if sample == 0:
               logger.debug('%s pricelevels: %s', side, " ".join([str(s) for s in pricelevels]))
-            if len(pricelevels) < maxlevel + 2:
-              pricelevels += [maxrate] * (2 + maxlevel - len(pricelevels))
+            if len(pricelevels) < maxlevel + 3:
+              pricelevels += [maxrate] * (3 + maxlevel - len(pricelevels))
             # calculate level
             levelvolume = [ 0.0 for p in pricelevels ]
             for user,order in orders:
