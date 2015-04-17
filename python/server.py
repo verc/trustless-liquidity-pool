@@ -423,8 +423,6 @@ def credit():
             target = min(mass, config._interest[name][unit][side]['target'])
             maxlevel = int(ceil(mass / target))
             pricelevels = sorted(list(set( [ order[2] for _,order in orders if order[2] < maxrate ])) + [maxrate, maxrate])
-            if sample == 0:
-              logger.debug('%s pricelevels: %s', side, " ".join([str(s) for s in pricelevels]))
             if len(pricelevels) < maxlevel + 3:
               pricelevels += [maxrate] * (3 + maxlevel - len(pricelevels))
             # calculate level
@@ -437,6 +435,9 @@ def credit():
               if v >= config._interest[name][unit][side]['target']:
                 lvl = i
                 break
+            if sample == 0:
+              logger.debug('%s pricelevels: %s', side, " ".join([str(s) for s in pricelevels]))
+              logger.debug('%s pricevolumes: %s', side, " ".join([str(s) for s in pricelevels]))
             config._interest[name][unit][side]['low'] = pricelevels[lvl+1]
             config._interest[name][unit][side]['high'] = pricelevels[lvl+2]
             # collect user contribution
