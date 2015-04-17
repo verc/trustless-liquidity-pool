@@ -423,8 +423,8 @@ def credit():
             target = min(mass, config._interest[name][unit][side]['target'])
             maxlevel = int(ceil(mass / target))
             pricelevels = sorted(list(set( [ order[2] for _,order in orders if order[2] < maxrate ])) + [maxrate, maxrate])
-            if len(pricelevels) < maxlevel + 3:
-              pricelevels += [maxrate] * (3 + maxlevel - len(pricelevels))
+            if len(pricelevels) < maxlevel + 2:
+              pricelevels += [maxrate] * (2 + maxlevel - len(pricelevels))
             # calculate level
             levelvolume = [ 0.0 for p in pricelevels ]
             for user,order in orders:
@@ -432,12 +432,14 @@ def credit():
                 for i,p in enumerate(pricelevels):
                   if p >= order[2]:
                     levelvolume[i] += order[1]
+            lower = mass - int(mass / target) * target
+            higher = int((mass / target) + 1) * target - mass
             lvl = len(pricelevels) - 3
-            for i,v in enumerate(levelvolume[:-2]):
-              if v >= config._interest[name][unit][side]['target']:
-                lvl = i
+            for i in xrange(1, len(levelvolume) - 1):
+              if levelvolume[i - 1] >= lower and levelvolume[i] >= higher:
+                lvl = i - 1
                 break
-            if sample == 0:
+            if sample == config._sampling - 1:
               logger.debug('%s pricelevels: %s', side, " ".join([str(s) for s in pricelevels]))
               logger.debug('%s pricevolumes: %s', side, " ".join([str(s) for s in levelvolume]))
             config._interest[name][unit][side]['low'] = pricelevels[lvl+1]
@@ -457,7 +459,7 @@ def credit():
             for user in volume[1]:
               if norm > 0 and volume[1][user] > 0:
                 price = pricelevels[lvl+2]
-                contrib = min(volume[1][user], (int((mass / target) + 1) * target - mass) * volume[1][user] / norm)
+                contrib = min(volume[1][user], higher * volume[1][user] / norm)
                 payout = contrib * price
                 volume[0][user] -= contrib
                 volume[2][user] -= contrib
@@ -472,7 +474,7 @@ def credit():
             for user in volume[0]:
               if norm > 0 and volume[0][user] > 0:
                 price = pricelevels[lvl+1]
-                contrib = min(volume[0][user], (mass - int(mass / target) * target) * volume[0][user] / norm)
+                contrib = min(volume[0][user], lower * volume[0][user] / norm)
                 payout = contrib * price
                 volume[2][user] -= contrib
                 keys[user][unit].balance += payout / float(24 * 60  * config._sampling)
