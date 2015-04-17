@@ -436,7 +436,7 @@ def credit():
             higher = int((mass / target) + 1) * target - mass
             lvl = len(pricelevels) - 3
             for i in xrange(1, len(levelvolume) - 1):
-              if levelvolume[i - 1] >= lower and levelvolume[i] >= higher:
+              if levelvolume[i - 1] >= lower and levelvolume[i] >= target:
                 lvl = i - 1
                 break
             if sample == config._sampling - 1:

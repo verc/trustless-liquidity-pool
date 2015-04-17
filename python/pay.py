@@ -26,29 +26,30 @@ import sys
 import json
 
 if len(sys.argv) == 1:
-  print "usage:", sys.argv[0], 'timestemp'
+  print "usage:", sys.argv[0], 'timestemp1 timestemp2 ...'
 
 users = {}
 credits = {}
 
-try:
-  for line in open('logs/%s.log'%sys.argv[1]).readlines():
-    line = line.strip().split()
-    if line[2] == 'new':
-      if not line[7] in users:
-        users[line[7]] = []
-      users[line[7]].append(line[4])
-  for line in open('logs/%s.credits'%sys.argv[1]).readlines():
-    line = line.strip().split()
-    if not line[3] in credits:
-      credits[line[3]] = 0.0
-    if line[1] == '[-]':
-      credits[line[3]] -= float(line[2])
-    else:
-      credits[line[3]] += float(line[2])
-except:
-  print >> sys.stderr, "could not read data"
-  sys.exit(1)
+for ts in sys.argv[1:]:
+  try:
+    for line in open('logs/%s.log'%ts).readlines():
+      line = line.strip().split()
+      if line[2] == 'new':
+        if not line[7] in users:
+          users[line[7]] = []
+        users[line[7]].append(line[4])
+    for line in open('logs/%s.credits'%ts).readlines():
+      line = line.strip().split()
+      if not line[3] in credits:
+        credits[line[3]] = 0.0
+      if line[1] == '[-]':
+        credits[line[3]] -= float(line[2])
+      else:
+        credits[line[3]] += float(line[2])
+  except:
+    print >> sys.stderr, "could not read", ts
+    sys.exit(1)
 
 out = {}
 for addr in users:
