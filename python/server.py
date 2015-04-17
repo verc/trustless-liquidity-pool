@@ -437,7 +437,7 @@ def credit():
                 break
             if sample == 0:
               logger.debug('%s pricelevels: %s', side, " ".join([str(s) for s in pricelevels]))
-              logger.debug('%s pricevolumes: %s', side, " ".join([str(s) for s in pricelevels]))
+              logger.debug('%s pricevolumes: %s', side, " ".join([str(s) for s in levelvolume]))
             config._interest[name][unit][side]['low'] = pricelevels[lvl+1]
             config._interest[name][unit][side]['high'] = pricelevels[lvl+2]
             # collect user contribution
