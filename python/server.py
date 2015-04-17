@@ -433,7 +433,7 @@ def credit():
                   if p >= order[2]:
                     levelvolume[i] += order[1]
             lvl = len(pricelevels) - 3
-            for i,v in enumerate(levelvolume):
+            for i,v in enumerate(levelvolume[:-2]):
               if v >= config._interest[name][unit][side]['target']:
                 lvl = i
                 break
