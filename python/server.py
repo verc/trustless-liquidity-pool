@@ -449,7 +449,7 @@ def credit():
                 ulvl = pricelevels.index(order[2])
                 if ulvl < lvl + 1:
                   volume[0][user] += order[1]
-                if ulvl < lvl + 2:
+                if ulvl < lvl + 2 or pricelevels[lvl + 2] == maxlevel:
                   volume[1][user] += order[1]
             if sample == config._sampling - 1:
               logger.debug('%s pricelevel %d [%.4f,%.4f]: %s', side, lvl, float(sum(volume[0].values())), float(sum(volume[1].values())), " ".join([str(s) for s in pricelevels]))
