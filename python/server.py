@@ -430,7 +430,7 @@ def credit():
             for user,order in orders:
               if order[2] <= maxrate:
                 for i,p in enumerate(pricelevels):
-                  if p >= order[2]:
+                  if order[2] < p:
                     levelvolume[i] += order[1]
             lower = mass - int(mass / target) * target
             higher = int((mass / target) + 1) * target - mass
