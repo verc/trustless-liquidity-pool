@@ -430,7 +430,7 @@ def credit():
             for user,order in orders:
               if order[2] <= maxrate:
                 for i,p in enumerate(pricelevels):
-                  if order[2] < p or p == maxlevel:
+                  if order[2] < p or p == maxrate:
                     levelvolume[i] += order[1]
             lower = mass - int(mass / target) * target
             higher = int((mass / target) + 1) * target - mass
@@ -449,7 +449,7 @@ def credit():
                 ulvl = pricelevels.index(order[2])
                 if ulvl < lvl + 1:
                   volume[0][user] += order[1]
-                if ulvl < lvl + 2 or pricelevels[lvl + 2] == maxlevel:
+                if ulvl < lvl + 2 or pricelevels[lvl + 2] == maxrate:
                   volume[1][user] += order[1]
             if sample == config._sampling - 1:
               logger.debug('%s pricelevel %d [%.4f,%.4f]: %s', side, lvl, float(sum(volume[0].values())), float(sum(volume[1].values())), " ".join([str(s) for s in pricelevels]))
