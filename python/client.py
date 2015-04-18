@@ -228,7 +228,8 @@ class Client(ConnectionThread):
               if len(unitstring):
                 orderstring += " - %s%s" % (unit, unitstring)
             # print user information
-            self.logger.info('%s - balance: %.8f rate: %.2f%% ppm: %.8f efficiency: %.2f%% rejects: %d missing: %d%s - %s', repr(self.users[user].values()[0]['request'].exchange),
+            msg = '' if response['message'] == '' else "ATTENTION: %s " % response['message']
+            self.logger.info('%s%s - balance: %.8f rate: %.2f%% ppm: %.8f efficiency: %.2f%% rejects: %d missings: %d%s - %s', msg, repr(self.users[user].values()[0]['request'].exchange),
               response['balance'], effective_rate * 100, effective_rate * total / float(60 * 24), response['efficiency'] * 100, response['rejects'], response['missing'], orderstring, user)
             if not efficiencies:
               efficiencies = [ response['efficiency'] for i in xrange(5) ]

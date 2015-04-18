@@ -326,8 +326,9 @@ class PyBot(ConnectionThread):
                           self.cancel_orders(side)
                           self.limit[side] = funds
                         elif self.limit[side] < self.total[side] * deviation and effective_rate > self.requester.cost[side] and contrib < self.target[side]:
-                          self.logger.info("increasing tier 1 %s limit of %s on %s from %.8f to %.8f", side, self.unit, repr(self.exchange), self.total[side], self.total[side] + max(contrib * deviation, 0.5))
-                          self.limit[side] = max(contrib * deviation, 0.5)
+                          self.logger.info("increasing tier 1 %s limit of %s on %s from %.8f to %.8f",
+                            side, self.unit, repr(self.exchange), self.total[side], self.total[side] + max(1.0, max(contrib * deviation, 0.5)))
+                          self.limit[side] = max(1.0, max(contrib * deviation, 0.5))
                       lastdev = deviation
               self.place_orders()
           else:
