@@ -120,7 +120,7 @@ class Client(ConnectionThread):
     super(Client, self).__init__(self.conn, self.logger)
     self.basestatus = self.conn.get('status')
     self.exchangeinfo = self.conn.get('exchanges')
-    self.sampling = min(240, 3 * self.basestatus['sampling'])
+    self.sampling = min(240, 3 * self.basestatus['sampling'] / 2)
     self.users = {}
     self.lock = threading.Lock()
 
