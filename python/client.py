@@ -39,7 +39,7 @@ from exchanges import *
 from trading import *
 from utils import *
 
-_wrappers = { 'bittrex' : Bittrex(), 'ccedk' : CCEDK()} #, 'bitcoincoid' : BitcoinCoId(), 'bter' : BTER(), 'testing' : Peatio() }
+_wrappers = { 'bittrex' : Bittrex(), 'ccedk' : CCEDK(), 'bitcoincoid' : BitcoinCoId(), 'bter' : BTER(), 'testing' : Peatio() }
 
 _mainlogger = None
 def getlogger():

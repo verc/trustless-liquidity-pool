@@ -419,11 +419,10 @@ class BitcoinCoId(Exchange):
 
   def __repr__(self): return "bitcoincoid"
 
-  def nonce(self, factor = 1000.0):
+  def nonce(self, factor = 1000000.0):
     n = int((time.time() + self._shift) * float(factor))
-    if n - self._nonce <= 100:
-      time.sleep(0.1)
-      return self.nonce(factor)
+    if n == self._nonce:
+      n = self._nonce + 10
     self._nonce = n
     return n
 
