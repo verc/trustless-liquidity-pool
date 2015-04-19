@@ -93,7 +93,7 @@ class RequestThread(ConnectionThread):
     params.update(data)
     params.update(self.cost)
     curtime = time.time()
-    ret = self.conn.post('liquidity', params, trials = 1, timeout =  max(1.0, 60 / self.sampling))
+    ret = self.conn.post('liquidity', params, trials = 1, timeout = max(30.0, 60.0 / self.sampling))
     if ret['code'] != 0:
       self.trials += time.time() - curtime + 60.0 / self.sampling
       self.logger.error("submit: %s" % ret['message'])
