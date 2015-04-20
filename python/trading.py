@@ -282,6 +282,7 @@ class PyBot(ConnectionThread):
         if self.requester.errorflag:
           self.logger.error('server unresponsive for %s on %s', self.unit, repr(self.exchange))
           self.shutdown()
+          self.limit = self.target.copy()
           efftime = curtime
         else:
           response = self.conn.get('price/' + self.unit, trials = 3, timeout = 10)

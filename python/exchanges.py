@@ -63,13 +63,17 @@ class Bittrex(Exchange):
   def adjust(self, error):
     pass
 
-  def post(self, method, params, key, secret):
+  def post(self, method, params, key, secret, throttle = 5):
     data = 'https://bittrex.com/api/v1.1' + method + '?apikey=%s&nonce=%d&' % (key, self.nonce()) + urllib.urlencode(params)
     sign = hmac.new(secret, data, hashlib.sha512).hexdigest()
     headers = { 'apisign' : sign }
     connection = httplib.HTTPSConnection('bittrex.com', timeout = 10)
     connection.request('GET', data, headers = headers)
-    return json.loads(connection.getresponse().read())
+    response = json.loads(connection.getresponse().read())
+    if throttle > 0 and not response['success'] and response['message'] == 'THROTTLED_10_SECOND':
+      time.sleep(2)
+      return self.post(method, params, key, secret, throttle - 1)
+    return response
 
   def get(self, method, params):
     data = 'https://bittrex.com/api/v1.1' + method + '?' + urllib.urlencode(params)
