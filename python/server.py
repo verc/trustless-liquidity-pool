@@ -266,7 +266,7 @@ class User(threading.Thread):
     if self.active:
       self.cancel = True
       try:
-        self.lock.acquire(blocking = False)
+        self.lock.acquire()
         self.lock.release()
       except KeyboardInterrupt:
         raise
