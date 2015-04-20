@@ -162,6 +162,7 @@ class User(threading.Thread):
     self.logger = logger if logger else logging.getLogger('null')
     self.requests = []
     self.daemon = True
+    self.cancel = False
     self.history = []
     self.page = 1
     self.record()
@@ -203,6 +204,7 @@ class User(threading.Thread):
         requests = self.requests[:]
         self.requests = []
         for rid, request in enumerate(requests):
+          if self.cancel: break
           try:
             orders = self.exchange.validate_request(self.key, self.unit, request[0], request[1])
           except:
@@ -256,13 +258,15 @@ class User(threading.Thread):
       self.lock.release()
 
   def validate(self):
+    self.cancel = False
     try: self.trigger.release()
     except thread.error: pass # user did not finish last request in time
 
   def finish(self):
     if self.active:
+      self.cancel = True
       try:
-        self.lock.acquire()
+        self.lock.acquire(blocking = False)
         self.lock.release()
       except KeyboardInterrupt:
         raise
