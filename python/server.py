@@ -201,7 +201,7 @@ class User(threading.Thread):
       self.lock.acquire()
       res = 'm'
       if self.requests:
-        requests = self.requests[:]
+        requests = self.requests[::-1]
         self.requests = []
         for rid, request in enumerate(requests):
           if self.cancel: break
