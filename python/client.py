@@ -120,7 +120,7 @@ class Client(ConnectionThread):
     super(Client, self).__init__(self.conn, self.logger)
     self.basestatus = self.conn.get('status')
     self.exchangeinfo = self.conn.get('exchanges')
-    self.sampling = min(240, 2 * self.basestatus['sampling'])
+    self.sampling = min(240, 3 * self.basestatus['sampling'])
     self.users = {}
     self.lock = threading.Lock()
 
@@ -205,7 +205,7 @@ class Client(ConnectionThread):
             newstatus = self.conn.get('status', trials = 3)
             if not 'error' in newstatus:
               basestatus = newstatus
-              sampling = min(240, 3 * self.basestatus['sampling'] / 2)
+              sampling = min(240, 3 * self.basestatus['sampling'])
           else:
             # collect user information
             effective_rate = 0.0
