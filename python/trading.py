@@ -257,7 +257,7 @@ class PyBot(ConnectionThread):
     curtime = time.time()
     efftime = curtime
     lasttime = curtime
-    lastdev = 1.0
+    lastdev = { 'bid': 1.0, 'ask': 1.0 }
     delay = 0.0
     while self.active:
       try:
@@ -320,7 +320,7 @@ class PyBot(ConnectionThread):
                     else:
                       effective_rate /= self.total[side]
                       deviation = 1.0 - min(effective_rate, self.requester.cost[side]) / max(effective_rate, self.requester.cost[side])
-                      if deviation > 0.02 and lastdev > 0.02:
+                      if deviation > 0.02 and lastdev[side] > 0.02:
                         if self.total[side] > 0.5 and effective_rate < self.requester.cost[side]:
                           funds = max(0.5, self.total[side] * (1.0 - max(deviation, 0.1)))
                           self.logger.info("decreasing tier 1 %s limit of %s on %s from %.8f to %.8f", side, self.unit, repr(self.exchange), self.total[side], funds)
@@ -330,11 +330,11 @@ class PyBot(ConnectionThread):
                           self.logger.info("increasing tier 1 %s limit of %s on %s from %.8f to %.8f",
                             side, self.unit, repr(self.exchange), self.total[side], self.total[side] + max(1.0, max(contrib * deviation, 0.5)))
                           self.limit[side] = max(1.0, max(contrib * deviation, 0.5))
-                      elif deviation < 0.01 and lastdev < 0.01 and self.limit[side] < max(1.0, max(contrib * deviation, 0.5)) and contrib < self.target[side]:
+                      elif deviation < 0.01 and lastdev[side] < 0.01 and self.limit[side] < max(1.0, max(contrib * deviation, 0.5)) and contrib < self.target[side]:
                         self.logger.info("increasing tier 1 %s limit of %s on %s from %.8f to %.8f",
                           side, self.unit, repr(self.exchange), self.total[side], self.total[side] + max(1.0, max(contrib * deviation, 0.5)))
                         self.limit[side] = max(1.0, max(contrib * deviation, 0.5))
-                      lastdev = deviation
+                      lastdev[side] = deviation
               self.place_orders()
           else:
             self.logger.error('unable to retrieve server price: %s', response['message'])
