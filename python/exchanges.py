@@ -423,16 +423,20 @@ class BitcoinCoId(Exchange):
 
   def __repr__(self): return "bitcoincoid"
 
-  def nonce(self, factor = 1000000.0):
+  def adjust(self, error):
+    if "Nonce must be greater than" in error: # (TODO: regex)
+      if ':' in error: error = error.split(':')[1].strip()
+      error = error.replace('.', '').split()
+      self._shift += 100.0 + (int(error[5]) - int(error[8])) / 1000.0
+    else:
+      self._shift = self._shift + 100.0
+
+  def nonce(self, factor = 1000.0):
     n = int((time.time() + self._shift) * float(factor))
     if n == self._nonce:
       n = self._nonce + 10
     self._nonce = n
     return n
-
-  def adjust(self, error):
-    if "Invalid nonce" in error: #(TODO: regex)
-      self._shift = min(self._shift + 100, 3600)
 
   def post(self, method, params, key, secret):
     request = { 'nonce' : self.nonce(), 'method' : method }
