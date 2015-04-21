@@ -70,7 +70,7 @@ class Bittrex(Exchange):
     connection = httplib.HTTPSConnection('bittrex.com', timeout = 10)
     connection.request('GET', data, headers = headers)
     response = json.loads(connection.getresponse().read())
-    if throttle > 0 and not response['success'] and response['message'] == 'THROTTLED_10_SECOND':
+    if throttle > 0 and not response['success'] and 'THROTTLED' in response['message']:
       time.sleep(2)
       return self.post(method, params, key, secret, throttle - 1)
     return response

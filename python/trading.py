@@ -261,10 +261,10 @@ class PyBot(ConnectionThread):
     delay = 0.0
     while self.active:
       try:
-        sleep = 15 - time.time() + curtime
+        sleep = 30 - time.time() + curtime
         if sleep < 0:
           delay += abs(sleep)
-          if delay > 1.0:
+          if delay > 5.0:
             self.logger.warning('need to resynchronize trading bot for %s on %s because the deviation reached %.2f', self.unit, repr(self.exchange), delay)
             if self.sync():
               delay = 0.0
@@ -304,7 +304,7 @@ class PyBot(ConnectionThread):
                 self.place_orders()
                 efftime = curtime
                 continue
-              elif curtime - efftime > 120:
+              elif curtime - efftime > 60:
                 efftime = curtime
                 response = self.conn.get(self.key, trials = 1)
                 if 'error' in response:
