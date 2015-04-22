@@ -287,13 +287,13 @@ class CCEDK(Exchange):
         response = None
         if not self.pair_id:
           response = json.loads(urllib2.urlopen(urllib2.Request(
-            'https://www.ccedk.com/api/v1/stats/marketdepthfull?' + urllib.urlencode({ 'nonce' : self.nonce() }))).read())
+            'https://www.ccedk.com/api/v1/stats/marketdepthfull?' + urllib.urlencode({ 'nonce' : self.nonce() }))).read(), timeout = 15)
           for unit in response['response']['entities']:
             if unit['pair_name'][:4] == 'NBT/':
               self.pair_id[unit['pair_name'][4:]] = unit['pair_id']
         if not self.currency_id:
           response = json.loads(urllib2.urlopen(urllib2.Request(
-            'https://www.ccedk.com/api/v1/currency/list?' + urllib.urlencode({ 'nonce' : self.nonce() }))).read())
+            'https://www.ccedk.com/api/v1/currency/list?' + urllib.urlencode({ 'nonce' : self.nonce() }))).read(), timeout = 15)
           for unit in response['response']['entities']:
             self.currency_id[unit['iso'].lower()] = unit['currency_id']
       except:
