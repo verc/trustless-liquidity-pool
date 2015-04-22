@@ -128,6 +128,8 @@ class Client(ConnectionThread):
       return False
     key = str(key)
     secret = str(secret)
+    if isinstance(_wrappers[name], type):
+      _wrappers[name] = _wrappers[name]()
     exchange = _wrappers[name]
     cost = { 'bid' : bid if bid else self.exchangeinfo[name][unit]['bid']['rate'],
              'ask' : ask if ask else self.exchangeinfo[name][unit]['ask']['rate'] }
@@ -290,8 +292,6 @@ if __name__ == "__main__":
           if not name in _wrappers:
             logger.error("unknown exchange: %s", user[2])
             sys.exit(1)
-          if isinstance(_wrappers[name], type):
-            _wrappers[name] = _wrappers[name]()
           exchange = _wrappers[name]
           for unit in user[1].split(','):
             unit = unit.lower()
@@ -326,8 +326,6 @@ if __name__ == "__main__":
                     if 'exchange' in configdata:
                       name = configdata['exchange'].lower()
                       if name in _wrappers:
-                        if isinstance(_wrappers[name], type):
-                          _wrappers[name] = _wrappers[name]()
                         client = Client(configdata['server'], logger)
                         client.set(configdata['apikey'], configdata['apisecret'], configdata['address'], name, configdata['unit'].lower(), bid, ask, bot, ordermatch)
                       else:
