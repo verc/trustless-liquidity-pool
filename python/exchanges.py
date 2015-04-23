@@ -172,7 +172,7 @@ class Bittrex(Exchange):
       return { 'error' : 'missmatch between requests and signatures (%d vs %d)' % (len(data['requests']), len(signs)) }
     if len(requests) > 2:
       return { 'error' : 'too many requests received: %d' % len(requests) }
-    connection = httplib.HTTPSConnection('bittrex.com', timeout = 3)
+    connection = httplib.HTTPSConnection('bittrex.com', timeout = 5)
     for data, sign in zip(requests, signs):
       uuid = data.split('=')[-1]
       if not uuid in self.closed:
