@@ -240,7 +240,7 @@ class User(threading.Thread):
               break
           else:
             if self.cancel:
-              orders['error'] = 'request handling canceled'
+              orders = { 'error': 'request handling canceled' }
             res = 'r'
             if rid + 1 == len(requests) or self.cancel:
               self.last_errors.append("unable to validate request: " + orders['error'])
