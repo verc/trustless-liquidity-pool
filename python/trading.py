@@ -310,6 +310,8 @@ class PyBot(ConnectionThread):
                 if 'error' in response:
                   self.logger.error('unable to receive statistics for user %s: %s', self.key, response['message'])
                 else:
+                  if not self.unit in response['units']:
+                    response['units'][self.unit] = { 'bid': [], 'ask': [] }
                   for side in [ 'bid', 'ask' ]:
                     effective_rate = 0.0
                     effective_rate = float(sum([ o['amount'] * o['cost'] for o in response['units'][self.unit][side] ]))
