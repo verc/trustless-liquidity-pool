@@ -182,5 +182,18 @@ class PriceFeed():
             self.feed['eur'][2] = 2.0 / (float(ret['sell']) + float(ret['buy']))
           except:
             self.logger.error("unable to update price for EUR")
+      elif unit == 'cny':
+        try: # yahoo
+          ret = json.loads(urllib2.urlopen(urllib2.Request('http://finance.yahoo.com/webservice/v1/symbols/allcurrencies/quote?format=json'), timeout = 3).read())
+          for res in ret['list']['resources']:
+            if res['resource']['fields']['name'] == 'USD/CNY':
+              self.feed['cny'][2] = float(res['resource']['fields']['price'])
+        except:
+          self.logger.warning("unable to update CNY price from yahoo")
+          try: # bitstamp
+            ret = json.loads(urllib2.urlopen(urllib2.Request('https://api.coindesk.com/v1/bpi/currentprice/CNY.json'), timeout = 3).read())
+            self.feed['cny'][2] = ret['bpi']['CNY']['rate'] / ret['bpi']['USD']['rate']
+          except:
+            self.logger.error("unable to update price for CNY")
     self.feed[unit][1].release()
     return self.feed[unit][2]

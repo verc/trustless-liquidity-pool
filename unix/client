@@ -18,7 +18,7 @@ while [ $# -gt 0 ]; do
   -k|--key) echo "apikey=$2";shift;;
   -s|--secret) echo "apisecret=$2";shift;;
   -i|--interest) echo "interest=$2";shift;;
-  -o|--ordermatch) echo "ordermatch=True";shift;;
+  -o|--ordermatch) echo "ordermatch=True";;
   -u|--unit) echo "unit=$2";shift;;
   -e|--exchange) echo "exchange=$2";shift;;
   (--) shift; break;;
