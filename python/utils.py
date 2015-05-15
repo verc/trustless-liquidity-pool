@@ -190,7 +190,7 @@ class PriceFeed():
               self.feed['cny'][2] = float(res['resource']['fields']['price'])
         except:
           self.logger.warning("unable to update CNY price from yahoo")
-          try: # bitstamp
+          try: # coindesk
             ret = json.loads(urllib2.urlopen(urllib2.Request('https://api.coindesk.com/v1/bpi/currentprice/CNY.json'), timeout = 3).read())
             self.feed['cny'][2] = ret['bpi']['CNY']['rate'] / ret['bpi']['USD']['rate']
           except:
