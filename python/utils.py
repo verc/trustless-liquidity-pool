@@ -142,7 +142,7 @@ class CheckpointThread(ConnectionThread):
 class PriceFeed():
   def __init__(self, update_interval, logger):
     self.update_interval = update_interval
-    self.feed = { x : [0, threading.Lock(), 0.0] for x in [ 'btc', 'eur' ] }
+    self.feed = { x : [0, threading.Lock(), 0.0] for x in [ 'btc', 'eur', 'cny' ] }
     self.logger = logger if logger else logging.getLogger('null')
 
   def price(self, unit, force = False):
